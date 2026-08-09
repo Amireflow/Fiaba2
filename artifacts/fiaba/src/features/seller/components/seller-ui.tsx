@@ -119,15 +119,15 @@ export function SellerStat({
   tone?: StatTone;
 }) {
   return (
-    <SellerCard>
-      <div className="flex items-start justify-between">
-        <span className={`grid h-9 w-9 place-items-center rounded-xl ${statColors[tone]}`}>
+    <SellerCard className="p-3.5 sm:p-5 min-w-0">
+      <div className="flex items-start justify-between gap-1">
+        <span className={`grid h-8 w-8 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-xl ${statColors[tone]}`}>
           <Icon glyph={glyph} size={18} />
         </span>
-        <span className={`text-[10px] font-bold ${change.startsWith('-') || change.startsWith('−') ? 'text-[#c45667]' : 'text-[#278e69]'}`}>{change}</span>
+        {change && <span className={`text-[10px] font-bold ${change.startsWith('-') || change.startsWith('−') ? 'text-[#c45667]' : 'text-[#278e69]'}`}>{change}</span>}
       </div>
-      <p className="mt-5 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">{label}</p>
-      <strong className="mt-1 block font-[Space_Grotesk] text-2xl font-bold tracking-[-.06em] text-[#292541]">{value}</strong>
+      <p className="mt-3 sm:mt-5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] text-[#9290a2] truncate">{label}</p>
+      <strong className="mt-1 block font-[Space_Grotesk] text-base sm:text-2xl font-bold tracking-[-.04em] text-[#292541] truncate">{value}</strong>
     </SellerCard>
   );
 }

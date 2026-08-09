@@ -475,46 +475,53 @@ export function SignUpPage() {
         {/* Role selection (Vendeur vs Commerçant) */}
         <div className="mt-5 space-y-2">
           <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Type de compte</label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {[
               {
                 id: 'vendeur',
-                label: 'Je vends',
                 icon: UserGroupIcon,
                 title: 'Vendeur Social',
-                desc: 'Je recommande des produits à ma communauté et gagne des commissions.',
+                subtitle: 'Gagnez des commissions',
               },
               {
                 id: 'marchand',
-                label: 'Je distribue',
                 icon: Store01Icon,
                 title: 'Commerçant / Marque',
-                desc: 'Je vends mes produits et je recrute un réseau de vendeurs.',
+                subtitle: 'Vendez & recrutez',
               },
-            ].map((r) => (
-              <button
-                type="button"
-                key={r.id}
-                onClick={() => { haptic('light'); setRole(r.id as any); }}
-                className={`rounded-2xl border p-4 text-left transition flex flex-col justify-between ${
-                  role === r.id
-                    ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf] ring-2 ring-[#5b49e8]/20'
-                    : 'border-[#e7e5ef] bg-white text-[#757185] hover:bg-[#f8f8fc]'
-                }`}
-                data-testid={`button-signup-role-${r.id}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`grid h-8 w-8 place-items-center rounded-xl ${role === r.id ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#5b49e8]'}`}>
-                    <Icon glyph={r.icon} size={18} />
-                  </span>
-                  <span className="text-[11px] font-bold tracking-wide uppercase opacity-80">{r.label}</span>
-                </div>
-                <div className="mt-4">
-                  <strong className="block text-xs font-bold">{r.title}</strong>
-                  <span className="text-[11px] opacity-75 block leading-relaxed mt-1">{r.desc}</span>
-                </div>
-              </button>
-            ))}
+            ].map((r) => {
+              const isSelected = role === r.id;
+              return (
+                <button
+                  type="button"
+                  key={r.id}
+                  onClick={() => { haptic('light'); setRole(r.id as any); }}
+                  className={`rounded-2xl border px-3.5 py-3 text-left transition ${
+                    isSelected
+                      ? 'border-[#5b49e8] bg-[#f7f6ff] text-[#292541]'
+                      : 'border-[#e7e5ef] bg-white text-[#757185] hover:border-[#d0cbdc] hover:bg-[#fafafc]'
+                  }`}
+                  data-testid={`button-signup-role-${r.id}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`grid h-8 w-8 place-items-center rounded-xl transition ${
+                      isSelected ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#5b49e8]'
+                    }`}>
+                      <Icon glyph={r.icon} size={16} />
+                    </span>
+                    {isSelected && (
+                      <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-[#5b49e8] text-white">
+                        <Icon glyph={CheckmarkCircle02Icon} size={12} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2.5">
+                    <strong className="block text-xs font-bold text-[#292541] truncate">{r.title}</strong>
+                    <span className="text-[10px] text-[#77738a] block truncate mt-0.5">{r.subtitle}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

@@ -99,11 +99,13 @@ export function Discover() {
       title="Découvrir"
       description="Les produits et campagnes qui correspondent à vos niches. Rejoignez, partagez, gagnez."
     >
-      {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      {/* Stats (2 par ligne sur mobile) */}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <SellerStat label="Revenus disponibles" value={money(stats.available)} change="" glyph={Chart02Icon} tone="mint" />
         <SellerStat label="Campagnes actives" value={String(stats.activeCampaigns)} change="" glyph={Store01Icon} tone="violet" />
-        <SellerStat label="Réputation" value={`${stats.reputation}%`} change="" glyph={UserGroupIcon} tone="amber" />
+        <div className="col-span-2 sm:col-span-1">
+          <SellerStat label="Réputation" value={`${stats.reputation}%`} change="" glyph={UserGroupIcon} tone="amber" />
+        </div>
       </div>
 
       {/* Search + filter */}

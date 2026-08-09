@@ -298,6 +298,44 @@ body { min-width: 320px; overflow-x: hidden; }
 .dark-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 999px; }
 .dark-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .dark-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.12) transparent; -webkit-overflow-scrolling: touch; }
+.fiaba-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #5b49e8 var(--range-fill, 50%), #e8e6f0 var(--range-fill, 50%));
+  outline: none;
+  cursor: pointer;
+}
+.fiaba-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #5b49e8;
+  box-shadow: 0 2px 8px rgba(91, 73, 232, .25);
+  cursor: pointer;
+  transition: transform .15s;
+}
+.fiaba-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.fiaba-range::-webkit-slider-thumb:active { transform: scale(1.05); }
+.fiaba-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #5b49e8;
+  box-shadow: 0 2px 8px rgba(91, 73, 232, .25);
+  cursor: pointer;
+  border: 3px solid #5b49e8;
+}
+.fiaba-range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #e8e6f0;
+}
 .fiaba-grid {
   background-image: linear-gradient(hsl(247 40% 80% / .06) 1px, transparent 1px), linear-gradient(90deg, hsl(247 40% 80% / .06) 1px, transparent 1px);
   background-size: 36px 36px;

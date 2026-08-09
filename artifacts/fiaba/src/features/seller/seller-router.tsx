@@ -9,6 +9,7 @@ import { SaleDetail } from './pages/sale-detail';
 import { Earnings } from './pages/earnings';
 import { EarningWithdraw } from './pages/earning-withdraw';
 import { SellerProfile } from './pages/profile';
+import { SellerNotifications } from './pages/notifications';
 
 export function SellerRouter() {
   return (
@@ -23,6 +24,7 @@ export function SellerRouter() {
         <Route path="/seller/earnings" component={Earnings} />
         <Route path="/seller/earnings/withdraw" component={EarningWithdraw} />
         <Route path="/seller/profile" component={SellerProfile} />
+        <Route path="/seller/notifications" component={SellerNotifications} />
       </Switch>
     </SellerShell>
   );

@@ -9,8 +9,11 @@ import { AdminPayouts } from './pages/payouts';
 import { AdminDisputes } from './pages/disputes';
 import { AdminFraud } from './pages/fraud';
 import { AdminZones } from './pages/zones';
+import { AdminZoneNew } from './pages/zone-new';
 import { AdminNiches } from './pages/niches';
+import { AdminNicheNew } from './pages/niche-new';
 import { AdminSettings } from './pages/settings';
+import { AdminNotifications } from './pages/notifications';
 
 export function AdminRouter() {
   return (
@@ -25,8 +28,11 @@ export function AdminRouter() {
         <Route path="/admin/disputes" component={AdminDisputes} />
         <Route path="/admin/fraud" component={AdminFraud} />
         <Route path="/admin/zones" component={AdminZones} />
+        <Route path="/admin/zones/new" component={AdminZoneNew} />
         <Route path="/admin/niches" component={AdminNiches} />
+        <Route path="/admin/niches/new" component={AdminNicheNew} />
         <Route path="/admin/settings" component={AdminSettings} />
+        <Route path="/admin/notifications" component={AdminNotifications} />
       </Switch>
     </AdminShell>
   );

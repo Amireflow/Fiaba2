@@ -2,6 +2,7 @@ import {
   Chart02Icon,
   CheckmarkCircle02Icon,
   Home01Icon,
+  Settings02Icon,
   Store01Icon,
   UserGroupIcon,
   ViewIcon,
@@ -27,7 +28,7 @@ export const primaryNav: NavItem[] = [
 
 export const secondaryNav: NavItem[] = [
   { href: '/merchant/delivery-zones', label: 'Zones de livraison', glyph: Store01Icon },
-  { href: '/merchant/settings', label: 'Réglages', glyph: ViewIcon },
+  { href: '/merchant/settings', label: 'Réglages', glyph: Settings02Icon },
 ];
 
 export const allNav: NavItem[] = [...primaryNav, ...secondaryNav];

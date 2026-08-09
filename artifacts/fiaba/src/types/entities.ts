@@ -1,6 +1,8 @@
 export type ProductStatus = 'Actif' | 'Brouillon' | 'Épuisé';
 export type CampaignStatus = 'Active' | 'En pause' | 'Terminée';
 export type OrderStatus = 'À préparer' | 'En livraison' | 'Livrée' | 'Annulée';
+export type CommissionType = 'percentage' | 'fixed';
+export type CommissionModel = 'Commission' | 'Marge';
 
 export type Product = {
   id: string;
@@ -9,6 +11,10 @@ export type Product = {
   price: number;
   stock: number;
   status: ProductStatus;
+  description?: string;
+  image?: string;
+  weight?: number; // en grammes
+  lowStockThreshold?: number;
 };
 
 export type Campaign = {
@@ -17,10 +23,14 @@ export type Campaign = {
   description?: string;
   product?: string;
   commission: number;
+  commissionType: CommissionType;
+  model: CommissionModel;
   goal?: number;
   sellers: number;
   sales: number;
   status: CampaignStatus;
+  startDate?: string;
+  endDate?: string;
 };
 
 export type Order = {
@@ -29,6 +39,17 @@ export type Order = {
   amount: number;
   date: string;
   status: OrderStatus;
+  sellerId?: string;
+  sellerCode?: string;
+  sellerName?: string;
+  productName?: string;
+  quantity?: number;
+  zone?: string;
+  deliveryFee?: number;
+  paymentMethod?: string;
+  phone?: string;
+  address?: string;
+  commissionAmount?: number;
 };
 
 export type DeliveryZone = [name: string, active: boolean, fee: number];

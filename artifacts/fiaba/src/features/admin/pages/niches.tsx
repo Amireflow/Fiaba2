@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { Add01Icon, Tag01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
@@ -7,14 +8,10 @@ import {
   AdminBadge,
   AdminButton as Button,
   AdminCard as Card,
-  AdminDrawer,
   AdminEmptyState,
-  AdminField,
   AdminPage,
   AdminScrollTable,
   AdminToggle,
-  adminInputClass,
-  adminSelectClass,
 } from '../components/admin-ui';
 import { seedAdminNiches } from '@/config/admin-seeds';
 import type { AdminNiche } from '@/types/entities';
@@ -23,8 +20,6 @@ export function AdminNiches() {
   const { toast } = useToast();
   const [niches, setNiches] = useState<AdminNiche[]>(() => read('admin-niches', seedAdminNiches));
   const [typeFilter, setTypeFilter] = useState<'Tous' | 'Catégorie' | 'Sous-niche'>('Tous');
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<{ name: string; type: 'Catégorie' | 'Sous-niche'; parent: string; tags: string }>({ name: '', type: 'Sous-niche', parent: 'Beauté', tags: '' });
 
   const filtered = niches.filter((n) => typeFilter === 'Tous' || n.type === typeFilter);
 
@@ -35,31 +30,9 @@ export function AdminNiches() {
     toast({ title: `${niche.name} · ${!niche.active ? 'activée' : 'désactivée'}`, description: 'La niche sera (dés)affichée dans le matching.' });
   }
 
-  function createNiche() {
-    if (!form.name.trim()) return;
-    const id = `n-${Date.now()}`;
-    const newNiche: AdminNiche = {
-      id,
-      name: form.name.trim(),
-      type: form.type,
-      parent: form.type === 'Catégorie' ? '—' : form.parent,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-      sellers: 0,
-      products: 0,
-      active: true,
-    };
-    const updated = [...niches, newNiche];
-    setNiches(updated);
-    write('admin-niches', updated);
-    toast({ title: 'Niche créée', description: `${newNiche.name} (${newNiche.type}) ajoutée.` });
-    setCreating(false);
-    setForm({ name: '', type: 'Sous-niche', parent: 'Beauté', tags: '' });
-  }
-
   const categories = niches.filter((n) => n.type === 'Catégorie');
   const subNiches = niches.filter((n) => n.type === 'Sous-niche');
   const active = niches.filter((n) => n.active).length;
-  const parentOptions = categories.map((c) => c.name);
 
   return (
     <AdminPage
@@ -67,9 +40,11 @@ export function AdminNiches() {
       title="Taxonomie"
       description="Structure hiérarchique : catégorie → sous-niche → tags. Le matching produit ↔ vendeur s'appuie sur cette taxonomie."
       action={
-        <Button onClick={() => setCreating(true)} testId="button-add-niche">
-          <Icon glyph={Add01Icon} size={15} /> Ajouter
-        </Button>
+        <Link href="/admin/niches/new">
+          <Button testId="button-add-niche">
+            <Icon glyph={Add01Icon} size={15} /> Ajouter
+          </Button>
+        </Link>
       }
     >
       {/* Stats */}
@@ -89,7 +64,12 @@ export function AdminNiches() {
       {/* Table */}
       <Card className="mt-5 p-0">
         {filtered.length === 0 ? (
-          <AdminEmptyState glyph={Tag01Icon} title="Aucune niche" description="Ajoutez une catégorie ou sous-niche." />
+          <AdminEmptyState
+            glyph={Tag01Icon}
+            title="Aucune niche"
+            description="Ajoutez une catégorie ou sous-niche."
+            action={<Link href="/admin/niches/new"><Button><Icon glyph={Add01Icon} size={15} /> Ajouter</Button></Link>}
+          />
         ) : (
           <AdminScrollTable minWidth={720} testId="scroll-admin-niches">
             <table className="w-full text-left text-sm">
@@ -130,43 +110,6 @@ export function AdminNiches() {
       <p className="mt-4 text-[11px] text-[#9290a2]">
         Niches initiales candidates : Tech, Mode, Beauté, Maison, Food, Sport, Auto, Gaming, Éducation, Voyage, Luxe, Bébé (§8).
       </p>
-
-      {/* Create drawer */}
-      <AdminDrawer
-        open={creating}
-        onClose={() => setCreating(false)}
-        title="Ajouter une niche"
-        subtitle="Taxonomie de matching"
-        testId="drawer-niche-create"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setCreating(false)}>Annuler</Button>
-            <Button variant="primary" onClick={createNiche} testId="button-confirm-niche">Ajouter</Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <AdminField label="Nom">
-            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={adminInputClass} placeholder="ex : Soins capillaires" data-testid="input-niche-name" />
-          </AdminField>
-          <AdminField label="Type">
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as 'Catégorie' | 'Sous-niche', parent: e.target.value === 'Catégorie' ? '—' : form.parent })} className={adminSelectClass} data-testid="select-niche-type">
-              <option value="Catégorie">Catégorie</option>
-              <option value="Sous-niche">Sous-niche</option>
-            </select>
-          </AdminField>
-          {form.type === 'Sous-niche' && (
-            <AdminField label="Catégorie parente">
-              <select value={form.parent} onChange={(e) => setForm({ ...form, parent: e.target.value })} className={adminSelectClass} data-testid="select-niche-parent">
-                {parentOptions.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </AdminField>
-          )}
-          <AdminField label="Tags" hint="Séparés par des virgules">
-            <input type="text" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} className={adminInputClass} placeholder="karité, baobab, naturel" data-testid="input-niche-tags" />
-          </AdminField>
-        </div>
-      </AdminDrawer>
     </AdminPage>
   );
 }

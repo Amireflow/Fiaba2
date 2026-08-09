@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { Add01Icon, MapPinIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
@@ -7,14 +8,10 @@ import {
   AdminBadge,
   AdminButton as Button,
   AdminCard as Card,
-  AdminDrawer,
   AdminEmptyState,
-  AdminField,
   AdminPage,
   AdminScrollTable,
   AdminToggle,
-  adminInputClass,
-  adminSelectClass,
 } from '../components/admin-ui';
 import { seedAdminZones } from '@/config/admin-seeds';
 import type { AdminZone, ZoneLevel } from '@/types/entities';
@@ -25,8 +22,6 @@ export function AdminZones() {
   const { toast } = useToast();
   const [zones, setZones] = useState<AdminZone[]>(() => read('admin-zones', seedAdminZones));
   const [levelFilter, setLevelFilter] = useState<'Tous' | ZoneLevel>('Tous');
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<{ name: string; level: ZoneLevel; parent: string }>({ name: '', level: 'Commune', parent: 'Dakar' });
 
   const filtered = zones.filter((z) => levelFilter === 'Tous' || z.level === levelFilter);
 
@@ -37,22 +32,9 @@ export function AdminZones() {
     toast({ title: `${zone.name} · ${!zone.active ? 'activée' : 'désactivée'}`, description: 'Référentiel de zones mis à jour.' });
   }
 
-  function createZone() {
-    if (!form.name.trim()) return;
-    const id = `z-${Date.now()}`;
-    const newZone: AdminZone = { id, name: form.name.trim(), level: form.level, parent: form.parent, active: true, communes: 0 };
-    const updated = [...zones, newZone];
-    setZones(updated);
-    write('admin-zones', updated);
-    toast({ title: 'Zone créée', description: `${newZone.name} (${newZone.level}) ajoutée au référentiel.` });
-    setCreating(false);
-    setForm({ name: '', level: 'Commune', parent: 'Dakar' });
-  }
-
   const regions = zones.filter((z) => z.level === 'Région');
   const departments = zones.filter((z) => z.level === 'Département');
   const communes = zones.filter((z) => z.level === 'Commune');
-  const parentOptions = form.level === 'Région' ? ['—'] : form.level === 'Département' ? regions.map((r) => r.name) : departments.map((d) => d.name);
 
   return (
     <AdminPage
@@ -60,9 +42,11 @@ export function AdminZones() {
       title="Zones de livraison"
       description="Référentiel unique partagé (région / département / commune). Couverture et frais définis par chaque commerçant."
       action={
-        <Button onClick={() => setCreating(true)} testId="button-add-zone">
-          <Icon glyph={Add01Icon} size={15} /> Ajouter une zone
-        </Button>
+        <Link href="/admin/zones/new">
+          <Button testId="button-add-zone">
+            <Icon glyph={Add01Icon} size={15} /> Ajouter une zone
+          </Button>
+        </Link>
       }
     >
       {/* Stats */}
@@ -82,7 +66,12 @@ export function AdminZones() {
       {/* Table */}
       <Card className="mt-5 p-0">
         {filtered.length === 0 ? (
-          <AdminEmptyState glyph={MapPinIcon} title="Aucune zone" description="Ajoutez une zone au référentiel." />
+          <AdminEmptyState
+            glyph={MapPinIcon}
+            title="Aucune zone"
+            description="Ajoutez une zone au référentiel."
+            action={<Link href="/admin/zones/new"><Button><Icon glyph={Add01Icon} size={15} /> Ajouter une zone</Button></Link>}
+          />
         ) : (
           <AdminScrollTable minWidth={620} testId="scroll-admin-zones">
             <table className="w-full text-left text-sm">
@@ -114,41 +103,6 @@ export function AdminZones() {
       <p className="mt-4 text-[11px] text-[#9290a2]">
         Couverture initiale recommandée : granularité complète jusqu'à la commune sur Dakar. Les autres régions restent au niveau département tant que le volume ne justifie pas plus de détail (§9.2).
       </p>
-
-      {/* Create drawer */}
-      <AdminDrawer
-        open={creating}
-        onClose={() => setCreating(false)}
-        title="Ajouter une zone"
-        subtitle="Référentiel partagé par tous les commerçants"
-        testId="drawer-zone-create"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setCreating(false)}>Annuler</Button>
-            <Button variant="primary" onClick={createZone} testId="button-confirm-zone">Ajouter</Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <AdminField label="Nom de la zone">
-            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={adminInputClass} placeholder="ex : Médina" data-testid="input-zone-name" />
-          </AdminField>
-          <AdminField label="Niveau">
-            <select value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value as ZoneLevel, parent: e.target.value === 'Région' ? '—' : form.parent })} className={adminSelectClass} data-testid="select-zone-level">
-              <option value="Région">Région</option>
-              <option value="Département">Département</option>
-              <option value="Commune">Commune</option>
-            </select>
-          </AdminField>
-          {form.level !== 'Région' && (
-            <AdminField label="Parent">
-              <select value={form.parent} onChange={(e) => setForm({ ...form, parent: e.target.value })} className={adminSelectClass} data-testid="select-zone-parent">
-                {parentOptions.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </AdminField>
-          )}
-        </div>
-      </AdminDrawer>
     </AdminPage>
   );
 }

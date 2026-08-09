@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from 'react';
 import { Link } from 'wouter';
 import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
+import { haptic } from '@/lib/utils';
 
 /* ── SellerLogo (matches MerchantLogo) ── */
 export function SellerLogo({ light = true }: { light?: boolean }) {
@@ -62,7 +63,7 @@ export function SellerButton({
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={() => { haptic('light'); onClick?.(); }}
       disabled={disabled}
       form={form}
       data-testid={testId}

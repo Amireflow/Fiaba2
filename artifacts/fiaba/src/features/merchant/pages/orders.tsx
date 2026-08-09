@@ -99,17 +99,18 @@ export function Orders() {
         {filtered.length === 0 ? (
           <EmptyState glyph={Search01Icon} title="Aucune commande trouvée" description="Modifiez votre recherche ou votre filtre pour voir d'autres commandes." />
         ) : (
-          <ScrollTable minWidth={760} testId="scroll-orders">
-            <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_.8fr] gap-4 px-5 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">
-              <span>Commande</span><span>Client</span><span>Montant</span><span>Statut</span><span className="text-right">Détail</span>
+          <ScrollTable minWidth={860} testId="scroll-orders">
+            <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_.8fr] gap-4 px-5 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">
+              <span>Commande</span><span>Client</span><span>Vendeur</span><span>Montant</span><span>Statut</span><span className="text-right">Détail</span>
             </div>
             {filtered.map((o) => (
-              <div key={o.id} className="grid grid-cols-[2fr_1.5fr_1fr_1fr_.8fr] items-center gap-4 border-b border-[#f1eef7] px-5 py-4 last:border-b-0 transition hover:bg-[#faf9fd]">
+              <div key={o.id} className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_.8fr] items-center gap-4 border-b border-[#f1eef7] px-5 py-4 last:border-b-0 transition hover:bg-[#faf9fd]">
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f0eff5] text-[#67627b]"><Icon glyph={Store01Icon} size={18} /></span>
                   <div className="min-w-0"><p className="truncate font-bold text-[#292541]">{o.id}</p><p className="text-xs text-[#9290a2]">{o.date}</p></div>
                 </div>
                 <span className="truncate text-sm font-medium text-[#292541]">{o.customer}</span>
+                <span className="truncate text-xs font-bold text-[#5b49e8]">{o.sellerCode ?? '—'}</span>
                 <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(o.amount)}</span>
                 <Badge tone={toneFor(o.status)}>{o.status}</Badge>
                 <div className="text-right">

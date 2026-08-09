@@ -3,7 +3,7 @@ import {
   CheckmarkCircle02Icon,
   DashboardSquare01Icon,
   MapPinIcon,
-  Settings01Icon,
+  Settings02Icon,
   Shield01Icon,
   Store01Icon,
   Tag01Icon,
@@ -32,7 +32,7 @@ export const adminSecondaryNav: NavItem[] = [
   { href: '/admin/fraud', label: 'Fraude & risque', glyph: Shield01Icon },
   { href: '/admin/zones', label: 'Référentiel zones', glyph: MapPinIcon },
   { href: '/admin/niches', label: 'Niches & catégories', glyph: Tag01Icon },
-  { href: '/admin/settings', label: 'Paramètres', glyph: Settings01Icon },
+  { href: '/admin/settings', label: 'Paramètres', glyph: Settings02Icon },
 ];
 
 export const adminAllNav: NavItem[] = [...adminPrimaryNav, ...adminSecondaryNav];

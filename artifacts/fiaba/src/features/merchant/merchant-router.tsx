@@ -15,6 +15,7 @@ import { PaymentWithdraw } from './pages/payment-withdraw';
 import { DeliveryZones } from './pages/delivery-zones';
 import { DeliveryZoneNew } from './pages/delivery-zone-new';
 import { Settings } from './pages/settings';
+import { Notifications } from './pages/notifications';
 
 export function MerchantRouter() {
   return (
@@ -37,6 +38,7 @@ export function MerchantRouter() {
         <Route path="/merchant/delivery-zones" component={DeliveryZones} />
         <Route path="/merchant/delivery-zones/new" component={DeliveryZoneNew} />
         <Route path="/merchant/settings" component={Settings} />
+        <Route path="/merchant/notifications" component={Notifications} />
       </Switch>
     </MerchantShell>
   );

@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { Chart02Icon, Delete02Icon, Edit02Icon, PauseIcon, PlayIcon, Store01Icon, UserGroupIcon, Target01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
+import { money } from '@/lib/utils';
 import { read, write } from '@/lib/storage';
 import {
   Badge,
@@ -97,7 +98,7 @@ export function Campaigns() {
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3">
-                  <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.commission}%</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.commissionType === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
                   <div><p className="text-[10px] text-[#9290a2]">Vendeurs</p><p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.sellers}</p></div>
                   <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.sales}</p></div>
                 </div>

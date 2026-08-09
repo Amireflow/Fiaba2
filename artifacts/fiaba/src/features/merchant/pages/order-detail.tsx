@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { ArrowLeft01Icon, CheckmarkCircle02Icon, Store01Icon, DeliveryTruck01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CheckmarkCircle02Icon, Store01Icon, DeliveryTruck01Icon, Cancel01Icon, UserGroupIcon, Wallet01Icon, MapPinIcon, SmartPhone01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { read, write } from '@/lib/storage';
@@ -112,18 +112,49 @@ export function OrderDetail() {
         <Card>
           <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Client</p>
           <p className="mt-2 text-sm font-bold text-[#292541]">{order.customer}</p>
-          <p className="mt-1 text-xs text-[#77738a]">Dakar, Sénégal</p>
+          {order.phone && <p className="mt-1 flex items-center gap-1.5 text-xs text-[#77738a]"><Icon glyph={SmartPhone01Icon} size={13} /> {order.phone}</p>}
+          {order.address && <p className="mt-1 flex items-center gap-1.5 text-xs text-[#77738a]"><Icon glyph={MapPinIcon} size={13} /> {order.address}, {order.zone ?? 'Sénégal'}</p>}
         </Card>
+
+        {/* Seller attribution */}
+        {order.sellerCode && (
+          <Card>
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={UserGroupIcon} size={20} /></span>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Vendeur référent</p>
+                <p className="mt-1 text-sm font-bold text-[#292541]">{order.sellerCode}</p>
+                {order.sellerName && <p className="text-xs text-[#77738a]">{order.sellerName}</p>}
+              </div>
+              {order.commissionAmount && order.commissionAmount > 0 && (
+                <div className="text-right">
+                  <p className="text-[10px] text-[#278e69]">Commission</p>
+                  <strong className="font-[Space_Grotesk] text-base font-bold text-[#278e69]">{money(order.commissionAmount)}</strong>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card>
           <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Montant</p>
           <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold tracking-[-.06em] text-[#292541]">{money(order.amount)}</p>
-          <div className="mt-3 flex justify-between text-xs text-[#77738a]">
-            <span>Produits (2 articles)</span><span>{money(order.amount - 1500)}</span>
-          </div>
-          <div className="mt-1 flex justify-between text-xs text-[#77738a]">
-            <span>Livraison</span><span>1 500 F</span>
-          </div>
+          {order.productName && order.quantity && (
+            <div className="mt-3 flex justify-between text-xs text-[#77738a]">
+              <span>{order.productName} × {order.quantity}</span><span>{money(order.amount - (order.deliveryFee ?? 0))}</span>
+            </div>
+          )}
+          {order.deliveryFee != null && (
+            <div className="mt-1 flex justify-between text-xs text-[#77738a]">
+              <span>Livraison {order.zone ?? ''}</span><span>{money(order.deliveryFee)}</span>
+            </div>
+          )}
+          {order.paymentMethod && (
+            <div className="mt-3 flex items-center gap-2 border-t border-[#f0eff5] pt-3">
+              <Icon glyph={Wallet01Icon} size={14} />
+              <span className="text-xs font-bold text-[#292541]">Paiement : {order.paymentMethod === 'wave' ? 'Wave' : order.paymentMethod === 'orange' ? 'Orange Money' : 'À la livraison'}</span>
+            </div>
+          )}
         </Card>
 
         <Card>

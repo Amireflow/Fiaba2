@@ -38,7 +38,7 @@ begin
     v_phone,
     v_role,
     'Dakar',
-    case when v_role = 'admin' then 'verified' else 'pending' end,
+    case when v_role = 'admin' then 'verified'::verification_status else 'pending'::verification_status end,
     case when v_role = 'admin' then 100 else 50 end
   )
   on conflict (id) do update set
@@ -46,7 +46,7 @@ begin
     full_name = case when excluded.full_name <> '' then excluded.full_name else profiles.full_name end,
     phone = coalesce(excluded.phone, profiles.phone),
     role = excluded.role,
-    verification_status = case when excluded.role = 'admin' then 'verified' else profiles.verification_status end;
+    verification_status = case when excluded.role = 'admin' then 'verified'::verification_status else profiles.verification_status end;
 
   -- Enregistrement seller pour vendeur
   if v_role = 'vendeur' then

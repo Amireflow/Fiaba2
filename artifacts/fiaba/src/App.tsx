@@ -51,7 +51,7 @@ import { SellerOnboarding } from "@/features/seller/pages/onboarding";
 import { SignInPage, SignUpPage } from "@/pages/auth";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -476,6 +476,11 @@ function EarningsSimulator() {
 }
 
 function Home() {
+  const { session, profile } = useAuth();
+  const isLoggedIn = !!session;
+  const dashboardPath = profile?.role === 'marchand' ? '/merchant' : profile?.role === 'admin' ? '/admin' : profile?.role === 'vendeur' ? '/seller' : '/onboarding';
+  const dashboardLabel = profile?.role === 'marchand' ? 'Espace Boutique' : profile?.role === 'admin' ? 'Espace Admin' : profile?.role === 'vendeur' ? 'Espace Vendeur' : 'Mon Espace';
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [, setLocation] = useLocation();
   const [faq, setFaq] = useState<number | null>(0);
@@ -663,16 +668,28 @@ function Home() {
             <a href="#tarifs" data-testid="link-pricing">Tarifs</a>
           </nav>
           <div className="hidden items-center gap-3 md:flex">
-            <button
-              className="px-4 py-2 text-sm font-bold text-[#5d5772]"
-              onClick={() => setLocation("/sign-in")}
-              data-testid="button-login"
-            >
-              Se connecter
-            </button>
-            <Button className="px-4 py-2.5" onClick={() => setLocation("/sign-up")} testId="button-header-start">
-              Devenir créateur
-            </Button>
+            {isLoggedIn ? (
+              <Button
+                className="px-4 py-2.5 flex items-center gap-2 bg-[#5b49e8] text-white shadow-md hover:bg-[#4e3bd5]"
+                onClick={() => setLocation(dashboardPath)}
+                testId="button-header-dashboard"
+              >
+                {dashboardLabel} {icon(ArrowUpRight01Icon, 16)}
+              </Button>
+            ) : (
+              <>
+                <button
+                  className="px-4 py-2 text-sm font-bold text-[#5d5772]"
+                  onClick={() => setLocation("/sign-in")}
+                  data-testid="button-login"
+                >
+                  Se connecter
+                </button>
+                <Button className="px-4 py-2.5" onClick={() => setLocation("/sign-up")} testId="button-header-start">
+                  Devenir créateur
+                </Button>
+              </>
+            )}
           </div>
           <button
             className="rounded-xl p-2 text-[#514b71] md:hidden"
@@ -689,7 +706,15 @@ function Home() {
             <a href="#espace" onClick={() => { haptic('light'); setMenuOpen(false); }} className="block py-3 text-sm font-bold" data-testid="link-mobile-space">La plateforme</a>
             <a href="#temoignages" onClick={() => { haptic('light'); setMenuOpen(false); }} className="block py-3 text-sm font-bold" data-testid="link-mobile-stories">Créateurs</a>
             <a href="#tarifs" onClick={() => { haptic('light'); setMenuOpen(false); }} className="block py-3 text-sm font-bold" data-testid="link-mobile-pricing">Tarifs</a>
-            <Button className="mt-2 w-full" onClick={() => setLocation("/sign-up")} testId="button-mobile-start">Devenir créateur</Button>
+            {isLoggedIn ? (
+              <Button className="mt-2 w-full" onClick={() => setLocation(dashboardPath)} testId="button-mobile-dashboard">
+                Accéder à mon {dashboardLabel}
+              </Button>
+            ) : (
+              <Button className="mt-2 w-full" onClick={() => setLocation("/sign-up")} testId="button-mobile-start">
+                Devenir créateur
+              </Button>
+            )}
           </div>
         )}
       </header>
@@ -711,9 +736,15 @@ function Home() {
                 Fiaba transforme vos recommandations en revenus. Partagez des produits que vous aimez, gagnez à chaque vente sur WhatsApp, Instagram, TikTok. Construit à Dakar, pensé pour les créateurs sénégalais.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
-                  Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
-                </Button>
+                {isLoggedIn ? (
+                  <Button onClick={() => setLocation(dashboardPath)} testId="button-hero-dashboard">
+                    Accéder à mon {dashboardLabel} {icon(ArrowUpRight01Icon, 17)}
+                  </Button>
+                ) : (
+                  <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
+                    Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
+                  </Button>
+                )}
                 <a
                   href="#espace"
                   className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-[#625d77] hover:bg-white"

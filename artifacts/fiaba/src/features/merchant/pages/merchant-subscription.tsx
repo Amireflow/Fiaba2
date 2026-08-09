@@ -1,160 +1,250 @@
-import React, { useState } from 'react';
-import { CreditCard, CheckCircle, Award, ShieldAlert, ArrowRight, Clock, Zap, Check } from 'lucide-react';
-import { SubscriptionPlan, MerchantSubscription } from '../../../types/entities';
+import { useState } from 'react';
+import {
+  AlertCircleIcon,
+  ArrowRight02Icon,
+  Chart02Icon,
+  CheckmarkCircle02Icon,
+  CreditCardIcon,
+  PercentIcon,
+  SparklesIcon,
+  Store01Icon,
+} from '@hugeicons/core-free-icons';
+import { Icon } from '@/components/shared/icon';
+import { money, haptic } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { SubscriptionPlan } from '../../../types/entities';
 import { DEFAULT_SUBSCRIPTION_PLANS } from '../../../lib/monetization';
+import {
+  Badge,
+  MerchantButton as Button,
+  MerchantCard as Card,
+  Page,
+  ProgressBar,
+  SectionTitle,
+} from '../components/merchant-ui';
 
 export const MerchantSubscriptionPage: React.FC = () => {
+  const { toast } = useToast();
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>(DEFAULT_SUBSCRIPTION_PLANS[0]); // Plan Free initial
   const [activeProductsCount] = useState(4); // 4 / 5 produits
   const [activeCampaignsCount] = useState(2); // 2 / 2 campagnes (limite atteinte)
   const [isUpgrading, setIsUpgrading] = useState(false);
 
+  const productPct = Math.round((activeProductsCount / currentPlan.maxActiveProducts) * 100);
+  const campaignPct = Math.round((activeCampaignsCount / currentPlan.maxActiveCampaigns) * 100);
+  const productsNearLimit = activeProductsCount >= currentPlan.maxActiveProducts - 1;
+  const campaignsAtLimit = activeCampaignsCount >= currentPlan.maxActiveCampaigns;
+
   const handleUpgrade = () => {
+    haptic('medium');
     setIsUpgrading(true);
     setTimeout(() => {
       setCurrentPlan(DEFAULT_SUBSCRIPTION_PLANS[1]); // Upgrade vers Premium
       setIsUpgrading(false);
-      alert('Bravo ! Vous êtes désormais abonné au Plan Premium. Votre taux de commission est réduit à 3% et vos quotas sont débloqués.');
+      toast({
+        title: 'Bienvenue dans le Plan Premium',
+        description: 'Votre commission plateforme passe à 3 % et vos quotas sont débloqués.',
+      });
     }, 1000);
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <CreditCard className="w-7 h-7 text-purple-600 dark:text-purple-400" />
-          Abonnement & Capacités Boutique
-        </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Gérez votre formule, vos quotas de produits/campagnes et votre taux de commission plateforme.
-        </p>
-      </div>
-
-      {/* Carte Plan Actuel & Jauges Quotas */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-700">
-          <div>
-            <span className="text-xs uppercase font-semibold text-purple-600 dark:text-purple-400 tracking-wider">
-              Formule Actuelle
-            </span>
-            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2 mt-1">
-              Plan {currentPlan.name}
-              {currentPlan.name === 'Premium' && (
-                <span className="px-2.5 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full dark:bg-purple-900/50 dark:text-purple-300">
-                  Certifié Premium
+    <Page
+      eyebrow="Votre formule"
+      title="Abonnement & Capacités"
+      description="Gérez votre formule, vos quotas de produits et campagnes, ainsi que votre taux de commission plateforme."
+    >
+      {/* ── Hero : plan actuel + taux de commission ── */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        {/* Plan actuel — carte profonde violette */}
+        <div className="rounded-[22px] bg-[#5745df] p-5 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#d0caff]">Formule actuelle</p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/15">
+                  <Icon glyph={CreditCardIcon} size={18} />
                 </span>
-              )}
-            </h2>
+                <strong className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.06em] sm:text-3xl">
+                  Plan {currentPlan.name}
+                </strong>
+              </div>
+            </div>
+            {currentPlan.name === 'Premium' ? (
+              <Badge tone="mint" className="bg-white/15 text-white">
+                <Icon glyph={SparklesIcon} size={12} /> Certifié
+              </Badge>
+            ) : (
+              <Badge tone="slate" className="bg-white/15 text-white">Standard</Badge>
+            )}
           </div>
 
-          <div className="text-right">
-            <div className="text-sm font-medium text-slate-500">Taux de Commission Plateforme</div>
-            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
-              {currentPlan.platformFeeRate}%
+          <div className="mt-6 grid grid-cols-2 gap-4 pt-5 border-t border-white/15">
+            <div>
+              <p className="text-[10px] text-[#d0caff]">Tarif mensuel</p>
+              <p className="mt-1 font-[Space_Grotesk] text-xl font-bold">
+                {currentPlan.priceMonthly === 0 ? 'Gratuit' : `${money(currentPlan.priceMonthly).replace(' F', '')}`}
+                {currentPlan.priceMonthly > 0 && <small className="ml-1 text-xs font-sans text-[#d0caff]">FCFA</small>}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#d0caff]">Commission plateforme</p>
+              <p className="mt-1 font-[Space_Grotesk] text-xl font-bold">{currentPlan.platformFeeRate}%</p>
             </div>
           </div>
         </div>
 
-        {/* Quotas Progress Bars */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Jauge Produits */}
-          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl space-y-2 border border-slate-200/60 dark:border-slate-800">
-            <div className="flex justify-between text-sm font-semibold text-slate-800 dark:text-slate-200">
-              <span>Produits Actifs</span>
-              <span>{activeProductsCount} / {currentPlan.maxActiveProducts}</span>
-            </div>
-            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  activeProductsCount >= currentPlan.maxActiveProducts ? 'bg-amber-500' : 'bg-emerald-500'
-                }`}
-                style={{ width: `${Math.min(100, (activeProductsCount / currentPlan.maxActiveProducts) * 100)}%` }}
-              />
-            </div>
-            {activeProductsCount >= currentPlan.maxActiveProducts - 1 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium pt-1">
-                <ShieldAlert className="w-3.5 h-3.5" /> Quota presque atteint ({activeProductsCount}/{currentPlan.maxActiveProducts})
-              </p>
-            )}
+        {/* Taux de commission — carte claire */}
+        <Card>
+          <div className="flex items-start justify-between">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+              <Icon glyph={PercentIcon} size={18} />
+            </span>
+            <Badge tone={currentPlan.platformFeeRate <= 3 ? 'mint' : 'amber'}>
+              {currentPlan.platformFeeRate <= 3 ? 'Réduit' : 'Standard'}
+            </Badge>
           </div>
-
-          {/* Jauge Campagnes */}
-          <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl space-y-2 border border-slate-200/60 dark:border-slate-800">
-            <div className="flex justify-between text-sm font-semibold text-slate-800 dark:text-slate-200">
-              <span>Campagnes Actives</span>
-              <span>{activeCampaignsCount} / {currentPlan.maxActiveCampaigns}</span>
-            </div>
-            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  activeCampaignsCount >= currentPlan.maxActiveCampaigns ? 'bg-rose-500' : 'bg-emerald-500'
-                }`}
-                style={{ width: `${Math.min(100, (activeCampaignsCount / currentPlan.maxActiveCampaigns) * 100)}%` }}
-              />
-            </div>
-            {activeCampaignsCount >= currentPlan.maxActiveCampaigns && (
-              <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1 font-medium pt-1">
-                <ShieldAlert className="w-3.5 h-3.5" /> Limite atteinte ! Passez au plan Premium pour créer d'autres campagnes.
-              </p>
-            )}
-          </div>
-        </div>
+          <p className="mt-5 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">Commission plateforme</p>
+          <strong className="mt-1 block font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] text-[#292541]">
+            {currentPlan.platformFeeRate}%
+          </strong>
+          <p className="mt-3 text-[11px] leading-5 text-[#77738a]">
+            Prélevée sur chaque commande validée. Passez à Premium pour descendre à 3 %.
+          </p>
+        </Card>
       </div>
 
-      {/* Grille Comparative des Formules */}
-      <div className="space-y-4">
-        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Formules Disponibles</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {DEFAULT_SUBSCRIPTION_PLANS.map(plan => {
+      {/* ── Jauges quotas ── */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        {/* Jauge Produits */}
+        <Card>
+          <SectionTitle
+            title="Produits actifs"
+            subtitle={`${activeProductsCount} / ${currentPlan.maxActiveProducts} utilisés`}
+            action={
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${productsNearLimit ? 'bg-[#fff4de] text-[#ac741e]' : 'bg-[#e7faf2] text-[#278e69]'}`}>
+                <Icon glyph={Store01Icon} size={18} />
+              </span>
+            }
+          />
+          <div className="mt-4">
+            <ProgressBar value={productPct} tone={productsNearLimit ? 'amber' : 'mint'} />
+            <div className="mt-2 flex items-center justify-between text-[11px] text-[#9290a2]">
+              <span>{activeProductsCount} en ligne</span>
+              <span>{currentPlan.maxActiveProducts - activeProductsCount} restant(s)</span>
+            </div>
+          </div>
+          {productsNearLimit && (
+            <p className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-[#ac741e]">
+              <Icon glyph={AlertCircleIcon} size={14} /> Quota presque atteint — passez à Premium pour 50 produits.
+            </p>
+          )}
+        </Card>
+
+        {/* Jauge Campagnes */}
+        <Card>
+          <SectionTitle
+            title="Campagnes actives"
+            subtitle={`${activeCampaignsCount} / ${currentPlan.maxActiveCampaigns} utilisées`}
+            action={
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${campaignsAtLimit ? 'bg-[#fff0f1] text-[#c45667]' : 'bg-[#e7faf2] text-[#278e69]'}`}>
+                <Icon glyph={Chart02Icon} size={18} />
+              </span>
+            }
+          />
+          <div className="mt-4">
+            <ProgressBar value={campaignPct} tone={campaignsAtLimit ? 'amber' : 'mint'} />
+            <div className="mt-2 flex items-center justify-between text-[11px] text-[#9290a2]">
+              <span>{activeCampaignsCount} en cours</span>
+              <span>{Math.max(0, currentPlan.maxActiveCampaigns - activeCampaignsCount)} restante(s)</span>
+            </div>
+          </div>
+          {campaignsAtLimit && (
+            <p className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-[#c45667]">
+              <Icon glyph={AlertCircleIcon} size={14} /> Limite atteinte — Premium débloque 10 campagnes.
+            </p>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Formules disponibles ── */}
+      <div className="mt-6">
+        <SectionTitle
+          title="Formules disponibles"
+          subtitle="Choisissez la formule adaptée à la taille de votre activité."
+        />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {DEFAULT_SUBSCRIPTION_PLANS.map((plan) => {
             const isSelected = currentPlan.id === plan.id;
+            const isPremium = plan.name === 'Premium';
             return (
               <div
                 key={plan.id}
-                className={`rounded-2xl border p-6 flex flex-col justify-between transition-all ${
+                className={`rounded-[22px] p-5 transition ${
                   isSelected
-                    ? 'border-purple-500 bg-purple-50/20 dark:bg-purple-950/20 ring-2 ring-purple-500/20'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                    ? 'bg-[#fffefd] ring-2 ring-[#5b49e8]'
+                    : 'bg-[#fffefd] ring-1 ring-[#f1eef7]'
                 }`}
               >
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-lg font-bold text-slate-900 dark:text-white">{plan.name}</h4>
-                    {isSelected && (
-                      <span className="px-2.5 py-1 bg-purple-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" /> Actif
-                      </span>
-                    )}
+                {/* En-tête formule */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${isPremium ? 'bg-[#efedff] text-[#5b49e8]' : 'bg-[#f0eff5] text-[#716d82]'}`}>
+                      <Icon glyph={isPremium ? SparklesIcon : CreditCardIcon} size={18} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-[#292541]">Plan {plan.name}</p>
+                      <p className="text-[10px] text-[#9290a2]">
+                        {isPremium ? 'Croissance' : 'Démarrage'}
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="text-2xl font-black text-slate-900 dark:text-white my-3">
-                    {plan.priceMonthly === 0 ? 'Gratuit' : `${plan.priceMonthly.toLocaleString('fr-FR')} FCFA / mois`}
-                  </div>
-
-                  <ul className="space-y-2.5 text-sm text-slate-600 dark:text-slate-300 my-4">
-                    {plan.features.map((feat, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {isSelected && (
+                    <Badge tone="violet">
+                      <Icon glyph={CheckmarkCircle02Icon} size={12} /> Actif
+                    </Badge>
+                  )}
                 </div>
 
-                <div className="pt-4">
+                {/* Prix */}
+                <div className="mt-5 flex items-end gap-1">
+                  <strong className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] text-[#292541]">
+                    {plan.priceMonthly === 0 ? 'Gratuit' : money(plan.priceMonthly).replace(' F', '')}
+                  </strong>
+                  {plan.priceMonthly > 0 && <span className="mb-1 text-xs text-[#9290a2]">FCFA / mois</span>}
+                </div>
+
+                {/* Features */}
+                <ul className="mt-5 space-y-2.5">
+                  {plan.features.map((feat, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-[13px] text-[#292541]">
+                      <Icon glyph={CheckmarkCircle02Icon} size={16} className="mt-0.5 shrink-0 text-[#278e69]" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <div className="mt-6">
                   {isSelected ? (
-                    <button disabled className="w-full py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-400 font-semibold rounded-xl text-sm cursor-not-allowed">
-                      Formule Actuelle
-                    </button>
+                    <Button variant="soft" disabled className="w-full" testId={`plan-${plan.id}-current`}>
+                      Formule actuelle
+                    </Button>
                   ) : (
-                    <button
+                    <Button
+                      variant="primary"
+                      className="w-full"
                       onClick={handleUpgrade}
                       disabled={isUpgrading}
-                      className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl text-sm shadow transition-colors flex items-center justify-center gap-2"
+                      testId={`plan-${plan.id}-upgrade`}
                     >
-                      {isUpgrading ? 'Traitement...' : 'Passer à Premium (25 000 FCFA)'}
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                      {isUpgrading ? 'Traitement…' : (
+                        <>
+                          Passer à Premium · {money(plan.priceMonthly).replace(' F', '')} FCFA
+                          <Icon glyph={ArrowRight02Icon} size={15} />
+                        </>
+                      )}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -162,6 +252,6 @@ export const MerchantSubscriptionPage: React.FC = () => {
           })}
         </div>
       </div>
-    </div>
+    </Page>
   );
 };

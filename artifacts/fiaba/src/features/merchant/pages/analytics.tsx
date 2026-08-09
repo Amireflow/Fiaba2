@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Calendar03Icon, Chart02Icon, Download01Icon, UserGroupIcon, Wallet01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import { money } from '@/lib/utils';
 import {
   Badge,
@@ -14,33 +16,197 @@ import {
 
 const periods = ['7 jours', '30 jours', '90 jours', 'Année', 'Personnalisé'] as const;
 
-const dataByPeriod: Record<string, { bars: number[]; total: number; conversion: number; avg: number }> = {
-  '7 jours': { bars: [35, 43, 38, 57, 50, 68, 61], total: 47200, conversion: 7.8, avg: 13160 },
-  '30 jours': { bars: [35, 43, 38, 57, 50, 68, 61, 76, 69, 88, 81, 95, 89, 100, 72, 84, 91, 78, 86, 93, 67, 74, 82, 95, 88, 76, 81, 90, 85, 92], total: 184250, conversion: 7.8, avg: 13160 },
-  '90 jours': { bars: [40, 52, 48, 61, 55, 72, 65, 80, 73, 92, 85, 100, 68, 75, 82, 95, 88, 70, 78, 85, 90, 82, 75, 88], total: 512400, conversion: 8.2, avg: 13480 },
-  'Année': { bars: [30, 45, 52, 48, 61, 55, 72, 65, 80, 73, 92, 85], total: 1845200, conversion: 8.5, avg: 13920 },
-  'Personnalisé': { bars: [35, 43, 38, 57, 50, 68, 61, 76, 69, 88, 81, 95, 89, 72], total: 128400, conversion: 7.5, avg: 12800 },
+type OrderRow = {
+  id: string;
+  total_amount: number;
+  seller_id: string | null;
+  created_at: string;
 };
 
-const topSellers = [
-  { name: 'Marième Fall', amount: 42500, sales: 42, pct: 78 },
-  { name: 'Ndeye Kébé', amount: 31200, sales: 31, pct: 61 },
-  { name: 'Saliou Kane', amount: 24800, sales: 24, pct: 48 },
-  { name: 'Aminata Seck', amount: 18600, sales: 18, pct: 35 },
-];
+type OrderItemRow = {
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  line_total: number;
+};
 
-const topProducts = [
-  { name: 'Coffret Soin Karité', sales: 38, pct: 85 },
-  { name: 'Boubou Ndar — Indigo', sales: 22, pct: 62 },
-  { name: 'Huile de Baobab 100ml', sales: 18, pct: 48 },
-  { name: 'Panier petit-déjeuner', sales: 12, pct: 30 },
-];
+type SellerRow = {
+  id: string;
+  display_name: string;
+};
+
+function getPeriodDays(period: string): number {
+  switch (period) {
+    case '7 jours': return 7;
+    case '30 jours': return 30;
+    case '90 jours': return 90;
+    case 'Année': return 365;
+    default: return 30;
+  }
+}
+
+function getDateRange(period: string, customFrom: string, customTo: string): { from: Date; to: Date } {
+  const to = new Date();
+  if (period === 'Personnalisé' && customFrom && customTo) {
+    const from = new Date(customFrom);
+    const toDate = new Date(customTo);
+    toDate.setHours(23, 59, 59, 999);
+    return { from, to: toDate };
+  }
+  const days = getPeriodDays(period);
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  return { from, to };
+}
 
 export function Analytics() {
+  const { merchantId } = useAuth();
   const [period, setPeriod] = useState<string>('30 jours');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const data = dataByPeriod[period] ?? dataByPeriod['30 jours'];
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [totalClicks, setTotalClicks] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const { from, to } = useMemo(() => getDateRange(period, customFrom, customTo), [period, customFrom, customTo]);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!merchantId) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+
+      // Fetch orders in date range
+      const { data: orderRows } = await supabase
+        .from('orders')
+        .select('id, total_amount, seller_id, created_at')
+        .eq('merchant_id', merchantId)
+        .gte('created_at', from.toISOString())
+        .lte('created_at', to.toISOString())
+        .order('created_at', { ascending: true });
+
+      const oRows = (orderRows as OrderRow[] | null) ?? [];
+      setOrders(oRows);
+
+      // Fetch order_items for these orders
+      if (oRows.length > 0) {
+        const orderIds = oRows.map((o) => o.id);
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('product_id, product_name, quantity, line_total')
+          .in('order_id', orderIds);
+        setOrderItems((items as OrderItemRow[] | null) ?? []);
+      } else {
+        setOrderItems([]);
+      }
+
+      // Fetch sellers for this merchant (for names)
+      const { data: sellerRows } = await supabase
+        .from('sellers')
+        .select('id, display_name')
+        .eq('merchant_id', merchantId);
+      setSellers((sellerRows as SellerRow[] | null) ?? []);
+
+      // Fetch total clicks from tracking_links for this merchant's campaigns
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('merchant_id', merchantId);
+      const campaignIds = ((campaigns as { id: string }[] | null) ?? []).map((c) => c.id);
+      if (campaignIds.length > 0) {
+        const { data: links } = await supabase
+          .from('tracking_links')
+          .select('clicks')
+          .in('campaign_id', campaignIds);
+        const clicks = ((links as { clicks: number }[] | null) ?? []).reduce((sum, l) => sum + (l.clicks ?? 0), 0);
+        setTotalClicks(clicks);
+      } else {
+        setTotalClicks(0);
+      }
+
+      setLoading(false);
+    }
+    loadData();
+  }, [merchantId, from, to]);
+
+  // Compute stats
+  const totalRevenue = orders.reduce((sum, o) => sum + o.total_amount, 0);
+  const orderCount = orders.length;
+  const avgBasket = orderCount > 0 ? Math.round(totalRevenue / orderCount) : 0;
+  const conversionRate = totalClicks > 0 ? (orderCount / totalClicks) * 100 : 0;
+
+  // Build daily revenue bars
+  const bars = useMemo(() => {
+    const days = getPeriodDays(period);
+    if (period === 'Année') {
+      // Monthly bars
+      const monthly: number[] = new Array(12).fill(0);
+      orders.forEach((o) => {
+        const month = new Date(o.created_at).getMonth();
+        monthly[month] += o.total_amount;
+      });
+      const max = Math.max(...monthly, 1);
+      return monthly.map((v) => Math.round((v / max) * 100));
+    }
+    // Daily bars
+    const daily: number[] = new Array(days).fill(0);
+    const now = new Date();
+    orders.forEach((o) => {
+      const orderDate = new Date(o.created_at);
+      const dayDiff = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+      const idx = days - 1 - dayDiff;
+      if (idx >= 0 && idx < days) daily[idx] += o.total_amount;
+    });
+    const max = Math.max(...daily, 1);
+    return daily.map((v) => Math.round((v / max) * 100));
+  }, [orders, period]);
+
+  // Top sellers
+  const topSellers = useMemo(() => {
+    const sellerMap = new Map<string, { amount: number; sales: number }>();
+    orders.forEach((o) => {
+      if (!o.seller_id) return;
+      const agg = sellerMap.get(o.seller_id) ?? { amount: 0, sales: 0 };
+      agg.amount += o.total_amount;
+      agg.sales += 1;
+      sellerMap.set(o.seller_id, agg);
+    });
+    const sellerNameMap = new Map(sellers.map((s) => [s.id, s.display_name]));
+    const maxAmount = Math.max(...Array.from(sellerMap.values()).map((v) => v.amount), 1);
+    return Array.from(sellerMap.entries())
+      .map(([id, v]) => ({
+        name: sellerNameMap.get(id) ?? 'Vendeur',
+        amount: v.amount,
+        sales: v.sales,
+        pct: Math.round((v.amount / maxAmount) * 100),
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+  }, [orders, sellers]);
+
+  // Top products
+  const topProducts = useMemo(() => {
+    const productMap = new Map<string, { sales: number }>();
+    orderItems.forEach((item) => {
+      const key = item.product_id ?? item.product_name;
+      const agg = productMap.get(key) ?? { sales: 0 };
+      agg.sales += item.quantity;
+      productMap.set(key, agg);
+    });
+    const maxSales = Math.max(...Array.from(productMap.values()).map((v) => v.sales), 1);
+    return Array.from(productMap.entries())
+      .map(([key, v]) => ({
+        name: orderItems.find((i) => (i.product_id ?? i.product_name) === key)?.product_name ?? 'Produit',
+        sales: v.sales,
+        pct: Math.round((v.sales / maxSales) * 100),
+      }))
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5);
+  }, [orderItems]);
 
   function exportCSV() {
     const rows = [
@@ -109,68 +275,84 @@ export function Analytics() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="Ventes générées" value={money(data.total)} change="+18,4%" glyph={Chart02Icon} />
-        <Stat label="Taux de conversion" value={`${data.conversion}%`} change="+1,2 pt" glyph={UserGroupIcon} tone="mint" />
-        <Stat label="Panier moyen" value={money(data.avg)} change="+640 F" glyph={Wallet01Icon} tone="amber" />
-      </div>
-
-      {/* Revenue chart — fixed card (no color conflict) */}
-      <div className="mt-5 rounded-[22px] bg-[#5745df] p-5 text-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-bold">Chiffre d'affaires</p>
-            <p className="mt-1 text-[11px] text-white/70">Période : {period === 'Personnalisé' && customFrom && customTo ? `${customFrom} → ${customTo}` : period}</p>
+      {loading ? (
+        <div className="mt-6 flex items-center justify-center p-12">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+        </div>
+      ) : (
+        <>
+          {/* Stats */}
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <Stat label="Ventes générées" value={money(totalRevenue)} glyph={Chart02Icon} />
+            <Stat label="Taux de conversion" value={`${conversionRate.toFixed(1)}%`} glyph={UserGroupIcon} tone="mint" />
+            <Stat label="Panier moyen" value={money(avgBasket)} glyph={Wallet01Icon} tone="amber" />
           </div>
-          <Badge tone="mint">+18,4%</Badge>
-        </div>
-        <div className="mt-4 flex items-end gap-2">
-          <span className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] sm:text-4xl">{money(data.total).replace(' F', '')}</span>
-          <span className="mb-1 text-sm text-white/70">FCFA</span>
-        </div>
-        <div className="mt-6 flex h-[200px] items-end gap-1 px-1 sm:gap-2">
-          {data.bars.map((height, i) => (
-            <div key={i} className="group relative flex flex-1 flex-col justify-end">
-              <div className={`w-full rounded-t-md transition group-hover:bg-white/80 ${i > data.bars.length / 2 ? 'bg-white/80' : 'bg-white/30'}`} style={{ height: `${height}%` }} />
+
+          {/* Revenue chart — fixed card (no color conflict) */}
+          <div className="mt-5 rounded-[22px] bg-[#5745df] p-5 text-white">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-bold">Chiffre d'affaires</p>
+                <p className="mt-1 text-[11px] text-white/70">Période : {period === 'Personnalisé' && customFrom && customTo ? `${customFrom} → ${customTo}` : period}</p>
+              </div>
+              <Badge tone="mint">{orderCount} cmd</Badge>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Top sellers + products */}
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <p className="text-sm font-bold text-[#292541]">Vos meilleurs relais</p>
-          <div className="mt-5 space-y-5">
-            {topSellers.map((s) => (
-              <div key={s.name}>
-                <div className="flex justify-between text-xs">
-                  <span className="font-bold text-[#292541]">{s.name}</span>
-                  <span className="text-[#77738a]">{money(s.amount)}</span>
+            <div className="mt-4 flex items-end gap-2">
+              <span className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] sm:text-4xl">{money(totalRevenue).replace(' F', '')}</span>
+              <span className="mb-1 text-sm text-white/70">FCFA</span>
+            </div>
+            <div className="mt-6 flex h-[200px] items-end gap-1 px-1 sm:gap-2">
+              {bars.map((height, i) => (
+                <div key={i} className="group relative flex flex-1 flex-col justify-end">
+                  <div className={`w-full rounded-t-md transition group-hover:bg-white/80 ${i > bars.length / 2 ? 'bg-white/80' : 'bg-white/30'}`} style={{ height: `${height}%` }} />
                 </div>
-                <div className="mt-2"><ProgressBar value={s.pct} tone="violet" /></div>
-                <p className="mt-1 text-[10px] text-[#9290a2]">{s.sales} ventes</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </Card>
 
-        <Card>
-          <p className="text-sm font-bold text-[#292541]">Produits les plus vendus</p>
-          <div className="mt-5 space-y-5">
-            {topProducts.map((p) => (
-              <div key={p.name}>
-                <div className="flex justify-between text-xs">
-                  <span className="font-bold text-[#292541]">{p.name}</span>
-                  <span className="text-[#77738a]">{p.sales} ventes</span>
+          {/* Top sellers + products */}
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <Card>
+              <p className="text-sm font-bold text-[#292541]">Vos meilleurs relais</p>
+              {topSellers.length === 0 ? (
+                <p className="mt-5 text-xs text-[#9290a2]">Aucune vente sur cette période.</p>
+              ) : (
+                <div className="mt-5 space-y-5">
+                  {topSellers.map((s) => (
+                    <div key={s.name}>
+                      <div className="flex justify-between text-xs">
+                        <span className="font-bold text-[#292541]">{s.name}</span>
+                        <span className="text-[#77738a]">{money(s.amount)}</span>
+                      </div>
+                      <div className="mt-2"><ProgressBar value={s.pct} tone="violet" /></div>
+                      <p className="mt-1 text-[10px] text-[#9290a2]">{s.sales} ventes</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-2"><ProgressBar value={p.pct} tone="mint" /></div>
-              </div>
-            ))}
+              )}
+            </Card>
+
+            <Card>
+              <p className="text-sm font-bold text-[#292541]">Produits les plus vendus</p>
+              {topProducts.length === 0 ? (
+                <p className="mt-5 text-xs text-[#9290a2]">Aucune vente sur cette période.</p>
+              ) : (
+                <div className="mt-5 space-y-5">
+                  {topProducts.map((p) => (
+                    <div key={p.name}>
+                      <div className="flex justify-between text-xs">
+                        <span className="font-bold text-[#292541]">{p.name}</span>
+                        <span className="text-[#77738a]">{p.sales} ventes</span>
+                      </div>
+                      <div className="mt-2"><ProgressBar value={p.pct} tone="mint" /></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
-        </Card>
-      </div>
+        </>
+      )}
     </Page>
   );
 }

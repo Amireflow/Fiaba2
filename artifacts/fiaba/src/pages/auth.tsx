@@ -118,14 +118,9 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
   );
 }
 
-/* ── Check Profile Completeness & Redirect ── */
+/* ── Check Profile Role & Redirect ── */
 function redirectUser(profile: any, setLocation: (path: string) => void) {
   if (!profile) {
-    setLocation('/onboarding');
-    return;
-  }
-
-  if (!profile.phone || !profile.city) {
     setLocation('/onboarding');
     return;
   }

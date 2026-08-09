@@ -68,15 +68,46 @@ create type analytics_event as enum (
 create type payout_account_type as enum ('wave', 'orange_money', 'bank', 'cash');
 
 -- ============================================================================
--- 2. ALTÉRATIONS TABLES EXISTANTES
+-- 2. NOUVELLES TABLES (créées en premier pour les dépendances FK)
 -- ============================================================================
 
--- 2a. profiles : ajouter statut de vérification + trust score
+-- 2a. zones — référentiel géographique admin (§9)
+create table public.zones (
+  id          uuid primary key default uuid_generate_v4(),
+  name        text not null,
+  level       zone_level not null,
+  parent_id   uuid references public.zones(id) on delete cascade,
+  is_active   boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index idx_zones_parent on public.zones(parent_id);
+create index idx_zones_level on public.zones(level);
+
+-- 2b. niches — catégories et sous-niches (§8)
+create table public.niches (
+  id          uuid primary key default uuid_generate_v4(),
+  name        text not null,
+  type        niche_type not null default 'category',
+  parent_id   uuid references public.niches(id) on delete cascade,
+  tags        text[] default '{}',
+  is_active   boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index idx_niches_parent on public.niches(parent_id);
+create index idx_niches_type on public.niches(type);
+
+-- ============================================================================
+-- 3. ALTÉRATIONS TABLES EXISTANTES
+-- ============================================================================
+
+-- 3a. profiles : ajouter statut de vérification + trust score
 alter table public.profiles
   add column if not exists verification_status verification_status not null default 'pending',
   add column if not exists trust_score integer not null default 50 check (trust_score >= 0 and trust_score <= 100);
 
--- 2b. campaigns : ajouter modèle, type, produit, objectif, niches
+-- 3b. campaigns : ajouter modèle, type, produit, objectif, niches
 alter table public.campaigns
   add column if not exists product_id uuid references public.products(id) on delete set null,
   add column if not exists model commission_model not null default 'commission',
@@ -84,7 +115,7 @@ alter table public.campaigns
   add column if not exists goal integer,
   add column if not exists niche_id uuid references public.niches(id) on delete set null;
 
--- 2c. orders : statuts étendus + zone figée + snapshot financier
+-- 3c. orders : statuts étendus + zone figée + snapshot financier
 alter table public.orders
   add column if not exists status_v2 order_status_v2 not null default 'created',
   add column if not exists zone_id uuid,
@@ -100,11 +131,11 @@ alter table public.orders
   add column if not exists snapshot_product_price integer,
   add column if not exists snapshot_commission_amount integer;
 
--- 2d. sellers : rendre merchant_id nullable (vendeurs indépendants)
+-- 3d. sellers : rendre merchant_id nullable (vendeurs indépendants)
 alter table public.sellers
   alter column merchant_id drop not null;
 
--- 2e. commissions : statut + modèle + période de sécurité
+-- 3e. commissions : statut + modèle + période de sécurité
 alter table public.commissions
   add column if not exists status commission_status not null default 'pending',
   add column if not exists model commission_model not null default 'commission',
@@ -112,32 +143,19 @@ alter table public.commissions
   add column if not exists reversed_at timestamptz,
   add column if not exists reversal_reason text;
 
--- 2f. delivery_zones : lier au référentiel de zones admin
+-- 3f. delivery_zones : lier au référentiel de zones admin
 alter table public.delivery_zones
   add column if not exists zone_ref_id uuid references public.zones(id) on delete set null;
 
--- 2g. notifications : ajouter colonne data (JSON)
+-- 3g. notifications : ajouter colonne data (JSON)
 alter table public.notifications
   add column if not exists data jsonb;
 
 -- ============================================================================
--- 3. NOUVELLES TABLES
+-- 4. AUTRES NOUVELLES TABLES
 -- ============================================================================
 
--- 3a. zones — référentiel géographique admin (§9)
-create table public.zones (
-  id          uuid primary key default uuid_generate_v4(),
-  name        text not null,
-  level       zone_level not null,
-  parent_id   uuid references public.zones(id) on delete cascade,
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-create index idx_zones_parent on public.zones(parent_id);
-create index idx_zones_level on public.zones(level);
-
--- 3b. merchant_zone_coverage — zones couvertes par commerçant (§9.3)
+-- 4a. merchant_zone_coverage — zones couvertes par commerçant (§9.3)
 create table public.merchant_zone_coverage (
   id          uuid primary key default uuid_generate_v4(),
   merchant_id uuid not null references public.merchants(id) on delete cascade,
@@ -152,21 +170,7 @@ create table public.merchant_zone_coverage (
 create index idx_mzc_merchant on public.merchant_zone_coverage(merchant_id);
 create index idx_mzc_zone on public.merchant_zone_coverage(zone_id);
 
--- 3c. niches — catégories et sous-niches (§8)
-create table public.niches (
-  id          uuid primary key default uuid_generate_v4(),
-  name        text not null,
-  type        niche_type not null default 'category',
-  parent_id   uuid references public.niches(id) on delete cascade,
-  tags        text[] default '{}',
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-create index idx_niches_parent on public.niches(parent_id);
-create index idx_niches_type on public.niches(type);
-
--- 3d. seller_niches — niches d'un vendeur (§8)
+-- 4b. seller_niches — niches d'un vendeur (§8)
 create table public.seller_niches (
   id          uuid primary key default uuid_generate_v4(),
   seller_id   uuid not null references public.sellers(id) on delete cascade,
@@ -177,7 +181,7 @@ create table public.seller_niches (
 create index idx_seller_niches_seller on public.seller_niches(seller_id);
 create index idx_seller_niches_niche on public.seller_niches(niche_id);
 
--- 3e. product_niches — niches d'un produit (§8)
+-- 4c. product_niches — niches d'un produit (§8)
 create table public.product_niches (
   id          uuid primary key default uuid_generate_v4(),
   product_id  uuid not null references public.products(id) on delete cascade,
@@ -188,7 +192,7 @@ create table public.product_niches (
 create index idx_product_niches_product on public.product_niches(product_id);
 create index idx_product_niches_niche on public.product_niches(niche_id);
 
--- 3f. seller_profiles — profil étendu vendeur (§7.3)
+-- 4d. seller_profiles — profil étendu vendeur (§7.3)
 create table public.seller_profiles (
   id          uuid primary key default uuid_generate_v4(),
   profile_id  uuid not null references public.profiles(id) on delete cascade,
@@ -205,7 +209,7 @@ create table public.seller_profiles (
 );
 create index idx_seller_profiles_profile on public.seller_profiles(profile_id);
 
--- 3g. tracking_links — liens d'attribution signés (§14)
+-- 4e. tracking_links — liens d'attribution signés (§14)
 create table public.tracking_links (
   id          uuid primary key default uuid_generate_v4(),
   seller_id   uuid not null references public.sellers(id) on delete cascade,
@@ -224,7 +228,7 @@ create index idx_tracking_links_seller on public.tracking_links(seller_id);
 create index idx_tracking_links_campaign on public.tracking_links(campaign_id);
 create index idx_tracking_links_token on public.tracking_links(token);
 
--- 3h. clicks — tracking des clics (§14, §25)
+-- 4f. clicks — tracking des clics (§14, §25)
 create table public.clicks (
   id          uuid primary key default uuid_generate_v4(),
   tracking_link_id uuid not null references public.tracking_links(id) on delete cascade,
@@ -236,7 +240,7 @@ create table public.clicks (
 create index idx_clicks_link on public.clicks(tracking_link_id);
 create index idx_clicks_created on public.clicks(created_at);
 
--- 3i. payouts — retraits vendeurs (§17)
+-- 4g. payouts — retraits vendeurs (§17)
 create table public.payouts (
   id          uuid primary key default uuid_generate_v4(),
   seller_id   uuid not null references public.sellers(id) on delete cascade,
@@ -252,7 +256,7 @@ create table public.payouts (
 create index idx_payouts_seller on public.payouts(seller_id);
 create index idx_payouts_status on public.payouts(status);
 
--- 3j. ledger_entries — écritures financières immuables (§16, §17)
+-- 4h. ledger_entries — écritures financières immuables (§16, §17)
 create table public.ledger_entries (
   id          uuid primary key default uuid_generate_v4(),
   seller_id   uuid references public.sellers(id) on delete set null,
@@ -270,7 +274,7 @@ create index idx_ledger_seller on public.ledger_entries(seller_id);
 create index idx_ledger_merchant on public.ledger_entries(merchant_id);
 create index idx_ledger_order on public.ledger_entries(order_id);
 
--- 3k. disputes — litiges (§7.4)
+-- 4i. disputes — litiges (§7.4)
 create table public.disputes (
   id          uuid primary key default uuid_generate_v4(),
   order_id    uuid not null references public.orders(id) on delete cascade,
@@ -288,7 +292,7 @@ create table public.disputes (
 create index idx_disputes_order on public.disputes(order_id);
 create index idx_disputes_status on public.disputes(status);
 
--- 3l. fraud_signals — signaux antifraude (§24)
+-- 4j. fraud_signals — signaux antifraude (§24)
 create table public.fraud_signals (
   id          uuid primary key default uuid_generate_v4(),
   signal_type text not null,
@@ -304,7 +308,7 @@ create table public.fraud_signals (
 create index idx_fraud_status on public.fraud_signals(status);
 create index idx_fraud_target on public.fraud_signals(target_user);
 
--- 3m. audit_logs — journal d'audit (§22)
+-- 4k. audit_logs — journal d'audit (§22)
 create table public.audit_logs (
   id          uuid primary key default uuid_generate_v4(),
   actor_id    uuid references public.profiles(id) on delete set null,
@@ -317,7 +321,7 @@ create table public.audit_logs (
 create index idx_audit_actor on public.audit_logs(actor_id);
 create index idx_audit_entity on public.audit_logs(entity_type, entity_id);
 
--- 3n. country_settings — paramètres plateforme (§7.4)
+-- 4l. country_settings — paramètres plateforme (§7.4)
 create table public.country_settings (
   id          uuid primary key default uuid_generate_v4(),
   key         text not null unique,
@@ -329,7 +333,7 @@ create table public.country_settings (
   updated_at  timestamptz not null default now()
 );
 
--- 3o. analytics_events — tracking produit (§25)
+-- 4m. analytics_events — tracking produit (§25)
 create table public.analytics_events (
   id          uuid primary key default uuid_generate_v4(),
   event_type  analytics_event not null,
@@ -344,7 +348,7 @@ create index idx_events_user on public.analytics_events(user_id);
 create index idx_events_created on public.analytics_events(created_at);
 
 -- ============================================================================
--- 4. TRIGGERS — updated_at sur nouvelles tables
+-- 5. TRIGGERS — updated_at sur nouvelles tables
 -- ============================================================================
 do $$
 declare t text;
@@ -365,7 +369,7 @@ end;
 $$;
 
 -- ============================================================================
--- 5. RLS — nouvelles tables
+-- 6. RLS — nouvelles tables
 -- ============================================================================
 alter table public.zones                  enable row level security;
 alter table public.merchant_zone_coverage enable row level security;
@@ -450,7 +454,7 @@ create policy "seller_niches_select" on public.seller_niches
 create policy "seller_niches_insert" on public.seller_niches
   for insert with check (public.is_seller(seller_id));
 create policy "seller_niches_delete" on public.seller_niches
-  for delete with check (public.is_seller(seller_id));
+  for delete using (public.is_seller(seller_id));
 
 -- product_niches : owner gère ; vendeurs voient
 create policy "product_niches_select" on public.product_niches
@@ -605,10 +609,10 @@ create policy "events_select" on public.analytics_events
   for select using (public.is_admin() or user_id = auth.uid());
 
 -- ============================================================================
--- 6. SEEDS — données initiales
+-- 7. SEEDS — données initiales
 -- ============================================================================
 
--- 6a. Zones du Sénégal — Régions
+-- 7a. Zones du Sénégal — Régions
 insert into public.zones (name, level) values
   ('Dakar', 'region'),
   ('Thiès', 'region'),
@@ -626,7 +630,7 @@ insert into public.zones (name, level) values
   ('Ziguinchor', 'region')
 on conflict do nothing;
 
--- 6b. Départements de Dakar (couverture pilote prioritaire)
+-- 7b. Départements de Dakar (couverture pilote prioritaire)
 insert into public.zones (name, level, parent_id)
   select d.name, 'department', r.id
   from public.zones r
@@ -636,7 +640,7 @@ insert into public.zones (name, level, parent_id)
   where r.name = 'Dakar' and r.level = 'region'
 on conflict do nothing;
 
--- 6c. Communes de Dakar (granularité complète pour le pilote)
+-- 7c. Communes de Dakar (granularité complète pour le pilote)
 insert into public.zones (name, level, parent_id)
   select c.name, 'commune', d.id
   from public.zones d
@@ -651,7 +655,7 @@ insert into public.zones (name, level, parent_id)
   where d.name = 'Dakar' and d.level = 'department'
 on conflict do nothing;
 
--- 6d. Départements de Thiès
+-- 7d. Départements de Thiès
 insert into public.zones (name, level, parent_id)
   select d.name, 'department', r.id
   from public.zones r
@@ -661,7 +665,7 @@ insert into public.zones (name, level, parent_id)
   where r.name = 'Thiès' and r.level = 'region'
 on conflict do nothing;
 
--- 6e. Niches initiales (§8)
+-- 7e. Niches initiales (§8)
 insert into public.niches (name, type, tags) values
   ('Tech', 'category', '{"smartphones", "laptop", "accessoires", "gaming"}'),
   ('Mode', 'category', '{"vetements", "chaussures", "accessoires", "sacs"}'),
@@ -675,7 +679,7 @@ insert into public.niches (name, type, tags) values
   ('Luxe', 'category', '{"montres", "bijoux", "maroquinerie"}')
 on conflict do nothing;
 
--- 6f. Sous-niches Tech
+-- 7f. Sous-niches Tech
 insert into public.niches (name, type, parent_id, tags)
   select s.name, 'sub_niche', p.id, s.tags
   from public.niches p
@@ -686,7 +690,7 @@ insert into public.niches (name, type, parent_id, tags)
   where p.name = 'Tech' and p.type = 'category'
 on conflict do nothing;
 
--- 6g. Sous-niches Mode
+-- 7g. Sous-niches Mode
 insert into public.niches (name, type, parent_id, tags)
   select s.name, 'sub_niche', p.id, s.tags
   from public.niches p
@@ -697,7 +701,7 @@ insert into public.niches (name, type, parent_id, tags)
   where p.name = 'Mode' and p.type = 'category'
 on conflict do nothing;
 
--- 6h. Sous-niches Beauté
+-- 7h. Sous-niches Beauté
 insert into public.niches (name, type, parent_id, tags)
   select s.name, 'sub_niche', p.id, s.tags
   from public.niches p
@@ -708,7 +712,7 @@ insert into public.niches (name, type, parent_id, tags)
   where p.name = 'Beauté' and p.type = 'category'
 on conflict do nothing;
 
--- 6i. Paramètres pays initiaux
+-- 7i. Paramètres pays initiaux
 insert into public.country_settings (key, label, value, category) values
   ('pays', 'Pays pilote', 'Sénégal', 'Pays'),
   ('devise', 'Devise', 'FCFA', 'Pays'),

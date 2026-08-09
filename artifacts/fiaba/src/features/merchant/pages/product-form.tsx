@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { money, haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useMerchantId } from '@/hooks/use-supabase-query';
+import { supabaseInsert, supabaseUpdate } from '@/hooks/use-supabase-query';
 import {
   Field,
   MerchantButton as Button,
@@ -14,10 +16,8 @@ import {
   selectClass,
   textareaClass,
 } from '../components/merchant-ui';
-import { seedProducts } from '@/config/seeds';
-import type { Product } from '@/types/entities';
 
-const categories = ['Beauté', 'Mode', 'Maison', 'Épicerie'] as const;
+const categories = ['Beauté', 'Mode', 'Maison', 'Épicerie', 'Tech', 'Sport', 'Food', 'Gaming'] as const;
 
 type FormState = {
   name: string;
@@ -25,9 +25,7 @@ type FormState = {
   price: string;
   stock: string;
   description: string;
-  image: string;
-  weight: string;
-  lowStockThreshold: string;
+  image_url: string;
 };
 
 const emptyForm: FormState = {
@@ -36,72 +34,112 @@ const emptyForm: FormState = {
   price: '',
   stock: '',
   description: '',
-  image: '',
-  weight: '',
-  lowStockThreshold: '5',
+  image_url: '',
 };
 
 export function ProductForm() {
   const { id } = useParams<{ id?: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { merchantId } = useMerchantId();
   const isEdit = !!id;
 
-  const [products, setProducts] = useState<Product[]>(() => read('products', seedProducts));
-  const existing = isEdit ? products.find((p) => p.id === id) : undefined;
-  const [form, setForm] = useState<FormState>(
-    existing
-      ? {
-          name: existing.name,
-          category: existing.category,
-          price: String(existing.price),
-          stock: String(existing.stock),
-          description: existing.description ?? '',
-          image: existing.image ?? '',
-          weight: existing.weight ? String(existing.weight) : '',
-          lowStockThreshold: existing.lowStockThreshold ? String(existing.lowStockThreshold) : '5',
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+
+  // Load existing product from Supabase
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    setLoading(true);
+    supabase
+      .from('products')
+      .select('name, category, price, stock, description, image_url')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const p = data as { name: string; category: string; price: number; stock: number; description: string | null; image_url: string | null };
+          setForm({
+            name: p.name,
+            category: p.category,
+            price: String(p.price),
+            stock: String(p.stock),
+            description: p.description ?? '',
+            image_url: p.image_url ?? '',
+          });
         }
-      : emptyForm
-  );
+        setLoading(false);
+      });
+  }, [id, isEdit]);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!merchantId) {
+      toast({ title: 'Erreur', description: 'Impossible de trouver votre boutique.' });
+      return;
+    }
     const price = Number(form.price);
     const stock = Number(form.stock);
     if (!form.name.trim() || isNaN(price) || price < 0 || isNaN(stock) || stock < 0) {
+      haptic('error');
       toast({ title: 'Champs invalides', description: 'Vérifiez le nom, le prix et le stock.' });
       return;
     }
-    const data = {
+
+    setSaving(true);
+    haptic('medium');
+
+    const status = stock > 0 ? 'actif' : 'epuise';
+    const payload = {
+      merchant_id: merchantId,
       name: form.name.trim(),
       category: form.category,
       price,
       stock,
       description: form.description.trim(),
-      image: form.image.trim(),
-      weight: form.weight ? Number(form.weight) : undefined,
-      lowStockThreshold: form.lowStockThreshold ? Number(form.lowStockThreshold) : undefined,
+      image_url: form.image_url.trim() || null,
+      status,
     };
-    if (isEdit && existing) {
-      const status: Product['status'] = stock > 0 ? 'Actif' : 'Épuisé';
-      const updated = products.map((p) => (p.id === existing.id ? { ...p, ...data, status } : p));
-      setProducts(updated);
-      write('products', updated);
-      toast({ title: 'Produit modifié', description: `${data.name} a été mis à jour.` });
+
+    if (isEdit && id) {
+      const { error } = await supabaseUpdate('products', id, payload);
+      setSaving(false);
+      if (error) {
+        haptic('error');
+        toast({ title: 'Erreur', description: error });
+      } else {
+        haptic('success');
+        toast({ title: 'Produit modifié', description: `${payload.name} a été mis à jour.` });
+        navigate('/merchant/products');
+      }
     } else {
-      const updated = [...products, { id: crypto.randomUUID(), ...data, status: stock > 0 ? 'Actif' : 'Épuisé' } as Product];
-      setProducts(updated);
-      write('products', updated);
-      toast({ title: 'Produit ajouté', description: `${data.name} est dans votre catalogue.` });
+      const { error } = await supabaseInsert('products', payload);
+      setSaving(false);
+      if (error) {
+        haptic('error');
+        toast({ title: 'Erreur', description: error });
+      } else {
+        haptic('success');
+        toast({ title: 'Produit ajouté', description: `${payload.name} est dans votre catalogue.` });
+        navigate('/merchant/products');
+      }
     }
-    navigate('/merchant/products');
   }
 
-  const isLowStock = form.stock !== '' && form.lowStockThreshold !== '' && Number(form.stock) > 0 && Number(form.stock) <= Number(form.lowStockThreshold);
+  if (loading) {
+    return (
+      <Page eyebrow="Chargement" title="…" description="">
+        <div className="mt-6 flex items-center justify-center py-12">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+        </div>
+      </Page>
+    );
+  }
 
   return (
     <Page
@@ -137,23 +175,12 @@ export function ProductForm() {
                 <input type="number" min="0" value={form.stock} onChange={(e) => setField('stock', e.target.value)} placeholder="0" className={inputClass} data-testid="input-stock" />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Poids (g)" hint="Pour le calcul des frais de livraison">
-                <input type="number" min="0" value={form.weight} onChange={(e) => setField('weight', e.target.value)} placeholder="Ex. 350" className={inputClass} data-testid="input-weight" />
-              </Field>
-              <Field label="Seuil d'alerte stock" hint="Notification quand le stock descend sous ce seuil">
-                <input type="number" min="0" value={form.lowStockThreshold} onChange={(e) => setField('lowStockThreshold', e.target.value)} placeholder="5" className={inputClass} data-testid="input-low-stock" />
-              </Field>
-            </div>
             {form.stock !== '' && Number(form.stock) === 0 && (
               <p className="rounded-xl bg-[#fff4de] px-4 py-3 text-xs font-bold text-[#ac741e]">Ce produit sera marqué comme « Épuisé ».</p>
             )}
-            {isLowStock && (
-              <p className="rounded-xl bg-[#fff4de] px-4 py-3 text-xs font-bold text-[#ac741e]">Stock faible : il reste {form.stock} unités (seuil d'alerte : {form.lowStockThreshold}).</p>
-            )}
             <div className="flex justify-end gap-2 pt-2">
               <Link href="/merchant/products"><Button variant="ghost" type="button">Annuler</Button></Link>
-              <Button type="submit" testId="button-save-product">{isEdit ? 'Enregistrer' : 'Ajouter le produit'}</Button>
+              <Button type="submit" disabled={saving} testId="button-save-product">{saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Ajouter le produit'}</Button>
             </div>
           </form>
         </Card>
@@ -163,10 +190,10 @@ export function ProductForm() {
           <Card>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Image du produit</p>
             <div className="mt-3">
-              {form.image ? (
+              {form.image_url ? (
                 <div className="relative overflow-hidden rounded-2xl">
-                  <img src={form.image} alt={form.name} className="h-48 w-full object-cover" />
-                  <button type="button" onClick={() => setField('image', '')} className="absolute right-2 top-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-bold text-[#c45667]" data-testid="button-remove-image">Retirer</button>
+                  <img src={form.image_url} alt={form.name} className="h-48 w-full object-cover" />
+                  <button type="button" onClick={() => setField('image_url', '')} className="absolute right-2 top-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-bold text-[#c45667]" data-testid="button-remove-image">Retirer</button>
                 </div>
               ) : (
                 <div className="grid h-48 place-items-center rounded-2xl bg-[#f8f7fc] text-[#9290a2]">
@@ -176,14 +203,14 @@ export function ProductForm() {
                   </div>
                 </div>
               )}
-              <input value={form.image} onChange={(e) => setField('image', e.target.value)} placeholder="URL de l'image…" className={`${inputClass} mt-3`} data-testid="input-image" />
+              <input value={form.image_url} onChange={(e) => setField('image_url', e.target.value)} placeholder="URL de l'image…" className={`${inputClass} mt-3`} data-testid="input-image" />
             </div>
           </Card>
 
           <Card>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu client</p>
             <div className="mt-3">
-              {form.image && <img src={form.image} alt={form.name} className="h-32 w-full rounded-xl object-cover" />}
+              {form.image_url && <img src={form.image_url} alt={form.name} className="h-32 w-full rounded-xl object-cover" />}
               <h3 className="mt-3 font-[Space_Grotesk] text-base font-bold text-[#292541]">{form.name || 'Nom du produit'}</h3>
               <p className="mt-1 text-xs leading-4 text-[#77738a] line-clamp-2">{form.description || 'La description apparaîtra ici.'}</p>
               <div className="mt-3 flex items-center justify-between">

@@ -150,7 +150,20 @@ create table public.order_items (
 );
 
 -- ----------------------------------------------------------------------------
--- 9. deliveries  (livraisons)
+-- 9. delivery_zones  (zones de livraison)
+-- ----------------------------------------------------------------------------
+create table public.delivery_zones (
+  id            uuid primary key default uuid_generate_v4(),
+  merchant_id   uuid not null references public.merchants(id) on delete cascade,
+  name          text not null,
+  fee           integer not null default 0 check (fee >= 0),
+  is_active     boolean not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- 10. deliveries  (livraisons)
 -- ----------------------------------------------------------------------------
 create table public.deliveries (
   id            uuid primary key default uuid_generate_v4(),
@@ -162,19 +175,6 @@ create table public.deliveries (
   fee           integer not null default 0 check (fee >= 0),
   shipped_at    timestamptz,
   delivered_at  timestamptz,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-
--- ----------------------------------------------------------------------------
--- 10. delivery_zones  (zones de livraison)
--- ----------------------------------------------------------------------------
-create table public.delivery_zones (
-  id            uuid primary key default uuid_generate_v4(),
-  merchant_id   uuid not null references public.merchants(id) on delete cascade,
-  name          text not null,
-  fee           integer not null default 0 check (fee >= 0),
-  is_active     boolean not null default true,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

@@ -86,8 +86,9 @@ export function SellerOnboarding() {
           .single();
 
         const sellerId = (seller as { id: string } | null)?.id;
+        const niches = nicheRows as { id: string; name: string }[];
         if (sellerId) {
-          const inserts = nicheRows.map(n => ({
+          const inserts = niches.map(n => ({
             seller_id: sellerId,
             niche_id: n.id,
           }));

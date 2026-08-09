@@ -26,16 +26,16 @@ begin
       verification_status = 'verified'::verification_status,
       trust_score = 100;
 
-    -- Création d'une boutique d'administration si nécessaire
-    insert into public.merchants (owner_id, name, slug, email, city)
-    values (
-      v_user_id,
-      'Fiaba Admin HQ',
-      'fiaba-admin-hq-' || substr(v_user_id::text, 1, 8),
-      'admin@fiaba.com',
-      'Dakar'
-    )
-    on conflict (owner_id) do update set
-      name = coalesce(merchants.name, 'Fiaba Admin HQ');
+    -- Création d'une boutique d'administration si aucune n'existe pour cet owner
+    if not exists (select 1 from public.merchants where owner_id = v_user_id) then
+      insert into public.merchants (owner_id, name, slug, email, city)
+      values (
+        v_user_id,
+        'Fiaba Admin HQ',
+        'fiaba-admin-hq-' || substr(v_user_id::text, 1, 8),
+        'admin@fiaba.com',
+        'Dakar'
+      );
+    end if;
   end if;
 end $$;

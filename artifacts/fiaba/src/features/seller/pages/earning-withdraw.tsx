@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
@@ -7,7 +7,8 @@ import { money } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { useSellerQuery } from '@/hooks/use-supabase-query';
-import { calculatePayoutFee } from '@/lib/monetization';
+import { calculatePayoutFee, DEFAULT_PAYOUT_FEE_RULE } from '@/lib/monetization';
+import type { PayoutFeeRule } from '@/types/entities';
 import {
   SellerButton as Button,
   SellerCard as Card,
@@ -30,6 +31,31 @@ export function EarningWithdraw() {
   const [amount, setAmount] = useState('');
   const [account, setAccount] = useState('wave');
   const [submitting, setSubmitting] = useState(false);
+  const [payoutRule, setPayoutRule] = useState<PayoutFeeRule>(DEFAULT_PAYOUT_FEE_RULE);
+
+  // Fetch payout fee rule from Supabase
+  useEffect(() => {
+    async function loadRule() {
+      const { data } = await supabase
+        .from('payout_fee_rules')
+        .select('id, fee_percent, fixed_fee, free_threshold, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const row = data as { id: string; fee_percent: number; fixed_fee: number; free_threshold: number; is_active: boolean } | null;
+      if (row) {
+        setPayoutRule({
+          id: row.id,
+          feePercent: Number(row.fee_percent),
+          fixedFee: row.fixed_fee,
+          freeThreshold: row.free_threshold,
+          isActive: row.is_active,
+        });
+      }
+    }
+    loadRule();
+  }, []);
 
   // Fetch commissions available
   const { data: commissions } = useSellerQuery<{ amount: number; status: string }>('commissions', {

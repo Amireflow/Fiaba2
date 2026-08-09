@@ -1,23 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'wouter';
 import { ArrowLeft01Icon, Copy01Icon, Facebook01Icon, InstagramIcon, Share02Icon, Store01Icon, TiktokIcon, WhatsappIcon, Wallet01Icon, Chart02Icon, CheckmarkCircle02Icon, LockKeyIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
-import { linkToCheckoutPath, getFullShareableUrl } from '@/lib/link';
-import { trackClick } from '@/lib/attribution';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
+import { money, haptic } from '@/lib/utils';
 import {
   SellerBadge,
   SellerButton as Button,
   SellerCard as Card,
-  SellerField,
   SellerPage as Page,
-  sellerInputClass,
   sellerTextareaClass,
 } from '../components/seller-ui';
-import { seedSellerCampaigns, seedOpportunities } from '@/config/seller-seeds';
-import type { SellerCampaign, Opportunity } from '@/types/entities';
 
 const shareChannels = [
   { id: 'whatsapp', label: 'WhatsApp', glyph: WhatsappIcon, color: 'bg-[#25d366] text-white', url: (link: string, text: string) => `https://wa.me/?text=${encodeURIComponent(`${text}\n\n${link}`)}` },
@@ -26,17 +21,133 @@ const shareChannels = [
   { id: 'facebook', label: 'Facebook', glyph: Facebook01Icon, color: 'bg-[#1877f2] text-white', url: (link: string) => `https://facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}` },
 ];
 
+type CampaignData = {
+  campaignId: string;
+  campaignName: string;
+  productName: string;
+  merchantName: string;
+  commission: number;
+  commissionType: string | null;
+  model: string;
+  productPrice: number;
+  productImage: string | null;
+  token: string;
+  sellerCode: string;
+  clicks: number;
+  sales: number;
+  earnings: number;
+};
+
 export function Share() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const [campaigns] = useState<SellerCampaign[]>(() => read('seller-campaigns', seedSellerCampaigns));
-  const [opportunities] = useState<Opportunity[]>(() => read('opportunities', seedOpportunities));
+  const { profile } = useAuth();
+  const [campaign, setCampaign] = useState<CampaignData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
 
-  const campaign = campaigns.find((c) => c.campaignId === id || c.id === id);
-  const op = opportunities.find((o) => o.campaignId === id);
+  useEffect(() => {
+    async function loadData() {
+      if (!id || !profile) {
+        setLoading(false);
+        return;
+      }
 
-  const savedMessage = campaign ? read(`seller-message-${campaign.campaignId}`, '') : '';
-  const [message, setMessage] = useState(savedMessage || (campaign ? `Découvrez ${campaign.productName} de ${campaign.merchantName} ! Qualité au top, livraison rapide. Utilisez mon code ${campaign?.code ?? ''} 👇` : ''));
+      // Get seller
+      const { data: seller } = await supabase
+        .from('sellers')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      const sId = (seller as { id: string } | null)?.id;
+      if (!sId) {
+        setLoading(false);
+        return;
+      }
+
+      // Get tracking link for this campaign + seller
+      const { data: linkRow } = await supabase
+        .from('tracking_links')
+        .select('token, seller_code, clicks, campaign_id')
+        .eq('campaign_id', id)
+        .eq('seller_id', sId)
+        .maybeSingle();
+
+      const link = linkRow as { token: string; seller_code: string; clicks: number; campaign_id: string } | null;
+      if (!link) {
+        setLoading(false);
+        return;
+      }
+
+      // Get campaign details
+      const { data: campaignRow } = await supabase
+        .from('campaigns')
+        .select(`
+          id, name, commission, commission_type, model, product_id, merchant_id,
+          products:product_id (name, price, image_url),
+          merchants:merchant_id (name)
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      const c = campaignRow as {
+        id: string; name: string; commission: number; commission_type: string | null;
+        model: string; product_id: string | null; merchant_id: string;
+        products: { name: string; price: number; image_url: string | null } | null;
+        merchants: { name: string } | null;
+      } | null;
+
+      if (!c) {
+        setLoading(false);
+        return;
+      }
+
+      // Get commissions for this seller + campaign
+      const { data: commissions } = await supabase
+        .from('commissions')
+        .select('amount')
+        .eq('seller_id', sId)
+        .eq('campaign_id', id);
+
+      const commissionRows = (commissions as { amount: number }[] | null) ?? [];
+      const sales = commissionRows.length;
+      const earnings = commissionRows.reduce((sum, c) => sum + c.amount, 0);
+
+      const data: CampaignData = {
+        campaignId: c.id,
+        campaignName: c.name,
+        productName: c.products?.name ?? 'Produit',
+        merchantName: c.merchants?.name ?? 'Boutique',
+        commission: Number(c.commission),
+        commissionType: c.commission_type,
+        model: c.model,
+        productPrice: c.products?.price ?? 0,
+        productImage: c.products?.image_url ?? null,
+        token: link.token,
+        sellerCode: link.seller_code,
+        clicks: link.clicks ?? 0,
+        sales,
+        earnings,
+      };
+
+      setCampaign(data);
+      setMessage(`Découvrez ${data.productName} de ${data.merchantName} ! Qualité au top, livraison rapide. Utilisez mon code ${data.sellerCode} 👇`);
+      setLoading(false);
+    }
+    loadData();
+  }, [id, profile]);
+
+  if (loading) {
+    return (
+      <Page eyebrow="Partager et gagner" title="Chargement…" description="">
+        <Card className="mt-6 p-12">
+          <div className="flex items-center justify-center">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        </Card>
+      </Page>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -48,21 +159,28 @@ export function Share() {
     );
   }
 
-  const fullLink = getFullShareableUrl(campaign.link);
-  const isFixed = campaign.model === 'Marge';
-  const commissionDisplay = isFixed ? money(campaign.commission) : `${campaign.commission}%`;
+  const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const fullLink = `${window.location.origin}${baseUrl}/p/${campaign.token}`;
+  const checkoutPath = `/checkout/${campaign.campaignId}?t=${campaign.token}`;
+  const isFixed = campaign.model === 'marge';
+  const commissionDisplay = isFixed || campaign.commissionType === 'fixed'
+    ? money(campaign.commission)
+    : `${campaign.commission}%`;
 
   function copyLink() {
+    haptic('light');
     navigator.clipboard?.writeText(fullLink).catch(() => {});
     toast({ title: 'Lien copié !', description: 'Collez-le où vous voulez partager.' });
   }
 
   function copyCode() {
-    navigator.clipboard?.writeText(campaign!.code).catch(() => {});
-    toast({ title: 'Code copié', description: `Code ${campaign!.code} prêt à partager.` });
+    haptic('light');
+    navigator.clipboard?.writeText(campaign!.sellerCode).catch(() => {});
+    toast({ title: 'Code copié', description: `Code ${campaign!.sellerCode} prêt à partager.` });
   }
 
   function copyMessage() {
+    haptic('light');
     navigator.clipboard?.writeText(message).catch(() => {});
     toast({ title: 'Message copié', description: 'Collez-le dans votre réseau.' });
   }
@@ -73,7 +191,8 @@ export function Share() {
   }
 
   function saveMessage() {
-    write(`seller-message-${campaign!.campaignId}`, message);
+    haptic('light');
+    // Note: message persistence could be added to a seller_preferences table in the future
     toast({ title: 'Message enregistré', description: 'Votre message sera utilisé à chaque partage.' });
   }
 
@@ -89,7 +208,7 @@ export function Share() {
 
       {/* Product preview card */}
       <Card className="mt-4 overflow-hidden p-0">
-        {op?.image && <img src={op.image} alt={campaign.productName} className="h-48 w-full object-cover" />}
+        {campaign.productImage && <img src={campaign.productImage} alt={campaign.productName} className="h-48 w-full object-cover" />}
         <div className="p-5">
           <div className="flex items-start gap-4">
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={24} /></span>
@@ -98,7 +217,7 @@ export function Share() {
               <p className="mt-0.5 text-xs text-[#9290a2]">{campaign.merchantName}</p>
               <div className="mt-2 flex items-center gap-2">
                 <SellerBadge tone="mint"><Icon glyph={Wallet01Icon} size={12} /> {isFixed ? 'Marge' : 'Commission'} : {commissionDisplay}</SellerBadge>
-                {op && <SellerBadge tone="violet">{money(op.price)}</SellerBadge>}
+                <SellerBadge tone="violet">{money(campaign.productPrice)}</SellerBadge>
               </div>
             </div>
           </div>
@@ -136,7 +255,7 @@ export function Share() {
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#f8f7fc] px-4 py-3">
           <span className="text-[10px] font-bold uppercase text-[#9290a2]">Code</span>
-          <span className="flex-1 text-xs font-bold text-[#292541]">{campaign.code}</span>
+          <span className="flex-1 text-xs font-bold text-[#292541]">{campaign.sellerCode}</span>
           <button onClick={copyCode} className="shrink-0 rounded-lg bg-[#efedff] px-3 py-1.5 text-[10px] font-bold text-[#5040cf]" data-testid="button-copy-code">
             <Icon glyph={Copy01Icon} size={13} /> Copier
           </button>
@@ -182,7 +301,7 @@ export function Share() {
             <p className="mt-1 font-[Space_Grotesk] text-xl font-bold text-[#278e69]">{money(campaign.earnings)}</p>
           </div>
         </div>
-        {campaign.sales > 0 && (
+        {campaign.sales > 0 && campaign.clicks > 0 && (
           <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#e7faf2] px-4 py-3 text-xs font-bold text-[#278e69]">
             <Icon glyph={CheckmarkCircle02Icon} size={16} /> Taux de conversion : {Math.round((campaign.sales / campaign.clicks) * 100)}%
           </div>
@@ -193,8 +312,7 @@ export function Share() {
       <div className="mt-6 flex flex-col items-center gap-3">
         <Button onClick={copyLink} testId="button-copy-share" className="w-full sm:w-auto"><Icon glyph={Share02Icon} size={16} /> Copier et partager</Button>
         <Link
-          href={linkToCheckoutPath(campaign.link)}
-          onClick={() => trackClick(campaign.campaignId, campaign.code)}
+          href={checkoutPath}
           className="text-xs font-bold text-[#5b49e8] hover:underline"
           data-testid="link-preview-checkout"
         >

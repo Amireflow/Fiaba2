@@ -5,8 +5,8 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { useMerchantId } from '@/hooks/use-supabase-query';
-import { supabaseInsert, supabaseUpdate } from '@/hooks/use-supabase-query';
+import { useMerchantId, supabaseInsert, supabaseUpdate } from '@/hooks/use-supabase-query';
+import { uploadImageToSupabase } from '@/lib/storage-upload';
 import {
   Field,
   MerchantButton as Button,
@@ -47,6 +47,7 @@ export function ProductForm() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Load existing product from Supabase
   useEffect(() => {
@@ -75,6 +76,26 @@ export function ProductForm() {
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    setUploadingImage(true);
+    haptic('medium');
+
+    const { url, error: uploadErr } = await uploadImageToSupabase(file, 'products');
+    setUploadingImage(false);
+
+    if (uploadErr || !url) {
+      haptic('error');
+      toast({ title: 'Erreur d\'envoi', description: uploadErr || 'Impossible de télécharger l\'image.' });
+    } else {
+      haptic('success');
+      setField('image_url', url);
+      toast({ title: 'Image ajoutée !', description: 'L\'image a été téléchargée vers Supabase Storage.' });
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -214,30 +235,55 @@ export function ProductForm() {
           </form>
         </Card>
 
-        {/* Preview & image */}
+        {/* Upload Image & Preview */}
         <div className="space-y-5">
           <Card>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Image du produit</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Photo du produit</p>
             <div className="mt-3">
               {form.image_url ? (
-                <div className="relative overflow-hidden rounded-2xl">
+                <div className="relative overflow-hidden rounded-2xl border border-[#f1effa]">
                   <img src={form.image_url} alt={form.name} className="h-48 w-full object-cover" />
-                  <button type="button" onClick={() => setField('image_url', '')} className="absolute right-2 top-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-bold text-[#c45667]" data-testid="button-remove-image">Retirer</button>
-                </div>
-              ) : (
-                <div className="grid h-48 place-items-center rounded-2xl bg-[#f8f7fc] text-[#9290a2]">
-                  <div className="text-center">
-                    <Icon glyph={ImageUploadIcon} size={32} />
-                    <p className="mt-2 text-xs">Aperçu image</p>
+                  <div className="absolute right-2 top-2 flex gap-1.5">
+                    <label className="cursor-pointer rounded-lg bg-white/95 px-2.5 py-1 text-[10px] font-bold text-[#5b49e8] shadow-sm hover:bg-white transition">
+                      Changer
+                      <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingImage} />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setField('image_url', '')}
+                      className="rounded-lg bg-white/95 px-2.5 py-1 text-[10px] font-bold text-[#c45667] shadow-sm hover:bg-white transition"
+                      data-testid="button-remove-image"
+                    >
+                      Retirer
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <label className="flex h-48 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8d5e8] bg-[#f8f7fc] p-4 text-center transition hover:border-[#5b49e8] hover:bg-[#efedff]/40">
+                  {uploadingImage ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+                      <p className="text-xs font-bold text-[#5b49e8]">Envoi vers Supabase Storage…</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-[#77738a]">
+                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                        <Icon glyph={ImageUploadIcon} size={24} />
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-[#292541]">Télécharger une photo</p>
+                        <p className="text-[10px] text-[#9290a2] mt-0.5">Glissez ou cliquez pour importer</p>
+                      </div>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingImage} data-testid="input-image-file" />
+                </label>
               )}
-              <input value={form.image_url} onChange={(e) => setField('image_url', e.target.value)} placeholder="URL de l'image…" className={`${inputClass} mt-3`} data-testid="input-image" />
             </div>
           </Card>
 
           <Card>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu client</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu fiche produit</p>
             <div className="mt-3">
               {form.image_url && <img src={form.image_url} alt={form.name} className="h-32 w-full rounded-xl object-cover" />}
               <h3 className="mt-3 font-[Space_Grotesk] text-base font-bold text-[#292541]">{form.name || 'Nom du produit'}</h3>

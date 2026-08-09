@@ -1,10 +1,11 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { Copy01Icon, Search01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
+import { money, haptic } from '@/lib/utils';
 import {
   Badge,
   EmptyState,
@@ -15,67 +16,133 @@ import {
   inputClass,
 } from '../components/merchant-ui';
 
-type Seller = {
+type SellerRow = {
   id: string;
-  name: string;
-  city: string;
-  followers: string;
-  category: string;
-  status: 'Actif' | 'Invité' | 'En attente';
+  display_name: string;
+  status: string;
+  followers: number;
+  phone: string | null;
+  joined_at: string | null;
+  invited_at: string;
+  city: string | null;
   sales: number;
   revenue: number;
-  joined: string;
 };
 
-const seedSellers: Seller[] = [
-  { id: 's-1', name: 'Marième Fall', city: 'Dakar', followers: '12,4k abonnés', category: 'Beauté & soin', status: 'Actif', sales: 42, revenue: 42500, joined: '15 mars 2024' },
-  { id: 's-2', name: 'Ndeye Kébé', city: 'Rufisque', followers: '8,2k abonnés', category: 'Maison & famille', status: 'Actif', sales: 31, revenue: 31200, joined: '22 mars 2024' },
-  { id: 's-3', name: 'Saliou Kane', city: 'Thiès', followers: '5,8k abonnés', category: 'Mode locale', status: 'Actif', sales: 24, revenue: 24800, joined: '3 avril 2024' },
-  { id: 's-4', name: 'Aminata Seck', city: 'Dakar', followers: '3,1k abonnés', category: 'Beauté & soin', status: 'Invité', sales: 0, revenue: 0, joined: '—' },
-  { id: 's-5', name: 'Ousmane Diop', city: 'Pikine', followers: '6,5k abonnés', category: 'Épicerie', status: 'En attente', sales: 0, revenue: 0, joined: '—' },
-];
-
-const recommended: Seller[] = [
-  { id: 'r-1', name: 'Fatima Sow', city: 'Dakar', followers: '15,2k abonnés', category: 'Beauté & soin', status: 'Invité', sales: 0, revenue: 0, joined: '—' },
-  { id: 'r-2', name: 'Cheikh Ndiaye', city: 'Mbour', followers: '9,7k abonnés', category: 'Mode locale', status: 'Invité', sales: 0, revenue: 0, joined: '—' },
-];
+const statusLabel: Record<string, 'Actif' | 'Invité' | 'En attente'> = {
+  actif: 'Actif',
+  invite: 'Invité',
+  suspendu: 'En attente',
+};
 
 const getInitials = (name: string) => name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
+function formatFollowers(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace('.', ',')}k abonnés`;
+  return `${n} abonnés`;
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 export function Sellers() {
   const { toast } = useToast();
-  const [sellers, setSellers] = useState<Seller[]>(() => read('sellers', seedSellers));
-  const [invited, setInvited] = useState<string[]>(() => read('invites', []));
+  const { merchantId } = useAuth();
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('Tous');
 
   const filters = ['Tous', 'Actif', 'Invité', 'En attente'] as const;
 
+  useEffect(() => {
+    async function loadData() {
+      if (!merchantId) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch sellers for this merchant
+      const { data: sellerRows } = await supabase
+        .from('sellers')
+        .select('id, display_name, status, followers, phone, joined_at, invited_at, profile_id')
+        .eq('merchant_id', merchantId);
+
+      const rows = (sellerRows as { id: string; display_name: string; status: string; followers: number; phone: string | null; joined_at: string | null; invited_at: string; profile_id: string | null }[] | null) ?? [];
+      if (rows.length === 0) {
+        setSellers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch profile cities
+      const profileIds = rows.map((r) => r.profile_id).filter(Boolean) as string[];
+      let cityMap = new Map<string, string>();
+      if (profileIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, city')
+          .in('id', profileIds);
+        ((profiles as { id: string; city: string | null }[] | null) ?? []).forEach((p) => {
+          cityMap.set(p.id, p.city ?? 'Dakar');
+        });
+      }
+
+      // Fetch commissions aggregated per seller
+      const sellerIds = rows.map((r) => r.id);
+      const { data: commissions } = await supabase
+        .from('commissions')
+        .select('seller_id, amount')
+        .in('seller_id', sellerIds);
+
+      const commissionAgg = new Map<string, { sales: number; revenue: number }>();
+      ((commissions as { seller_id: string; amount: number }[] | null) ?? []).forEach((c) => {
+        const agg = commissionAgg.get(c.seller_id) ?? { sales: 0, revenue: 0 };
+        agg.sales += 1;
+        agg.revenue += c.amount;
+        commissionAgg.set(c.seller_id, agg);
+      });
+
+      const enriched: SellerRow[] = rows.map((r) => {
+        const agg = commissionAgg.get(r.id) ?? { sales: 0, revenue: 0 };
+        return {
+          id: r.id,
+          display_name: r.display_name,
+          status: r.status,
+          followers: r.followers ?? 0,
+          phone: r.phone,
+          joined_at: r.joined_at,
+          invited_at: r.invited_at,
+          city: r.profile_id ? (cityMap.get(r.profile_id) ?? 'Dakar') : 'Dakar',
+          sales: agg.sales,
+          revenue: agg.revenue,
+        };
+      });
+
+      setSellers(enriched);
+      setLoading(false);
+    }
+    loadData();
+  }, [merchantId]);
+
   const filtered = sellers.filter((s) => {
-    const matchesFilter = filter === 'Tous' || s.status === filter;
+    const label = statusLabel[s.status] ?? 'En attente';
+    const matchesFilter = filter === 'Tous' || label === filter;
     const q = query.trim().toLowerCase();
-    const matchesQuery = q === '' || s.name.toLowerCase().includes(q) || s.city.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+    const matchesQuery = q === '' || s.display_name.toLowerCase().includes(q) || (s.city ?? '').toLowerCase().includes(q);
     return matchesFilter && matchesQuery;
   });
 
-  function invite(seller: Seller) {
-    if (invited.includes(seller.name)) return;
-    const updated = [...invited, seller.name];
-    setInvited(updated);
-    write('invites', updated);
-    const updatedSellers = sellers.map((s) => (s.id === seller.id ? { ...s, status: 'Invité' as const } : s));
-    setSellers(updatedSellers);
-    write('sellers', updatedSellers);
-    toast({ title: `${seller.name} invité`, description: 'Une notification lui a été envoyée.' });
-  }
-
   function copyInviteLink() {
-    const link = 'https://fiaba.sn/rejoindre/maison-ndar';
+    haptic('light');
+    const link = `https://fiaba.sn/rejoindre/${merchantId ?? ''}`;
     navigator.clipboard?.writeText(link).catch(() => {});
     toast({ title: "Lien d'invitation copié", description: 'Partagez-le avec vos vendeurs sur WhatsApp.' });
   }
 
-  const activeCount = sellers.filter((s) => s.status === 'Actif').length;
+  const activeCount = sellers.filter((s) => s.status === 'actif').length;
   const totalSales = sellers.reduce((sum, s) => sum + s.sales, 0);
   const totalRevenue = sellers.reduce((sum, s) => sum + s.revenue, 0);
 
@@ -108,56 +175,40 @@ export function Sellers() {
 
       {/* Sellers list */}
       <Card className="mt-5 p-0">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center p-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        ) : filtered.length === 0 ? (
           <EmptyState glyph={UserGroupIcon} title="Aucun vendeur trouvé" description="Modifiez votre recherche ou invitez de nouveaux vendeurs." action={<Button onClick={copyInviteLink}>Inviter un vendeur</Button>} />
         ) : (
           <ScrollTable minWidth={560} testId="scroll-sellers">
             <div className="divide-y divide-[#f1eef7]">
-              {filtered.map((s) => (
-                <Link key={s.id} href={`/merchant/sellers/${s.id}`} className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-[#faf9fd]" data-testid={`view-${s.id}`}>
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]">{getInitials(s.name)}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-[#292541]">{s.name}</p>
-                    <p className="mt-0.5 truncate text-xs text-[#9290a2]">{s.city} · {s.followers} · {s.category}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    {s.status === 'Actif' ? (
-                      <>
-                        <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">{s.sales} ventes</p>
-                        <p className="text-[10px] text-[#9290a2]">{money(s.revenue)}</p>
-                      </>
-                    ) : (
-                      <Badge tone={s.status === 'Invité' ? 'violet' : 'amber'}>{s.status}</Badge>
-                    )}
-                  </div>
-                </Link>
-              ))}
+              {filtered.map((s) => {
+                const label = statusLabel[s.status] ?? 'En attente';
+                return (
+                  <Link key={s.id} href={`/merchant/sellers/${s.id}`} className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-[#faf9fd]" data-testid={`view-${s.id}`}>
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]">{getInitials(s.display_name)}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-[#292541]">{s.display_name}</p>
+                      <p className="mt-0.5 truncate text-xs text-[#9290a2]">{s.city} · {formatFollowers(s.followers)}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {s.status === 'actif' ? (
+                        <>
+                          <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">{s.sales} ventes</p>
+                          <p className="text-[10px] text-[#9290a2]">{money(s.revenue)}</p>
+                        </>
+                      ) : (
+                        <Badge tone={label === 'Invité' ? 'violet' : 'amber'}>{label}</Badge>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </ScrollTable>
         )}
-      </Card>
-
-      {/* Recommended */}
-      <Card className="mt-5">
-        <div className="flex items-center justify-between">
-          <div><p className="text-sm font-bold text-[#292541]">Profils recommandés</p><p className="mt-1 text-[11px] text-[#9290a2]">Choisis pour la qualité de leur communauté.</p></div>
-          <Badge>{recommended.length} nouveaux</Badge>
-        </div>
-        <div className="mt-4 divide-y divide-[#f1eef7]">
-          {recommended.map((s) => {
-            const isInvited = invited.includes(s.name);
-            return (
-              <div key={s.id} className="flex items-center gap-3 py-4">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]">{getInitials(s.name)}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#292541]">{s.name}</p>
-                  <p className="mt-0.5 text-xs text-[#9290a2]">{s.city} · {s.followers} · {s.category}</p>
-                </div>
-                {isInvited ? <Badge tone="mint">Invité</Badge> : <Button variant="soft" onClick={() => invite(s)} testId={`invite-${s.id}`}>Inviter</Button>}
-              </div>
-            );
-          })}
-        </div>
       </Card>
     </Page>
   );

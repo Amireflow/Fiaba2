@@ -59,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setProfile(prof);
 
-      // 2. Fetch or create Merchant if role === 'marchand'
-      if (prof.role === 'marchand') {
+      // 2. Fetch or create Merchant if role === 'marchand' or 'admin'
+      if (prof.role === 'marchand' || prof.role === 'admin') {
         const { data: merch } = await (supabase.from('merchants') as any)
           .select('*')
           .eq('owner_id', userId)

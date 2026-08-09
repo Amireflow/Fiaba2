@@ -1,5 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ClerkProvider } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   ArrowDown01Icon,
@@ -20,9 +22,17 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import { MerchantRouter, Onboarding } from '@/pages/merchant';
+import { SignInPage, SignUpPage } from '@/pages/auth';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 type Icon = typeof Home01Icon;
 
 const icon = (glyph: Icon, size = 18, stroke = 1.8) => (
@@ -135,8 +145,31 @@ function Home() {
 }
 
 function Router() {
-  return <RoutedErrorBoundary><Switch><Route path="/" component={Home} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  return <RoutedErrorBoundary><Switch>
+    <Route path="/" component={Home} />
+    <Route path="/onboarding" component={Onboarding} />
+    <Route path="/sign-in/*?" component={SignInPage} />
+    <Route path="/sign-up/*?" component={SignUpPage} />
+    <Route path="/merchant/*?" component={MerchantRouter} />
+    <Route component={NotFound} />
+  </Switch></RoutedErrorBoundary>;
 }
 function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>; }
+function App() {
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={{
+      variables: { colorPrimary: '#5b49e8', colorForeground: '#282441', colorMutedForeground: '#77738a', fontFamily: 'DM Sans, sans-serif', borderRadius: '1rem' },
+    }}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{
+      signIn: { start: { title: 'Bon retour parmi nous', subtitle: 'Connectez-vous à votre espace Fiaba' } },
+      signUp: { start: { title: 'Créer votre compte Fiaba', subtitle: 'Le commerce avance ensemble' } },
+    }}
+  >
+    <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={basePath}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>
+  </ClerkProvider>;
+}
 export default App;

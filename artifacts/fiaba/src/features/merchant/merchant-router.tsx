@@ -17,6 +17,7 @@ import { DeliveryZones } from './pages/delivery-zones';
 import { DeliveryZoneNew } from './pages/delivery-zone-new';
 import { Settings } from './pages/settings';
 import { Notifications } from './pages/notifications';
+import { MerchantSubscriptionPage } from './pages/merchant-subscription';
 
 export function MerchantRouter() {
   return (
@@ -24,6 +25,7 @@ export function MerchantRouter() {
       <MerchantShell>
         <Switch>
           <Route path="/merchant" component={Overview} />
+          <Route path="/merchant/subscription" component={MerchantSubscriptionPage} />
           <Route path="/merchant/products" component={Products} />
           <Route path="/merchant/products/new" component={ProductForm} />
           <Route path="/merchant/products/:id/edit" component={ProductForm} />

@@ -8,6 +8,8 @@ import { AdminLogo } from './admin-ui';
 import { adminPrimaryNav, adminSecondaryNav, adminAllNav } from '@/config/admin-navigation';
 import { haptic } from '@/lib/utils';
 
+import { useAuth } from '@/hooks/use-auth';
+
 /* Bottom nav items (4 shortcuts + Plus button) */
 const bottomNav = [
   { href: '/admin', label: 'Accueil', glyph: DashboardSquare01Icon },
@@ -20,8 +22,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await signOut();
     window.location.href = import.meta.env.BASE_URL;
   };
 

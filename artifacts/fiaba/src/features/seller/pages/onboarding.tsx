@@ -17,11 +17,11 @@ const CITIES = [
 ];
 
 export function SellerOnboarding() {
-  const { profile, fetchProfile } = useAuth();
+  const { profile, refetchProfile } = useAuth();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(0);
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('');
+  const [city, setCity] = useState('Dakar');
   const [selectedNiches, setSelectedNiches] = useState<string[]>([]);
   const [audienceType, setAudienceType] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,53 +55,46 @@ export function SellerOnboarding() {
     haptic('medium');
 
     try {
-      // Update profile
-      await supabase
-        .from('profiles')
-        .update({ phone, city } as never)
+      // 1. Update profile
+      await (supabase.from('profiles') as any)
+        .update({ phone, city, role: 'vendeur' })
         .eq('id', profile.id);
 
-      // Update seller profile
-      await supabase
-        .from('seller_profiles')
-        .update({
-          city,
-          audience_type: audienceType || null,
-        } as never)
-        .eq('profile_id', profile.id);
+      // 2. Fetch or create seller
+      let { data: seller } = await (supabase.from('sellers') as any)
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
 
-      // Fetch niche IDs and insert seller_niches
-      const { data: nicheRows } = await supabase
-        .from('niches')
-        .select('id, name')
-        .in('name', selectedNiches)
-        .eq('type', 'category');
-
-      if (nicheRows && nicheRows.length > 0) {
-        // Get seller record
-        const { data: seller } = await supabase
-          .from('sellers')
+      if (!seller) {
+        const { data: newSeller } = await (supabase.from('sellers') as any)
+          .insert({
+            profile_id: profile.id,
+            display_name: profile.full_name || 'Vendeur Fiaba',
+            phone,
+            status: 'actif',
+          })
           .select('id')
-          .eq('profile_id', profile.id)
           .single();
-
-        const sellerId = (seller as { id: string } | null)?.id;
-        const niches = nicheRows as { id: string; name: string }[];
-        if (sellerId) {
-          const inserts = niches.map(n => ({
-            seller_id: sellerId,
-            niche_id: n.id,
-          }));
-          await supabase.from('seller_niches').upsert(inserts as never);
-        }
+        seller = newSeller;
       }
 
+      // 3. Update seller profile
+      await (supabase.from('seller_profiles') as any)
+        .upsert({
+          profile_id: profile.id,
+          display_name: profile.full_name || 'Vendeur Fiaba',
+          city,
+          audience_type: audienceType || null,
+        });
+
       haptic('success');
-      await fetchProfile(profile.id);
+      await refetchProfile();
       setLocation('/seller');
-    } catch (e) {
+    } catch (e: any) {
+      console.error('Seller onboarding error:', e);
       haptic('error');
-      setError('Une erreur est survenue. Réessayez.');
+      setError('Une erreur est survenue lors de l’enregistrement de votre profil.');
     } finally {
       setLoading(false);
     }

@@ -2,59 +2,62 @@
 -- Fiaba — Données de démonstration (local & SQL editor)
 -- ============================================================================
 
--- 1. Utilisateur de test dans auth.users (ID fixe pour satisfaire la FK profiles.id -> auth.users.id)
+-- 1. Utilisateurs de test dans auth.users
 insert into auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
 )
-values (
-  '00000000-0000-0000-0000-000000000001',
-  '00000000-0000-0000-0000-000000000001',
-  'test@example.com',
-  crypt('password123', gen_salt('bf')),
-  now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Aminata Ndiaye","role":"marchand"}',
-  now(),
-  now(),
-  'authenticated',
-  'authenticated'
-)
+values
+  (
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000001',
+    'marchand@fiaba.sn',
+    crypt('password123', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Aminata Ndiaye","role":"marchand"}',
+    now(), now(), 'authenticated', 'authenticated'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000002',
+    'vendeur@fiaba.sn',
+    crypt('password123', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Marième Fall","role":"vendeur"}',
+    now(), now(), 'authenticated', 'authenticated'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000003',
+    'admin@fiaba.sn',
+    crypt('password123', gen_salt('bf')),
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{"full_name":"Super Admin Fiaba","role":"admin"}',
+    now(), now(), 'authenticated', 'authenticated'
+  )
 on conflict (id) do nothing;
 
--- 2. Garantir le profil marchand dans public.profiles
-insert into public.profiles (id, role, full_name, phone, email, city)
-select
-  u.id,
-  'marchand',
-  'Aminata Ndiaye',
-  '+221 77 482 19 06',
-  u.email,
-  'Saint-Louis'
-from auth.users u
-where u.id = '00000000-0000-0000-0000-000000000001' or u.email = 'test@example.com'
-limit 1
+-- 2. Profils publics correspondants
+insert into public.profiles (id, role, full_name, phone, email, city, verification_status, trust_score) values
+  ('00000000-0000-0000-0000-000000000001', 'marchand', 'Aminata Ndiaye', '+221 77 482 19 06', 'marchand@fiaba.sn', 'Saint-Louis', 'verified', 95),
+  ('00000000-0000-0000-0000-000000000002', 'vendeur', 'Marième Fall', '+221 77 123 45 67', 'vendeur@fiaba.sn', 'Dakar', 'verified', 88),
+  ('00000000-0000-0000-0000-000000000003', 'admin', 'Super Admin Fiaba', '+221 77 000 00 00', 'admin@fiaba.sn', 'Dakar', 'verified', 100)
 on conflict (id) do update set
-  role = 'marchand',
-  full_name = 'Aminata Ndiaye';
+  role = excluded.role,
+  full_name = excluded.full_name;
 
--- 3. Boutique "Maison Ndar" (UUID fixe)
-insert into public.merchants (id, owner_id, name, slug, description, phone, email, city)
-select
-  'a0000000-0000-0000-0000-000000000001',
-  p.id,
-  'Maison Ndar',
-  'maison-ndar',
-  'Boutique de produits artisanaux du Sénégal.',
-  '+221 77 482 19 06',
-  'bonjour@maisonndar.sn',
-  'Saint-Louis'
-from public.profiles p
-where p.id = '00000000-0000-0000-0000-000000000001' or p.email = 'test@example.com'
-limit 1
-on conflict (id) do update set
-  name = 'Maison Ndar',
-  slug = 'maison-ndar';
+-- 3. Boutique "Maison Ndar" (UUID fixe lié au marchand)
+insert into public.merchants (id, owner_id, name, slug, description, phone, email, city) values
+  ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Maison Ndar', 'maison-ndar', 'Boutique artisanale du Sénégal', '+221 77 482 19 06', 'marchand@fiaba.sn', 'Saint-Louis')
+on conflict (id) do update set owner_id = excluded.owner_id;
+
+-- 3b. Vendeur lié à Marième Fall
+insert into public.sellers (id, profile_id, merchant_id, display_name, phone, followers, status) values
+  ('b0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Marième Fall', '+221 77 123 45 67', 12400, 'actif')
+on conflict (id) do update set profile_id = excluded.profile_id;
 
 -- 4. Produits
 insert into public.products (merchant_id, name, category, price, stock, status) values
@@ -106,3 +109,26 @@ insert into public.payments (merchant_id, amount, method, status, reference, pai
   ('a0000000-0000-0000-0000-000000000001', 48800, 'wave', 'verse', 'WV-24053101', '2024-05-31T10:00:00Z'),
   ('a0000000-0000-0000-0000-000000000001', 36500, 'orange_money', 'verse', 'OM-24051501', '2024-05-15T10:00:00Z')
 on conflict do nothing;
+
+-- 10. Modèle Économique & Monétisation
+insert into public.subscription_plans (id, name, price_monthly, max_active_products, max_active_campaigns, platform_fee_rate, features) values
+  ('c0000000-0000-0000-0000-000000000001', 'Free', 0, 5, 2, 5.00, '["5 produits actifs", "2 campagnes actives", "Commission 5%", "Support standard"]'::jsonb),
+  ('c0000000-0000-0000-0000-000000000002', 'Premium', 25000, 50, 10, 3.00, '["50 produits actifs", "10 campagnes actives", "Commission réduite 3%", "Badges certifiés", "Support prioritaire 24/7"]'::jsonb)
+on conflict (name) do update set
+  price_monthly = excluded.price_monthly,
+  max_active_products = excluded.max_active_products,
+  max_active_campaigns = excluded.max_active_campaigns,
+  platform_fee_rate = excluded.platform_fee_rate;
+
+insert into public.platform_fee_rules (category, rate_percent, fixed_amount, is_active) values
+  (null, 5.00, 0, true)
+on conflict do nothing;
+
+insert into public.payout_fee_rules (fee_percent, fixed_fee, free_threshold, is_active) values
+  (0.00, 500, 25000, true)
+on conflict do nothing;
+
+insert into public.merchant_subscriptions (merchant_id, plan_id, status) values
+  ('a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'active')
+on conflict (merchant_id) do nothing;
+

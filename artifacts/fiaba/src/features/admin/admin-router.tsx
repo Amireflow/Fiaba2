@@ -15,6 +15,7 @@ import { AdminNiches } from './pages/niches';
 import { AdminNicheNew } from './pages/niche-new';
 import { AdminSettings } from './pages/settings';
 import { AdminNotifications } from './pages/notifications';
+import { FinancialReportingPage } from './pages/financial-reporting';
 
 export function AdminRouter() {
   return (
@@ -22,6 +23,7 @@ export function AdminRouter() {
       <AdminShell>
         <Switch>
           <Route path="/admin" component={AdminOverview} />
+          <Route path="/admin/finances" component={FinancialReportingPage} />
           <Route path="/admin/users" component={AdminUsers} />
           <Route path="/admin/products" component={AdminProducts} />
           <Route path="/admin/orders" component={AdminOrders} />

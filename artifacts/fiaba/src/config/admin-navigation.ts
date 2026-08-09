@@ -20,6 +20,7 @@ export type NavItem = {
 
 export const adminPrimaryNav: NavItem[] = [
   { href: '/admin', label: "Vue d'ensemble", glyph: DashboardSquare01Icon },
+  { href: '/admin/finances', label: 'Finances & Modèle Éco', glyph: Wallet01Icon },
   { href: '/admin/users', label: 'Utilisateurs', glyph: UserGroupIcon },
   { href: '/admin/products', label: 'Produits & campagnes', glyph: Store01Icon },
   { href: '/admin/orders', label: 'Commandes', glyph: CheckmarkCircle02Icon },

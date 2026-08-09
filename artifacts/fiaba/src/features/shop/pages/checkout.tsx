@@ -17,13 +17,9 @@ import {
 } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
 import { money, haptic } from '@/lib/utils';
-import { validateSecureLink, extractTokenFromUrl, type SecureLinkPayload } from '@/lib/link';
-import { attributeOrder, trackClick, findSellerByCode, type CheckoutOrderData } from '@/lib/attribution';
-import { seedOpportunities } from '@/config/seller-seeds';
-import { seedZones } from '@/config/seeds';
-import type { Opportunity, DeliveryZone } from '@/types/entities';
+import { supabase } from '@/lib/supabase';
+import { extractTokenFromUrl } from '@/lib/link';
 
 /* ── Types ── */
 
@@ -33,7 +29,8 @@ type CheckoutForm = {
   quantity: number;
   customerName: string;
   phone: string;
-  zone: string;
+  zoneId: string;
+  zoneName: string;
   address: string;
   paymentMethod: 'wave' | 'orange' | 'cod';
   paymentNumber: string;
@@ -41,26 +38,36 @@ type CheckoutForm = {
   sellerCode: string;
 };
 
-type CustomerOrder = {
+type CampaignInfo = {
+  campaign_id: string;
+  campaign_name: string;
+  commission: number;
+  commission_type: string | null;
+  model: string;
+  product_id: string | null;
+  product_name: string;
+  product_price: number;
+  product_image_url: string | null;
+  product_description: string | null;
+  merchant_id: string;
+  merchant_name: string;
+};
+
+type ZoneInfo = { id: string; name: string; fee: number };
+
+type ConfirmedOrder = {
   id: string;
-  productId: string;
   productName: string;
   merchantName: string;
-  sellerId?: string;
-  sellerCode?: string;
   quantity: number;
-  unitPrice: number;
   zone: string;
   deliveryFee: number;
   total: number;
   customerName: string;
   phone: string;
-  address: string;
   paymentMethod: string;
-  paymentNumber: string;
-  note: string;
-  date: string;
-  status: 'À préparer' | 'En livraison' | 'Livrée' | 'Annulée';
+  sellerCode: string | null;
+  commissionAmount: number;
 };
 
 /* ── Helpers ── */
@@ -73,10 +80,15 @@ const steps: { id: Step; label: string; glyph: IconType }[] = [
 ];
 
 function validatePhone(phone: string): boolean {
-  // Senegalese phone: starts with 7, 10 digits, or +221 + 9 digits
   const cleaned = phone.replace(/[\s-]/g, '');
   return /^(7[0-8])\d{7}$/.test(cleaned) || /^\+2217[0-8]\d{7}$/.test(cleaned) || /^(77|78|76|70)\d{7}$/.test(cleaned);
 }
+
+const paymentMethodMap: Record<string, 'wave' | 'orange_money' | 'cash'> = {
+  wave: 'wave',
+  orange: 'orange_money',
+  cod: 'cash',
+};
 
 /* ── Component ── */
 
@@ -84,16 +96,17 @@ export function Checkout() {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
   const { toast } = useToast();
-  const [opportunities] = useState<Opportunity[]>(() => read('opportunities', seedOpportunities));
-  const [zones] = useState<DeliveryZone[]>(() => read('delivery-zones', seedZones));
 
-  const op = opportunities.find((o) => o.id === id);
+  const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
+  const [zones, setZones] = useState<ZoneInfo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>('product');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [confirmedOrder, setConfirmedOrder] = useState<CustomerOrder | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Seller attribution state
-  const [sellerInfo, setSellerInfo] = useState<{ sellerId: string; sellerCode: string; campaignId: string } | null>(null);
+  const [sellerInfo, setSellerInfo] = useState<{ sellerId: string; sellerCode: string; campaignId: string; trackingLinkId: string } | null>(null);
   const [linkStatus, setLinkStatus] = useState<'validating' | 'valid' | 'invalid' | 'none'>('none');
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -101,7 +114,8 @@ export function Checkout() {
     quantity: 1,
     customerName: '',
     phone: '',
-    zone: '',
+    zoneId: '',
+    zoneName: '',
     address: '',
     paymentMethod: 'wave',
     paymentNumber: '',
@@ -109,7 +123,65 @@ export function Checkout() {
     sellerCode: '',
   });
 
-  // Parse and validate the secure link token from URL on mount
+  // Load campaign + product + merchant + zones
+  useEffect(() => {
+    async function loadData() {
+      if (!id) return;
+      setLoading(true);
+
+      // Fetch campaign with product + merchant
+      const { data: raw } = await supabase
+        .from('campaigns')
+        .select(`
+          id, name, commission, commission_type, model,
+          product_id, merchant_id,
+          products:product_id (id, name, price, image_url, description),
+          merchants:merchant_id (id, name)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (!raw) {
+        setLoading(false);
+        return;
+      }
+
+      const c = raw as {
+        id: string; name: string; commission: number; commission_type: string | null;
+        model: string; product_id: string | null; merchant_id: string;
+        products: { id: string; name: string; price: number; image_url: string | null; description: string | null } | null;
+        merchants: { id: string; name: string } | null;
+      };
+
+      setCampaign({
+        campaign_id: c.id,
+        campaign_name: c.name,
+        commission: c.commission,
+        commission_type: c.commission_type,
+        model: c.model,
+        product_id: c.product_id,
+        product_name: c.products?.name ?? c.name,
+        product_price: c.products?.price ?? 0,
+        product_image_url: c.products?.image_url ?? null,
+        product_description: c.products?.description ?? null,
+        merchant_id: c.merchant_id,
+        merchant_name: c.merchants?.name ?? 'Boutique',
+      });
+
+      // Fetch delivery zones for this merchant
+      const { data: zoneData } = await supabase
+        .from('delivery_zones')
+        .select('id, name, fee')
+        .eq('merchant_id', c.merchant_id)
+        .eq('is_active', true);
+      setZones(((zoneData as ZoneInfo[] | null) ?? []));
+
+      setLoading(false);
+    }
+    loadData();
+  }, [id]);
+
+  // Parse and validate the tracking link token from URL on mount
   useEffect(() => {
     const token = extractTokenFromUrl(window.location.href);
     if (!token) {
@@ -117,27 +189,68 @@ export function Checkout() {
       return;
     }
     setLinkStatus('validating');
-    validateSecureLink(token)
-      .then((result) => {
-        if (result.valid && result.payload) {
-          const p: SecureLinkPayload = result.payload;
-          setSellerInfo({ sellerId: p.sellerId, sellerCode: p.sellerCode, campaignId: p.campaignId });
-          setForm((prev) => ({ ...prev, sellerCode: p.sellerCode }));
-          setLinkStatus('valid');
-          // Track the click
-          trackClick(p.campaignId, p.sellerCode);
-        } else {
-          setLinkStatus('invalid');
-          setLinkError(result.error);
-        }
-      })
-      .catch(() => {
+
+    async function validateToken() {
+      // Look up tracking link by token
+      const { data: link } = await supabase
+        .from('tracking_links')
+        .select('id, seller_id, seller_code, campaign_id, is_active, expires_at, clicks')
+        .eq('token', token || '')
+        .single();
+
+      const tl = link as { id: string; seller_id: string; seller_code: string; campaign_id: string; is_active: boolean; expires_at: string | null; clicks: number } | null;
+
+      if (!tl || !tl.is_active) {
         setLinkStatus('invalid');
-        setLinkError('Erreur de validation du lien');
+        setLinkError('Lien non trouvé ou désactivé');
+        return;
+      }
+
+      // Check expiry
+      if (tl.expires_at && new Date(tl.expires_at) < new Date()) {
+        setLinkStatus('invalid');
+        setLinkError('Lien expiré');
+        return;
+      }
+
+      // Valid! Set seller info
+      setSellerInfo({
+        sellerId: tl.seller_id,
+        sellerCode: tl.seller_code,
+        campaignId: tl.campaign_id,
+        trackingLinkId: tl.id,
       });
+      setForm((prev) => ({ ...prev, sellerCode: tl.seller_code }));
+      setLinkStatus('valid');
+
+      // Track the click: insert into clicks + increment tracking_links.clicks
+      await supabase.from('clicks').insert({
+        tracking_link_id: tl.id,
+        user_agent: navigator.userAgent,
+        referrer: document.referrer || null,
+      } as never);
+
+      await (supabase
+        .from('tracking_links') as any)
+        .update({ clicks: tl.clicks + 1 })
+        .eq('id', tl.id);
+    }
+
+    validateToken().catch(() => {
+      setLinkStatus('invalid');
+      setLinkError('Erreur de validation du lien');
+    });
   }, [location]);
 
-  if (!op) {
+  if (loading) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-[#f8f8fc]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#e4e1ff] border-t-[#5b49e8]" />
+      </div>
+    );
+  }
+
+  if (!campaign) {
     return (
       <div className="grid min-h-[100dvh] place-items-center bg-[#f8f8fc] px-5">
         <div className="text-center">
@@ -150,10 +263,9 @@ export function Checkout() {
     );
   }
 
-  const activeZones = zones.filter((z) => z[1]);
-  const selectedZone = activeZones.find((z) => z[0] === form.zone);
-  const deliveryFee = selectedZone ? selectedZone[2] : 0;
-  const subtotal = op.price * form.quantity;
+  const selectedZone = zones.find((z) => z.id === form.zoneId);
+  const deliveryFee = selectedZone?.fee ?? 0;
+  const subtotal = campaign.product_price * form.quantity;
   const total = subtotal + deliveryFee;
 
   function setField<K extends keyof CheckoutForm>(key: K, value: CheckoutForm[K]) {
@@ -167,7 +279,7 @@ export function Checkout() {
       if (!form.customerName.trim()) e.customerName = 'Votre nom est requis';
       if (!form.phone.trim()) e.phone = 'Votre numéro est requis';
       else if (!validatePhone(form.phone)) e.phone = 'Numéro invalide (ex: 77 123 45 67)';
-      if (!form.zone) e.zone = 'Choisissez une zone de livraison';
+      if (!form.zoneId) e.zone = 'Choisissez une zone de livraison';
       if (!form.address.trim()) e.address = 'Votre adresse est requise';
     }
     if (s === 'payment') {
@@ -195,76 +307,137 @@ export function Checkout() {
     if (step === 'payment') setStep('delivery');
   }
 
-  function submitOrder() {
+  async function submitOrder() {
+    if (!campaign || submitting) return;
+    setSubmitting(true);
+    haptic('success');
+
+    // Calculate commission
+    let commissionAmount = 0;
+    let sellerAttributed = false;
+
+    if (sellerInfo) {
+      sellerAttributed = true;
+      if (campaign.commission_type === 'fixed') {
+        commissionAmount = campaign.commission * form.quantity;
+      } else {
+        commissionAmount = Math.round((campaign.product_price * form.quantity * campaign.commission) / 100);
+      }
+    }
+
     // Try to find seller by code if not already attributed from link
     let resolvedSellerId = sellerInfo?.sellerId;
     let resolvedSellerCode = sellerInfo?.sellerCode;
 
     if (!resolvedSellerCode && form.sellerCode.trim()) {
-      const found = findSellerByCode(form.sellerCode.trim());
+      const { data: linkByCode } = await supabase
+        .from('tracking_links')
+        .select('seller_id, seller_code')
+        .eq('seller_code', form.sellerCode.trim().toUpperCase())
+        .eq('is_active', true)
+        .limit(1);
+
+      const found = (linkByCode as { seller_id: string; seller_code: string }[] | null)?.[0];
       if (found) {
-        resolvedSellerCode = found.code;
-        resolvedSellerId = found.id;
+        resolvedSellerId = found.seller_id;
+        resolvedSellerCode = found.seller_code;
+        sellerAttributed = true;
+        if (campaign.commission_type === 'fixed') {
+          commissionAmount = campaign.commission * form.quantity;
+        } else {
+          commissionAmount = Math.round((campaign.product_price * form.quantity * campaign.commission) / 100);
+        }
       }
     }
 
-    const order: CustomerOrder = {
-      id: `CMD-${Date.now().toString().slice(-6)}`,
-      productId: op!.id,
-      productName: op!.productName,
-      merchantName: op!.merchantName,
-      sellerId: resolvedSellerId,
-      sellerCode: resolvedSellerCode,
+    // Insert order
+    const { data: orderRow, error: orderErr } = await (supabase
+      .from('orders') as any)
+      .insert({
+        merchant_id: campaign.merchant_id,
+        seller_id: resolvedSellerId ?? null,
+        campaign_id: campaign.campaign_id,
+        customer_name: form.customerName.trim(),
+        customer_phone: form.phone.trim(),
+        customer_address: form.address.trim(),
+        total_amount: total,
+        commission_amount: commissionAmount,
+        status: 'a_preparer',
+        status_v2: 'created',
+        zone_name: form.zoneName || selectedZone?.name || null,
+        delivery_fee: deliveryFee,
+        payment_method: paymentMethodMap[form.paymentMethod],
+        commission_model: campaign.model as 'commission' | 'marge',
+        commission_type: (campaign.commission_type ?? 'percentage') as 'percentage' | 'fixed',
+        commission_rate: campaign.commission,
+        snapshot_product_price: campaign.product_price,
+        snapshot_commission_amount: commissionAmount,
+        merchant_amount: total - commissionAmount - deliveryFee,
+        platform_fee: 0,
+      })
+      .select('id')
+      .single();
+
+    if (orderErr) {
+      setSubmitting(false);
+      haptic('error');
+      toast({ title: 'Erreur', description: orderErr.message });
+      return;
+    }
+
+    const orderId = (orderRow as { id: string }).id;
+
+    // Insert order item
+    if (campaign.product_id) {
+      await supabase.from('order_items').insert({
+        order_id: orderId,
+        product_id: campaign.product_id,
+        product_name: campaign.product_name,
+        unit_price: campaign.product_price,
+        quantity: form.quantity,
+      } as never);
+    }
+
+    // Insert commission if seller attributed
+    if (sellerAttributed && resolvedSellerId && commissionAmount > 0) {
+      const availableAt = new Date();
+      availableAt.setDate(availableAt.getDate() + 14); // 14-day safety period
+
+      await supabase.from('commissions').insert({
+        seller_id: resolvedSellerId,
+        order_id: orderId,
+        campaign_id: campaign.campaign_id,
+        amount: commissionAmount,
+        is_paid: false,
+        status: 'pending',
+        model: campaign.model as 'commission' | 'marge',
+        available_at: availableAt.toISOString(),
+      } as never);
+    }
+
+    setSubmitting(false);
+
+    const orderShortId = `CMD-${orderId.slice(-6).toUpperCase()}`;
+    setConfirmedOrder({
+      id: orderShortId,
+      productName: campaign.product_name,
+      merchantName: campaign.merchant_name,
       quantity: form.quantity,
-      unitPrice: op!.price,
-      zone: form.zone,
+      zone: form.zoneName || selectedZone?.name || '—',
       deliveryFee,
       total,
       customerName: form.customerName.trim(),
       phone: form.phone.trim(),
-      address: form.address.trim(),
       paymentMethod: form.paymentMethod,
-      paymentNumber: form.paymentNumber.trim(),
-      note: form.note.trim(),
-      date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-      status: 'À préparer',
-    };
-
-    // Save customer order
-    const existing = read<CustomerOrder[]>('customer-orders', []);
-    write('customer-orders', [order, ...existing]);
-
-    // Attribute to seller + merchant via the attribution service
-    const orderData: CheckoutOrderData = {
-      id: order.id,
-      productId: order.productId,
-      productName: order.productName,
-      merchantName: order.merchantName,
-      sellerId: resolvedSellerId,
-      sellerCode: resolvedSellerCode,
-      quantity: order.quantity,
-      unitPrice: order.unitPrice,
-      zone: order.zone,
-      deliveryFee: order.deliveryFee,
-      total: order.total,
-      customerName: order.customerName,
-      phone: order.phone,
-      address: order.address,
-      paymentMethod: order.paymentMethod,
-      paymentNumber: order.paymentNumber,
-      note: order.note,
-      date: order.date,
-      status: order.status,
-    };
-    const { commissionAmount, sellerAttributed } = attributeOrder(orderData);
-
-    setConfirmedOrder(order);
+      sellerCode: resolvedSellerCode ?? null,
+      commissionAmount,
+    });
     setStep('confirmation');
     toast({
       title: 'Commande confirmée !',
       description: sellerAttributed
-        ? `${order.id} · ${money(order.total)} · Vendeur ${resolvedSellerCode} crédité de ${money(commissionAmount)}`
-        : `${order.id} · ${money(order.total)}`,
+        ? `${orderShortId} · ${money(total)} · Vendeur ${resolvedSellerCode} crédité de ${money(commissionAmount)}`
+        : `${orderShortId} · ${money(total)}`,
     });
   }
 
@@ -304,13 +477,13 @@ export function Checkout() {
           {/* STEP 1: PRODUCT */}
           {step === 'product' && (
             <div className="space-y-4">
-              <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">{op.productName}</h1>
-              <p className="text-sm text-[#77738a]">par <strong className="text-[#292541]">{op.merchantName}</strong></p>
+              <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">{campaign.product_name}</h1>
+              <p className="text-sm text-[#77738a]">par <strong className="text-[#292541]">{campaign.merchant_name}</strong></p>
 
               {/* Product image */}
               <div className="overflow-hidden rounded-3xl bg-white">
-                {op.image ? (
-                  <img src={op.image} alt={op.productName} className="h-64 w-full object-cover" />
+                {campaign.product_image_url ? (
+                  <img src={campaign.product_image_url} alt={campaign.product_name} className="h-64 w-full object-cover" />
                 ) : (
                   <div className="grid h-64 w-full place-items-center bg-[#f8f7fc]">
                     <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={36} /></span>
@@ -323,7 +496,7 @@ export function Checkout() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Prix unitaire</p>
-                    <strong className="font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(op.price)}</strong>
+                    <strong className="font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(campaign.product_price)}</strong>
                   </div>
                   <div>
                     <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Quantité</p>
@@ -424,18 +597,18 @@ export function Checkout() {
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Zone de livraison *</label>
                   <div className="mt-1.5 space-y-2">
-                    {activeZones.map(([name, , fee]) => (
+                    {zones.map((z) => (
                       <button
-                        key={name}
-                        onClick={() => { haptic('light'); setField('zone', name); }}
-                        className={`flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition ${form.zone === name ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
-                        data-testid={`zone-${name}`}
+                        key={z.id}
+                        onClick={() => { haptic('light'); setField('zoneId', z.id); setField('zoneName', z.name); }}
+                        className={`flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition ${form.zoneId === z.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
+                        data-testid={`zone-${z.id}`}
                       >
                         <span className="flex items-center gap-2">
                           <Icon glyph={MapPinIcon} size={16} />
-                          <span className="text-sm font-bold text-[#292541]">{name}</span>
+                          <span className="text-sm font-bold text-[#292541]">{z.name}</span>
                         </span>
-                        <span className="text-xs font-bold text-[#278e69]">{money(fee)}</span>
+                        <span className="text-xs font-bold text-[#278e69]">{money(z.fee)}</span>
                       </button>
                     ))}
                   </div>
@@ -460,8 +633,8 @@ export function Checkout() {
               <div className="rounded-2xl bg-[#f6f5ff] p-5">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
                 <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-[#77738a]">{op.productName} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison {form.zone || '—'}</span><span className="font-bold text-[#292541]">{money(deliveryFee)}</span></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison {form.zoneName || '—'}</span><span className="font-bold text-[#292541]">{money(deliveryFee)}</span></div>
                   <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(total)}</strong></div>
                 </div>
               </div>
@@ -522,7 +695,7 @@ export function Checkout() {
               <div className="rounded-2xl bg-[#f6f5ff] p-5">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
                 <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-[#77738a]">{op.productName} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#292541]">{money(deliveryFee)}</span></div>
                   <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total à payer</span><strong className="font-[Space_Grotesk] text-xl font-bold text-[#5b49e8]">{money(total)}</strong></div>
                 </div>
@@ -533,8 +706,8 @@ export function Checkout() {
                 <Icon glyph={ShieldKeyIcon} size={16} /> Transaction protégée par chiffrement de bout en bout
               </div>
 
-              <button onClick={() => { haptic('success'); nextStep(); }} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7]" data-testid="button-confirm-order">
-                {form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(total)}`}
+              <button onClick={() => { haptic('success'); nextStep(); }} disabled={submitting} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7] disabled:opacity-60" data-testid="button-confirm-order">
+                {submitting ? 'Traitement…' : form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(total)}`}
               </button>
             </div>
           )}

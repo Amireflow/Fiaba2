@@ -27,6 +27,7 @@ export const primaryNav: NavItem[] = [
 ];
 
 export const secondaryNav: NavItem[] = [
+  { href: '/merchant/subscription', label: 'Abonnement & Quotas', glyph: Wallet01Icon },
   { href: '/merchant/delivery-zones', label: 'Zones de livraison', glyph: Store01Icon },
   { href: '/merchant/settings', label: 'Réglages', glyph: Settings02Icon },
 ];

@@ -1,51 +1,193 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { ArrowUpRight01Icon, Chart02Icon, Copy01Icon, Share02Icon, Store01Icon, Target01Icon, UserGroupIcon, Wallet01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { money, haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import {
   SellerBadge,
   SellerButton as Button,
   SellerCard as Card,
   SellerEmptyState,
   SellerPage as Page,
-  SellerScrollTable,
 } from '../components/seller-ui';
-import { seedSellerCampaigns } from '@/config/seller-seeds';
-import type { SellerCampaign } from '@/types/entities';
 
-const toneFor = (s: SellerCampaign['status']): 'mint' | 'violet' | 'slate' => (s === 'Active' ? 'mint' : s === 'Rejointe' ? 'violet' : 'slate');
+type JoinedCampaign = {
+  campaign_seller_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  product_name: string | null;
+  merchant_name: string;
+  commission: number;
+  commission_type: string | null;
+  model: string;
+  status: string;
+  tracking_token: string | null;
+  seller_code: string | null;
+  clicks: number;
+  sales: number;
+  earnings: number;
+};
 
 export function SellerCampaigns() {
   const { toast } = useToast();
-  const [campaigns, setCampaigns] = useState<SellerCampaign[]>(() => read('seller-campaigns', seedSellerCampaigns));
-  const [toLeave, setToLeave] = useState<SellerCampaign | null>(null);
+  const { profile } = useAuth();
+  const [campaigns, setCampaigns] = useState<JoinedCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toLeave, setToLeave] = useState<JoinedCampaign | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
-  function copyLink(c: SellerCampaign) {
-    const link = `https://${c.link}`;
+  useEffect(() => {
+    async function loadCampaigns() {
+      if (!profile) {
+        setLoading(false);
+        return;
+      }
+
+      // Get seller
+      const { data: seller } = await supabase
+        .from('sellers')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .single();
+      const sId = (seller as { id: string } | null)?.id;
+      if (!sId) {
+        setLoading(false);
+        return;
+      }
+
+      // Get joined campaigns
+      const { data: joined } = await supabase
+        .from('campaign_sellers')
+        .select('id, campaign_id, joined_at')
+        .eq('seller_id', sId);
+
+      const joinedRows = (joined as { id: string; campaign_id: string; joined_at: string }[] | null) ?? [];
+      if (joinedRows.length === 0) {
+        setCampaigns([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch campaign details
+      const campaignIds = joinedRows.map((j) => j.campaign_id);
+      const { data: campaignData } = await supabase
+        .from('campaigns')
+        .select(`
+          id, name, commission, commission_type, model, status,
+          product_id, merchant_id,
+          products:product_id (name),
+          merchants:merchant_id (name)
+        `)
+        .in('id', campaignIds);
+
+      // Fetch tracking links
+      const { data: links } = await supabase
+        .from('tracking_links')
+        .select('campaign_id, token, seller_code, clicks')
+        .eq('seller_id', sId);
+
+      // Fetch commissions for earnings + sales count
+      const { data: commissions } = await supabase
+        .from('commissions')
+        .select('campaign_id, amount, status')
+        .eq('seller_id', sId);
+
+      const campaignMap = new Map<string, JoinedCampaign>();
+      const linkMap = new Map<string, { token: string; seller_code: string; clicks: number }>(
+        ((links as { campaign_id: string; token: string; seller_code: string; clicks: number }[] | null) ?? [])
+          .map((l) => [l.campaign_id, { token: l.token, seller_code: l.seller_code, clicks: l.clicks }])
+      );
+
+      const commissionAgg = new Map<string, { earnings: number; sales: number }>();
+      ((commissions as { campaign_id: string; amount: number; status: string }[] | null) ?? []).forEach((c) => {
+        const agg = commissionAgg.get(c.campaign_id) ?? { earnings: 0, sales: 0 };
+        agg.earnings += c.amount;
+        agg.sales += 1;
+        commissionAgg.set(c.campaign_id, agg);
+      });
+
+      for (const j of joinedRows) {
+        const c = (campaignData as unknown[] | null)?.find((r) => {
+          const row = r as { id: string };
+          return row.id === j.campaign_id;
+        }) as {
+          id: string; name: string; commission: number; commission_type: string | null;
+          model: string; status: string;
+          products: { name: string } | null;
+          merchants: { name: string } | null;
+        } | undefined;
+
+        const link = linkMap.get(j.campaign_id);
+        const agg = commissionAgg.get(j.campaign_id) ?? { earnings: 0, sales: 0 };
+
+        if (c) {
+          campaignMap.set(j.campaign_id, {
+            campaign_seller_id: j.id,
+            campaign_id: j.campaign_id,
+            campaign_name: c.name,
+            product_name: c.products?.name ?? null,
+            merchant_name: c.merchants?.name ?? 'Boutique',
+            commission: c.commission,
+            commission_type: c.commission_type,
+            model: c.model,
+            status: c.status,
+            tracking_token: link?.token ?? null,
+            seller_code: link?.seller_code ?? null,
+            clicks: link?.clicks ?? 0,
+            sales: agg.sales,
+            earnings: agg.earnings,
+          });
+        }
+      }
+
+      setCampaigns(Array.from(campaignMap.values()));
+      setLoading(false);
+    }
+    loadCampaigns();
+  }, [profile]);
+
+  function copyLink(c: JoinedCampaign) {
+    haptic('light');
+    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const link = `${window.location.origin}${baseUrl}/p/${c.tracking_token ?? c.campaign_id}`;
     navigator.clipboard?.writeText(link).catch(() => {});
     toast({ title: 'Lien copié', description: 'Partagez-le sur WhatsApp ou vos réseaux.' });
   }
 
-  function copyCode(c: SellerCampaign) {
-    navigator.clipboard?.writeText(c.code).catch(() => {});
-    toast({ title: 'Code copié', description: `Code ${c.code} prêt à partager.` });
+  function copyCode(c: JoinedCampaign) {
+    haptic('light');
+    navigator.clipboard?.writeText(c.seller_code ?? '').catch(() => {});
+    toast({ title: 'Code copié', description: `Code ${c.seller_code} prêt à partager.` });
   }
 
-  function confirmLeave() {
+  async function confirmLeave() {
     if (!toLeave) return;
-    const updated = campaigns.filter((c) => c.id !== toLeave.id);
-    setCampaigns(updated);
-    write('seller-campaigns', updated);
-    toast({ title: 'Campagne quittée', description: `${toLeave.campaignName} n'est plus dans vos campagnes.` });
+    setLeaving(true);
+    haptic('warning');
+    const { error } = await supabase
+      .from('campaign_sellers')
+      .delete()
+      .eq('id', toLeave.campaign_seller_id);
+
+    setLeaving(false);
+    if (error) {
+      toast({ title: 'Erreur', description: error.message });
+    } else {
+      setCampaigns((prev) => prev.filter((c) => c.campaign_id !== toLeave.campaign_id));
+      toast({ title: 'Campagne quittée', description: `${toLeave.campaign_name} n'est plus dans vos campagnes.` });
+    }
     setToLeave(null);
   }
 
   const totalEarnings = campaigns.reduce((s, c) => s + c.earnings, 0);
   const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
   const totalSales = campaigns.reduce((s, c) => s + c.sales, 0);
+
+  const toneFor = (s: string): 'mint' | 'violet' | 'slate' =>
+    s === 'active' ? 'mint' : s === 'en_pause' ? 'slate' : 'violet';
 
   return (
     <Page
@@ -78,7 +220,13 @@ export function SellerCampaigns() {
       </div>
 
       {/* Campaigns list */}
-      {campaigns.length === 0 ? (
+      {loading ? (
+        <Card className="mt-5">
+          <div className="flex items-center justify-center py-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        </Card>
+      ) : campaigns.length === 0 ? (
         <Card className="mt-5">
           <SellerEmptyState
             glyph={Chart02Icon}
@@ -90,20 +238,20 @@ export function SellerCampaigns() {
       ) : (
         <div className="mt-5 space-y-4">
           {campaigns.map((c) => (
-            <Card key={c.id}>
+            <Card key={c.campaign_id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.campaignName}</p>
-                  <p className="mt-0.5 text-xs text-[#9290a2]">{c.productName} · {c.merchantName}</p>
+                  <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.campaign_name}</p>
+                  <p className="mt-0.5 text-xs text-[#9290a2]">{c.product_name ?? 'Produit'} · {c.merchant_name}</p>
                 </div>
-                <SellerBadge tone={toneFor(c.status)}>{c.status}</SellerBadge>
+                <SellerBadge tone={toneFor(c.status)}>{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
               </div>
 
               {/* Stats inline */}
               <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-3 text-center sm:grid-cols-4">
                 <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.clicks}</p></div>
                 <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.sales}</p></div>
-                <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">{c.commission}%</p></div>
+                <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
                 <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{money(c.earnings)}</p></div>
               </div>
 
@@ -111,25 +259,25 @@ export function SellerCampaigns() {
               <div className="mt-4 space-y-2">
                 <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2.5">
                   <Icon glyph={Store01Icon} size={15} />
-                  <span className="min-w-0 flex-1 truncate text-xs text-[#77738a]">{c.link}</span>
-                  <button onClick={() => copyLink(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-link-${c.id}`}><Icon glyph={Copy01Icon} size={15} /></button>
+                  <span className="min-w-0 flex-1 truncate text-xs text-[#77738a]">/p/{c.tracking_token ?? c.campaign_id}</span>
+                  <button onClick={() => copyLink(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-link-${c.campaign_id}`}><Icon glyph={Copy01Icon} size={15} /></button>
                 </div>
                 <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2.5">
                   <span className="text-[10px] font-bold uppercase text-[#9290a2]">Code</span>
-                  <span className="flex-1 text-xs font-bold text-[#292541]">{c.code}</span>
-                  <button onClick={() => copyCode(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-code-${c.id}`}><Icon glyph={Copy01Icon} size={15} /></button>
+                  <span className="flex-1 text-xs font-bold text-[#292541]">{c.seller_code ?? '—'}</span>
+                  <button onClick={() => copyCode(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-code-${c.campaign_id}`}><Icon glyph={Copy01Icon} size={15} /></button>
                 </div>
               </div>
 
               {/* Actions */}
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Link href={`/seller/share/${c.campaignId}`}>
-                  <Button testId={`share-${c.id}`}><Icon glyph={Share02Icon} size={15} /> Partager</Button>
+                <Link href={`/seller/share/${c.campaign_id}`}>
+                  <Button testId={`share-${c.campaign_id}`}><Icon glyph={Share02Icon} size={15} /> Partager</Button>
                 </Link>
                 <Link href="/seller/sales">
-                  <Button variant="soft" testId={`sales-${c.id}`}>Voir les ventes <Icon glyph={ArrowUpRight01Icon} size={14} /></Button>
+                  <Button variant="soft" testId={`sales-${c.campaign_id}`}>Voir les ventes <Icon glyph={ArrowUpRight01Icon} size={14} /></Button>
                 </Link>
-                <Button variant="ghost" onClick={() => setToLeave(c)} testId={`leave-${c.id}`}>Quitter</Button>
+                <Button variant="ghost" onClick={() => { haptic('light'); setToLeave(c); }} testId={`leave-${c.campaign_id}`}>Quitter</Button>
               </div>
             </Card>
           ))}
@@ -141,10 +289,10 @@ export function SellerCampaigns() {
         <div className="fixed inset-0 z-[60] grid place-items-center bg-[#201b3c]/75 p-4" role="alertdialog">
           <div className="w-full max-w-[380px] rounded-[22px] bg-[#fffefd] p-6 shadow-2xl">
             <p className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Quitter cette campagne ?</p>
-            <p className="mt-2 text-sm leading-5 text-[#77738a]">Vous ne gagnerez plus de commissions sur les futures ventes de « {toLeave.campaignName} ».</p>
+            <p className="mt-2 text-sm leading-5 text-[#77738a]">Vous ne gagnerez plus de commissions sur les futures ventes de « {toLeave.campaign_name} ».</p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setToLeave(null)}>Annuler</Button>
-              <Button variant="danger" onClick={confirmLeave}>Quitter</Button>
+              <Button variant="danger" onClick={confirmLeave} disabled={leaving}>{leaving ? '…' : 'Quitter'}</Button>
             </div>
           </div>
         </div>

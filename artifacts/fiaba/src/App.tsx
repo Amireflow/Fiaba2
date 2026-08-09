@@ -51,6 +51,7 @@ import { SellerOnboarding } from "@/features/seller/pages/onboarding";
 import { SignInPage, SignUpPage } from "@/pages/auth";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
+import { AuthProvider } from "@/hooks/use-auth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -740,7 +741,7 @@ function Home() {
                 <div className="relative overflow-hidden rounded-[22px]">
                   <img
                     src={`${import.meta.env.BASE_URL}images/influencer-4.jpg`}
-                    alt="Créatrice de contenu sénégalaise partageant un produit"
+                    alt="Créatrice de contenu et entrepreneure sociale sur smartphone"
                     className="h-[380px] w-full object-cover sm:h-[480px]"
                     loading="eager"
                   />
@@ -1288,14 +1289,16 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={basePath}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={basePath}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }
 

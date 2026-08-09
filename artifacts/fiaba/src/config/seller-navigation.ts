@@ -1,9 +1,9 @@
 import {
   Chart02Icon,
   Home01Icon,
+  Settings02Icon,
   Store01Icon,
   UserGroupIcon,
-  ViewIcon,
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
 import type { IconType } from '@/components/shared/icon';
@@ -22,7 +22,7 @@ export const sellerPrimaryNav: NavItem[] = [
 ];
 
 export const sellerSecondaryNav: NavItem[] = [
-  { href: '/seller/profile', label: 'Mon profil', glyph: ViewIcon },
+  { href: '/seller/profile', label: 'Profil & Paramètres', glyph: Settings02Icon },
 ];
 
 export const sellerAllNav: NavItem[] = [...sellerPrimaryNav, ...sellerSecondaryNav];

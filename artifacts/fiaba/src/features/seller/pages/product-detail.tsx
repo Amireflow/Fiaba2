@@ -1,38 +1,154 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams } from 'wouter';
 import { ArrowLeft01Icon, CheckmarkCircle02Icon, Chart02Icon, Store01Icon, UserGroupIcon, Share02Icon, Wallet01Icon, LockKeyIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
-import { generateSecureLink, generateSellerCode, generateSellerId } from '@/lib/link';
-import { seedSellerProfile, seedOpportunities, seedSellerCampaigns } from '@/config/seller-seeds';
+import { money, haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
+import { useSellerDiscovery } from '@/hooks/use-seller-discovery';
 import {
   PotentialBadge,
   SellerBadge,
   SellerButton as Button,
   SellerCard as Card,
-  SellerField,
   SellerPage as Page,
-  sellerInputClass,
   sellerTextareaClass,
 } from '../components/seller-ui';
-import type { Opportunity, SellerCampaign } from '@/types/entities';
+
+type CampaignDetail = {
+  campaign_id: string;
+  campaign_name: string;
+  campaign_description: string | null;
+  commission: number;
+  commission_type: string | null;
+  model: string;
+  goal: number | null;
+  product_id: string | null;
+  product_name: string | null;
+  product_price: number | null;
+  product_image_url: string | null;
+  product_category: string | null;
+  product_description: string | null;
+  merchant_id: string;
+  merchant_name: string;
+  niche_name: string | null;
+  match_score: number;
+  is_joined: boolean;
+};
+
+type ZoneCoverage = { id: string; name: string; fee: number };
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const [opportunities] = useState<Opportunity[]>(() => read('opportunities', seedOpportunities));
-  const [joined, setJoined] = useState<string[]>(() => read('seller-joined', seedSellerCampaigns.map((c) => c.campaignId)));
-  const [sellerCampaigns, setSellerCampaigns] = useState<SellerCampaign[]>(() => read('seller-campaigns', seedSellerCampaigns));
+  const { profile } = useAuth();
+  const { joinCampaign } = useSellerDiscovery();
+  const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
+  const [zones, setZones] = useState<ZoneCoverage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [quantity, setQuantity] = useState('10');
-  const [joining, setJoining] = useState(false);
-  const profile = read('seller-profile', seedSellerProfile);
 
-  const op = opportunities.find((o) => o.id === id);
+  useEffect(() => {
+    async function loadDetail() {
+      if (!id) return;
+      setLoading(true);
 
-  if (!op) {
+      // Fetch campaign with product + merchant + niche
+      const { data: raw } = await supabase
+        .from('campaigns')
+        .select(`
+          id, name, description, commission, commission_type, model, goal,
+          product_id, niche_id, merchant_id,
+          products:product_id (id, name, price, image_url, category, description),
+          merchants:merchant_id (id, name),
+          niches:niche_id (id, name)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (!raw) {
+        setLoading(false);
+        return;
+      }
+
+      const c = raw as {
+        id: string; name: string; description: string | null;
+        commission: number; commission_type: string | null; model: string;
+        goal: number | null; product_id: string | null; niche_id: string | null;
+        merchant_id: string;
+        products: { id: string; name: string; price: number; image_url: string | null; category: string | null; description: string | null } | null;
+        merchants: { id: string; name: string } | null;
+        niches: { id: string; name: string } | null;
+      };
+
+      // Check if joined
+      let isJoined = false;
+      if (profile) {
+        const { data: seller } = await supabase
+          .from('sellers')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .single();
+        const sId = (seller as { id: string } | null)?.id;
+        if (sId) {
+          const { data: joined } = await supabase
+            .from('campaign_sellers')
+            .select('campaign_id')
+            .eq('seller_id', sId)
+            .eq('campaign_id', id)
+            .single();
+          isJoined = !!joined;
+        }
+      }
+
+      setCampaign({
+        campaign_id: c.id,
+        campaign_name: c.name,
+        campaign_description: c.description,
+        commission: c.commission,
+        commission_type: c.commission_type,
+        model: c.model,
+        goal: c.goal,
+        product_id: c.product_id,
+        product_name: c.products?.name ?? null,
+        product_price: c.products?.price ?? null,
+        product_image_url: c.products?.image_url ?? null,
+        product_category: c.products?.category ?? null,
+        product_description: c.products?.description ?? null,
+        merchant_id: c.merchant_id,
+        merchant_name: c.merchants?.name ?? 'Boutique',
+        niche_name: c.niches?.name ?? null,
+        match_score: 50,
+        is_joined: isJoined,
+      });
+
+      // Fetch merchant delivery zones
+      const { data: zoneData } = await supabase
+        .from('delivery_zones')
+        .select('id, name, fee')
+        .eq('merchant_id', c.merchant_id)
+        .eq('is_active', true);
+      setZones(((zoneData as ZoneCoverage[] | null) ?? []));
+
+      setLoading(false);
+    }
+    loadDetail();
+  }, [id, profile]);
+
+  if (loading) {
+    return (
+      <Page eyebrow="Chargement" title="…" description="">
+        <div className="mt-6 flex items-center justify-center py-12">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+        </div>
+      </Page>
+    );
+  }
+
+  if (!campaign) {
     return (
       <Page eyebrow="Oups" title="Produit introuvable" description="Cette opportunité n'existe plus ou a été retirée.">
         <Card className="mt-6">
@@ -42,69 +158,42 @@ export function ProductDetail() {
     );
   }
 
-  const isJoined = joined.includes(op.campaignId);
-  const isFixedCommission = op.model === 'Marge';
-  const commissionAmount = isFixedCommission ? op.commission : Math.round((op.price * op.commission) / 100);
+  const isFixedCommission = campaign.commission_type === 'fixed';
+  const commissionAmount = isFixedCommission
+    ? campaign.commission
+    : Math.round(((campaign.product_price ?? 0) * campaign.commission) / 100);
   const qty = Math.max(1, Number(quantity) || 1);
   const potentialEarnings = commissionAmount * qty;
+  const potential = campaign.match_score >= 80 ? 'Fort' : campaign.match_score >= 40 ? 'Bon' : 'Moyen';
 
-  async function joinCampaign() {
-    if (isJoined || joining) return;
+  async function handleJoin() {
+    if (campaign?.is_joined || joining) return;
     setJoining(true);
-    try {
-      const sellerName = profile.name;
-      const sellerId = generateSellerId(sellerName);
-      const sellerCode = generateSellerCode(sellerName);
-
-      const { link, code } = await generateSecureLink({
-        productId: op!.id,
-        campaignId: op!.campaignId,
-        sellerId,
-        sellerCode,
-      });
-
-      const updated = [...joined, op!.campaignId];
-      setJoined(updated);
-      write('seller-joined', updated);
-
-      const newCampaign: SellerCampaign = {
-        id: `sc-${crypto.randomUUID().slice(0, 8)}`,
-        campaignId: op!.campaignId,
-        campaignName: op!.productName,
-        productName: op!.productName,
-        merchantName: op!.merchantName,
-        commission: op!.commission,
-        model: op!.model,
-        status: 'Active',
-        link,
-        code,
-        clicks: 0,
-        sales: 0,
-        earnings: 0,
-        joinedDate: "Aujourd'hui",
-      };
-      const updatedCampaigns = [newCampaign, ...sellerCampaigns];
-      setSellerCampaigns(updatedCampaigns);
-      write('seller-campaigns', updatedCampaigns);
-
+    haptic('medium');
+    const { error } = await joinCampaign(campaign!.campaign_id);
+    setJoining(false);
+    if (error) {
+      haptic('error');
+      toast({ title: 'Erreur', description: error });
+    } else {
+      setCampaign((prev) => prev ? { ...prev, is_joined: true } : prev);
       toast({ title: 'Campagne rejointe !', description: 'Votre lien sécurisé est prêt. Personnalisez votre message et partagez.' });
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de générer votre lien. Réessayez.' });
-    } finally {
-      setJoining(false);
     }
   }
 
   function saveMessage() {
-    write(`seller-message-${op!.campaignId}`, customMessage);
+    haptic('light');
+    if (campaign) {
+      localStorage.setItem(`seller-message-${campaign.campaign_id}`, customMessage);
+    }
     toast({ title: 'Message enregistré', description: 'Votre message personnalisé sera utilisé lors du partage.' });
   }
 
   return (
     <Page
-      eyebrow={op.merchantName}
-      title={op.productName}
-      description={`Catégorie ${op.category} · ${op.model}`}
+      eyebrow={campaign.merchant_name}
+      title={campaign.product_name ?? campaign.campaign_name}
+      description={`Catégorie ${campaign.product_category ?? 'Divers'} · ${campaign.model === 'commission' ? 'Commission' : 'Marge'}`}
     >
       <Link href="/seller" className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#5b49e8]" data-testid="link-back-discover">
         <Icon glyph={ArrowLeft01Icon} size={15} /> Retour à Découvrir
@@ -112,8 +201,8 @@ export function ProductDetail() {
 
       {/* Product visual + description */}
       <Card className="mt-4 overflow-hidden p-0">
-        {op.image ? (
-          <img src={op.image} alt={op.productName} className="h-56 w-full object-cover" />
+        {campaign.product_image_url ? (
+          <img src={campaign.product_image_url} alt={campaign.product_name ?? ''} className="h-56 w-full object-cover" />
         ) : (
           <div className="grid h-56 w-full place-items-center bg-[#f8f7fc]">
             <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={36} /></span>
@@ -121,14 +210,18 @@ export function ProductDetail() {
         )}
         <div className="p-5">
           <div className="flex items-center gap-2">
-            <PotentialBadge potential={op.potential} />
-            <SellerBadge tone="violet">{op.category}</SellerBadge>
+            <PotentialBadge potential={potential} />
+            {campaign.product_category && <SellerBadge tone="violet">{campaign.product_category}</SellerBadge>}
+            {campaign.niche_name && <SellerBadge tone="mint">{campaign.niche_name}</SellerBadge>}
           </div>
           <p className="mt-3 text-sm leading-6 text-[#77738a]">
-            Produit proposé par <strong className="text-[#292541]">{op.merchantName}</strong>. {op.model === 'Commission'
+            Produit proposé par <strong className="text-[#292541]">{campaign.merchant_name}</strong>. {campaign.model === 'commission'
               ? 'Vous partagez ce produit au prix fixé par le marchand. Chaque vente validée vous rapporte votre commission.'
               : 'Vous choisissez votre prix de vente (≥ prix de base). La différence est votre marge.'}
           </p>
+          {campaign.product_description && (
+            <p className="mt-3 text-sm leading-6 text-[#77738a]">{campaign.product_description}</p>
+          )}
         </div>
       </Card>
 
@@ -141,12 +234,12 @@ export function ProductDetail() {
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="rounded-2xl bg-[#f8f7fc] p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Prix client</p>
-            <p className="mt-2 font-[Space_Grotesk] text-lg font-bold text-[#292541]">{money(op.price)}</p>
+            <p className="mt-2 font-[Space_Grotesk] text-lg font-bold text-[#292541]">{campaign.product_price ? money(campaign.product_price) : '—'}</p>
           </div>
           <div className="rounded-2xl bg-[#e7faf2] p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#278e69]">{isFixedCommission ? 'Marge/unité' : 'Commission/unité'}</p>
             <p className="mt-2 font-[Space_Grotesk] text-lg font-bold text-[#278e69]">{money(commissionAmount)}</p>
-            <p className="mt-0.5 text-[10px] text-[#278e69]">{isFixedCommission ? 'montant fixe' : `${op.commission}%`}</p>
+            <p className="mt-0.5 text-[10px] text-[#278e69]">{isFixedCommission ? 'montant fixe' : `${campaign.commission}%`}</p>
           </div>
           <div className="rounded-2xl bg-[#efedff] p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5b49e8]">Si vous vendez</p>
@@ -179,7 +272,7 @@ export function ProductDetail() {
         <textarea
           value={customMessage}
           onChange={(e) => setCustomMessage(e.target.value)}
-          placeholder={`Ex. "Je vous recommande ce ${op.productName} que j'ai testé moi-même. Qualité au top, livraison rapide à Dakar. Utilisez mon code MARIFALL pour commander 👇"`}
+          placeholder={`Ex. "Je vous recommande ce ${campaign.product_name ?? 'produit'} que j'ai testé moi-même. Qualité au top, livraison rapide à Dakar. Utilisez mon code pour commander 👇"`}
           className={`${sellerTextareaClass} mt-3 min-h-24`}
           data-testid="input-custom-message"
         />
@@ -192,24 +285,33 @@ export function ProductDetail() {
       {/* Zones + conditions */}
       <Card className="mt-4">
         <p className="text-sm font-bold text-[#292541]">Zones couvertes</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {op.zones.map((z) => <SellerBadge key={z} tone="violet"><Icon glyph={Store01Icon} size={12} /> {z}</SellerBadge>)}
-        </div>
+        {zones.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {zones.map((z) => <SellerBadge key={z.id} tone="violet"><Icon glyph={Store01Icon} size={12} /> {z.name}</SellerBadge>)}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-[#9290a2]">Aucune zone configurée par ce marchand.</p>
+        )}
         <p className="mt-4 text-xs leading-5 text-[#77738a]">Les commandes sont acceptées uniquement dans ces zones. Vos clients doivent se trouver dans l'une d'elles.</p>
       </Card>
 
       {/* Why this recommendation */}
       <Card className="mt-4">
         <p className="text-xs font-bold text-[#292541]">Pourquoi cette recommandation ?</p>
-        <p className="mt-2 text-xs leading-5 text-[#77738a]">Vos niches (Beauté, Mode) correspondent à la catégorie de ce produit. Votre audience est active sur ces zones géographiques.</p>
+        <p className="mt-2 text-xs leading-5 text-[#77738a]">
+          {campaign.niche_name
+            ? `Vos niches correspondent à la catégorie "${campaign.niche_name}" de ce produit.`
+            : 'Ce produit correspond à votre profil vendeur.'}
+          {' '}Votre audience est active sur ces zones géographiques.
+        </p>
       </Card>
 
       {/* CTA */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {isJoined ? (
+        {campaign.is_joined ? (
           <>
             <SellerBadge tone="mint" className="text-sm"><Icon glyph={CheckmarkCircle02Icon} size={16} /> Campagne rejointe</SellerBadge>
-            <Link href={`/seller/share/${op.campaignId}`}>
+            <Link href={`/seller/share/${campaign.campaign_id}`}>
               <Button testId="button-go-share"><Icon glyph={UserGroupIcon} size={15} /> Partager maintenant</Button>
             </Link>
             <Link href="/seller/campaigns">
@@ -217,13 +319,13 @@ export function ProductDetail() {
             </Link>
           </>
         ) : (
-          <Button onClick={joinCampaign} testId="button-join-campaign" className="w-full sm:w-auto" disabled={joining}>
+          <Button onClick={handleJoin} testId="button-join-campaign" className="w-full sm:w-auto" disabled={joining}>
             {joining ? 'Génération de votre lien…' : 'Rejoindre cette campagne'}
           </Button>
         )}
-        {!isJoined && (
+        {!campaign.is_joined && (
           <span className="flex items-center gap-1.5 text-[10px] font-bold text-[#278e69]">
-            <Icon glyph={LockKeyIcon} size={12} /> Lien signé et sécurisé par HMAC-SHA256
+            <Icon glyph={LockKeyIcon} size={12} /> Lien signé et sécurisé
           </span>
         )}
       </div>

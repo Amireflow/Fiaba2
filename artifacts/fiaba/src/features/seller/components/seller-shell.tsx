@@ -8,6 +8,8 @@ import { SellerLogo } from './seller-ui';
 import { sellerPrimaryNav, sellerSecondaryNav, sellerAllNav } from '@/config/seller-navigation';
 import { haptic } from '@/lib/utils';
 
+import { useAuth } from '@/hooks/use-auth';
+
 /* Bottom nav items (4 shortcuts + Plus button) */
 const bottomNav = [
   { href: '/seller', label: 'Découvrir', glyph: Home01Icon },
@@ -20,8 +22,10 @@ export function SellerShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await signOut();
     window.location.href = import.meta.env.BASE_URL;
   };
 

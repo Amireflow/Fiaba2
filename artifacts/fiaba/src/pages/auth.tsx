@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { AlertCircleIcon, CheckmarkCircle02Icon, InformationCircleIcon, SmartPhone01Icon, Message01Icon } from '@hugeicons/core-free-icons';
@@ -67,11 +67,25 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
 }
 
 /* ── Role-based redirect ── */
-function redirectByRole(role: string, setLocation: (path: string) => void) {
-  if (role === 'marchand') setLocation('/merchant');
-  else if (role === 'vendeur') setLocation('/seller');
-  else if (role === 'admin') setLocation('/admin');
-  else setLocation('/onboarding');
+function redirectByRole(profile: any, setLocation: (path: string) => void) {
+  if (!profile) return;
+  if (profile.role === 'marchand') {
+    if (!profile.phone || !profile.city) {
+      setLocation('/onboarding');
+    } else {
+      setLocation('/merchant');
+    }
+  } else if (profile.role === 'vendeur') {
+    if (!profile.phone || !profile.city) {
+      setLocation('/seller/onboarding');
+    } else {
+      setLocation('/seller');
+    }
+  } else if (profile.role === 'admin') {
+    setLocation('/admin');
+  } else {
+    setLocation('/onboarding');
+  }
 }
 
 /* ── Sign In ── */
@@ -92,7 +106,7 @@ export function SignInPage() {
 
   /* Redirect if already logged in */
   useEffect(() => {
-    if (profile) redirectByRole(profile.role, setLocation);
+    if (profile) redirectByRole(profile, setLocation);
   }, [profile, setLocation]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
@@ -219,12 +233,12 @@ export function SignUpPage() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [role, setRole] = useState<'marchand' | 'vendeur'>('vendeur');
+  const [role, setRole] = useState<'vendeur' | 'marchand' | 'admin'>('vendeur');
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ tone: AlertTone; title: string; message: string } | null>(null);
 
   useEffect(() => {
-    if (profile) redirectByRole(profile.role, setLocation);
+    if (profile) redirectByRole(profile, setLocation);
   }, [profile, setLocation]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
@@ -238,7 +252,7 @@ export function SignUpPage() {
       setAlert({ tone: 'error', title: 'Inscription impossible', message: error.message });
     } else {
       haptic('success');
-      setAlert({ tone: 'success', title: 'Compte créé !', message: 'Vérifiez votre email pour confirmer votre compte.' });
+      setAlert({ tone: 'success', title: 'Compte créé !', message: 'Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.' });
       setLocation('/sign-in');
     }
   };
@@ -281,16 +295,16 @@ export function SignUpPage() {
         <p className="mt-2 text-sm text-[#77738a]">Le commerce avance ensemble</p>
 
         {/* Role selection */}
-        <div className="mt-6 grid grid-cols-2 gap-2">
-          {(['vendeur', 'marchand'] as const).map(r => (
+        <div className="mt-6 grid grid-cols-3 gap-1.5">
+          {(['vendeur', 'marchand', 'admin'] as const).map(r => (
             <button
               type="button"
               key={r}
               onClick={() => { haptic('light'); setRole(r); }}
-              className={`rounded-xl border p-3 text-xs font-bold ${role === r ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] text-[#757185]'}`}
+              className={`rounded-xl border p-2.5 text-xs font-bold transition ${role === r ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] text-[#757185]'}`}
               data-testid={`button-signup-role-${r}`}
             >
-              {r === 'vendeur' ? 'Je vends' : 'Je distribue'}
+              {r === 'vendeur' ? 'Je vends' : r === 'marchand' ? 'Je distribue' : 'Admin'}
             </button>
           ))}
         </div>

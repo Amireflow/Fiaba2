@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { money, haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Field,
   MerchantButton as Button,
@@ -14,38 +15,73 @@ import {
   selectClass,
 } from '../components/merchant-ui';
 
-type Payout = {
+type OrderRow = {
   id: string;
-  date: string;
-  amount: number;
-  account: string;
-  status: 'Versé' | 'En attente' | 'Rejeté';
+  total_amount: number;
+  merchant_amount: number;
+  status: string;
 };
 
-const seedPayouts: Payout[] = [
-  { id: 'po-1', date: '14 juin 2024', amount: 62300, account: 'Wave · · · 38 42', status: 'Versé' },
-  { id: 'po-2', date: '31 mai 2024', amount: 48800, account: 'Wave · · · 38 42', status: 'Versé' },
-  { id: 'po-3', date: '15 mai 2024', amount: 36500, account: 'Orange Money · · · 11 07', status: 'Versé' },
-  { id: 'po-4', date: '21 juin 2024', amount: 23750, account: 'Wave · · · 38 42', status: 'En attente' },
-];
+type PaymentRow = {
+  id: string;
+  amount: number;
+  status: string;
+};
 
 const accounts = [
-  { id: 'wave', label: 'Wave · · · 38 42' },
-  { id: 'om', label: 'Orange Money · · · 11 07' },
-  { id: 'bank', label: 'Ecobank · · · 4521' },
+  { id: 'wave', label: 'Wave' },
+  { id: 'orange_money', label: 'Orange Money' },
+  { id: 'bank', label: 'Compte bancaire' },
 ];
 
 export function PaymentWithdraw() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [payouts, setPayouts] = useState<Payout[]>(() => read('payouts', seedPayouts));
+  const { merchantId } = useAuth();
   const [amount, setAmount] = useState('');
   const [account, setAccount] = useState('wave');
+  const [balance, setBalance] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const balance = 107450;
+  useEffect(() => {
+    async function loadBalance() {
+      if (!merchantId) {
+        setLoading(false);
+        return;
+      }
 
-  function requestPayout(e: React.FormEvent) {
+      // Fetch delivered orders
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('id, total_amount, merchant_amount, status')
+        .eq('merchant_id', merchantId)
+        .eq('status', 'livree');
+      const orders = (orderData as OrderRow[] | null) ?? [];
+
+      // Fetch paid payments
+      const { data: payData } = await supabase
+        .from('payments')
+        .select('id, amount, status')
+        .eq('merchant_id', merchantId)
+        .eq('status', 'verse');
+      const payments = (payData as PaymentRow[] | null) ?? [];
+
+      const totalRevenue = orders.reduce((s, o) => s + (o.merchant_amount ?? o.total_amount), 0);
+      const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+      setBalance(Math.max(0, totalRevenue - totalPaid));
+      setLoading(false);
+    }
+    loadBalance();
+  }, [merchantId]);
+
+  async function requestPayout(e: React.FormEvent) {
     e.preventDefault();
+    if (!merchantId) {
+      toast({ title: 'Erreur', description: 'Marchand non identifié.' });
+      return;
+    }
+
     const amt = Number(amount);
     if (isNaN(amt) || amt <= 0) {
       toast({ title: 'Montant invalide', description: 'Saisissez un montant valide.' });
@@ -55,20 +91,36 @@ export function PaymentWithdraw() {
       toast({ title: 'Solde insuffisant', description: `Votre solde est de ${money(balance)}.` });
       return;
     }
-    const acc = accounts.find((a) => a.id === account)?.label ?? accounts[0].label;
-    const newPayout: Payout = { id: `po-${crypto.randomUUID().slice(0, 8)}`, date: 'À venir', amount: amt, account: acc, status: 'En attente' };
-    const updated = [newPayout, ...payouts];
-    setPayouts(updated);
-    write('payouts', updated);
-    toast({ title: 'Demande envoyée', description: `${money(amt)} seront versés sur ${acc}.` });
-    navigate('/merchant/payments');
+
+    haptic('medium');
+    setSubmitting(true);
+
+    const { error } = await (supabase.from('payments') as any).insert({
+      merchant_id: merchantId,
+      amount: amt,
+      method: account,
+      status: 'en_attente',
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      haptic('error');
+      toast({ title: 'Erreur de demande', description: error.message });
+    } else {
+      toast({
+        title: 'Demande envoyée',
+        description: `${money(amt)} seront versés sur votre compte ${accounts.find((a) => a.id === account)?.label ?? account}.`,
+      });
+      navigate('/merchant/payments');
+    }
   }
 
   return (
     <Page
       eyebrow="Trésorerie"
       title="Demander un versement"
-      description={`Solde disponible : ${money(balance)}`}
+      description={loading ? 'Chargement…' : `Solde disponible : ${money(balance)}`}
       action={
         <Link href="/merchant/payments">
           <Button variant="ghost"><Icon glyph={ArrowLeft01Icon} size={15} /> Retour</Button>
@@ -99,7 +151,9 @@ export function PaymentWithdraw() {
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Link href="/merchant/payments"><Button variant="ghost" type="button">Annuler</Button></Link>
-            <Button type="submit" testId="button-confirm-payout">Confirmer la demande</Button>
+            <Button type="submit" disabled={submitting || loading} testId="button-confirm-payout">
+              {submitting ? 'Envoi…' : 'Confirmer la demande'}
+            </Button>
           </div>
         </form>
       </Card>

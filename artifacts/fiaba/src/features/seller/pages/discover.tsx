@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'wouter';
 import { ArrowUpRight01Icon, Chart02Icon, Search01Icon, SparklesIcon, Store01Icon, Tick01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { money, haptic } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
+import { useSellerDiscovery, type DiscoveryCampaign } from '@/hooks/use-seller-discovery';
+import { supabase } from '@/lib/supabase';
 import {
   PotentialBadge,
   SellerBadge,
@@ -14,38 +16,82 @@ import {
   SellerStat,
   sellerInputClass,
 } from '../components/seller-ui';
-import { seedOpportunities, seedSellerCampaigns } from '@/config/seller-seeds';
-import type { Opportunity, SellerNiche } from '@/types/entities';
 
-const niches: (SellerNiche | 'Tous')[] = ['Tous', 'Beauté', 'Mode', 'Maison', 'Épicerie', 'Tech', 'Sport'];
-
-const potentialTone = (p: Opportunity['potential']): 'mint' | 'violet' | 'amber' => (p === 'Fort' ? 'mint' : p === 'Bon' ? 'violet' : 'amber');
+const potentialFromScore = (score: number): 'Fort' | 'Bon' | 'Moyen' =>
+  score >= 80 ? 'Fort' : score >= 40 ? 'Bon' : 'Moyen';
 
 export function Discover() {
-  const [opportunities] = useState<Opportunity[]>(() => read('opportunities', seedOpportunities));
-  const [joined, setJoined] = useState<string[]>(() => read('seller-joined', seedSellerCampaigns.map((c) => c.campaignId)));
+  const { profile } = useAuth();
+  const { campaigns, loading, sellerId, joinCampaign } = useSellerDiscovery();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('Tous');
+  const [joining, setJoining] = useState<string | null>(null);
 
-  const filtered = opportunities.filter((o) => {
-    const matchesFilter = filter === 'Tous' || o.category === filter;
+  // Extract unique categories from campaigns
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    campaigns.forEach((c) => { if (c.product_category) cats.add(c.product_category); });
+    return ['Tous', ...Array.from(cats)];
+  }, [campaigns]);
+
+  const filtered = campaigns.filter((c) => {
+    const matchesFilter = filter === 'Tous' || c.product_category === filter;
     const q = query.trim().toLowerCase();
-    const matchesQuery = q === '' || o.productName.toLowerCase().includes(q) || o.merchantName.toLowerCase().includes(q) || o.category.toLowerCase().includes(q);
+    const matchesQuery = q === '' ||
+      (c.product_name?.toLowerCase().includes(q) ?? false) ||
+      c.merchant_name.toLowerCase().includes(q) ||
+      (c.product_category?.toLowerCase().includes(q) ?? false);
     return matchesFilter && matchesQuery;
   });
 
-  const recommended = filtered.filter((o) => o.potential === 'Fort');
-  const others = filtered.filter((o) => o.potential !== 'Fort');
+  const recommended = filtered.filter((c) => c.match_score >= 80);
+  const others = filtered.filter((c) => c.match_score < 80);
 
-  function joinCampaign(op: Opportunity) {
-    if (joined.includes(op.campaignId)) return;
-    const updated = [...joined, op.campaignId];
-    setJoined(updated);
-    write('seller-joined', updated);
+  async function handleJoin(c: DiscoveryCampaign) {
+    setJoining(c.campaign_id);
+    const { error } = await joinCampaign(c.campaign_id);
+    setJoining(null);
+    if (error) {
+      haptic('error');
+    }
   }
 
-  const totalEarnings = read('seller-earnings', { available: 20500, pending: 5775, cancelled: 4275, total: 30550 }).available;
-  const activeCampaigns = joined.length;
+  // Load seller stats
+  const [stats, setStats] = useState({ available: 0, activeCampaigns: 0, reputation: 50 });
+
+  useMemo(() => {
+    async function loadStats() {
+      if (!profile || !sellerId) return;
+      // Count commissions
+      const { data: commissions } = await supabase
+        .from('commissions')
+        .select('amount, status')
+        .eq('seller_id', sellerId);
+      const available = ((commissions as { amount: number; status: string }[] | null) ?? [])
+        .filter((c) => c.status === 'available')
+        .reduce((sum, c) => sum + c.amount, 0);
+
+      // Count active campaigns
+      const { count } = await supabase
+        .from('campaign_sellers')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', sellerId);
+
+      // Get reputation from seller_profiles
+      const { data: sp } = await supabase
+        .from('seller_profiles')
+        .select('reputation')
+        .eq('profile_id', profile.id)
+        .single();
+
+      setStats({
+        available,
+        activeCampaigns: count ?? 0,
+        reputation: (sp as { reputation: number } | null)?.reputation ?? 50,
+      });
+    }
+    loadStats();
+  }, [profile, sellerId]);
 
   return (
     <Page
@@ -55,9 +101,9 @@ export function Discover() {
     >
       {/* Stats */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <SellerStat label="Revenus disponibles" value={money(totalEarnings)} change="+12%" glyph={Chart02Icon} tone="mint" />
-        <SellerStat label="Campagnes actives" value={String(activeCampaigns)} change="+1" glyph={Store01Icon} tone="violet" />
-        <SellerStat label="Réputation" value="82%" change="+4 cette semaine" glyph={UserGroupIcon} tone="amber" />
+        <SellerStat label="Revenus disponibles" value={money(stats.available)} change="" glyph={Chart02Icon} tone="mint" />
+        <SellerStat label="Campagnes actives" value={String(stats.activeCampaigns)} change="" glyph={Store01Icon} tone="violet" />
+        <SellerStat label="Réputation" value={`${stats.reputation}%`} change="" glyph={UserGroupIcon} tone="amber" />
       </div>
 
       {/* Search + filter */}
@@ -68,92 +114,112 @@ export function Discover() {
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {niches.map((n) => (
-          <button key={n} onClick={() => setFilter(n)} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${filter === n ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-seller-${n}`}>{n}</button>
+        {categories.map((n) => (
+          <button key={n} onClick={() => { haptic('light'); setFilter(n); }} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${filter === n ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-seller-${n}`}>{n}</button>
         ))}
       </div>
 
-      {/* Recommended (Fort potentiel) */}
-      {recommended.length > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center gap-2">
-            <span className="text-[#5b49e8]"><Icon glyph={SparklesIcon} size={18} /></span>
-            <p className="text-sm font-bold text-[#292541]">Recommandés pour vous</p>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {recommended.map((op) => {
-              const isJoined = joined.includes(op.campaignId);
-              return (
-                <Card key={op.id} className="flex flex-col">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{op.productName}</p>
-                      <p className="mt-0.5 text-xs text-[#9290a2]">{op.merchantName} · {op.category}</p>
-                    </div>
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={22} /></span>
-                  </div>
-                  <div className="mt-4"><PotentialBadge potential={op.potential} /></div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-[#f8f7fc] p-3 text-xs">
-                    <div><p className="text-[10px] text-[#9290a2]">Prix client</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#292541]">{money(op.price)}</p></div>
-                    <div><p className="text-[10px] text-[#9290a2]">{op.model === 'Commission' ? 'Commission' : 'Marge suggérée'}</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#278e69]">{op.commission}%</p></div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {op.zones.map((z) => <SellerBadge key={z} tone="slate">{z}</SellerBadge>)}
-                  </div>
-                  <div className="mt-5 flex items-center gap-2">
-                    <Link href={`/seller/product/${op.id}`}>
-                      <Button variant="soft" testId={`view-${op.id}`}>Voir le détail <Icon glyph={ArrowUpRight01Icon} size={14} /></Button>
-                    </Link>
-                    {isJoined ? (
-                      <Link href="/seller/campaigns"><Button variant="success" testId={`joined-${op.id}`}>Rejointe <Icon glyph={Tick01Icon} size={14} /></Button></Link>
-                    ) : (
-                      <Button onClick={() => joinCampaign(op)} testId={`join-${op.id}`}>Rejoindre</Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Others */}
-      {others.length > 0 && (
-        <div className="mt-6">
-          <p className="text-sm font-bold text-[#292541]">Autres opportunités</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {others.map((op) => {
-              const isJoined = joined.includes(op.campaignId);
-              return (
-                <Card key={op.id} className="flex flex-col">
-                  <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">{op.productName}</p>
-                  <p className="mt-0.5 text-xs text-[#9290a2]">{op.merchantName} · {op.category}</p>
-                  <div className="mt-3"><PotentialBadge potential={op.potential} /></div>
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(op.price)}</span>
-                    <span className="font-bold text-[#278e69]">{op.commission}%</span>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <Link href={`/seller/product/${op.id}`}>
-                      <Button variant="ghost" testId={`view-other-${op.id}`}>Détail</Button>
-                    </Link>
-                    {isJoined ? (
-                      <SellerBadge tone="mint">Rejointe <Icon glyph={Tick01Icon} size={12} /></SellerBadge>
-                    ) : (
-                      <Button variant="soft" onClick={() => joinCampaign(op)} testId={`join-other-${op.id}`}>Rejoindre</Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {filtered.length === 0 && (
+      {loading ? (
         <Card className="mt-6">
-          <SellerEmptyState glyph={Search01Icon} title="Aucune opportunité trouvée" description="Modifiez votre recherche ou changez de catégorie pour découvrir de nouveaux produits." />
+          <div className="flex items-center justify-center py-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
         </Card>
+      ) : (
+        <>
+          {/* Recommended (high match score) */}
+          {recommended.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center gap-2">
+                <span className="text-[#5b49e8]"><Icon glyph={SparklesIcon} size={18} /></span>
+                <p className="text-sm font-bold text-[#292541]">Recommandés pour vous</p>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {recommended.map((c) => {
+                  const potential = potentialFromScore(c.match_score);
+                  return (
+                    <Card key={c.campaign_id} className="flex flex-col">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.product_name ?? c.campaign_name}</p>
+                          <p className="mt-0.5 text-xs text-[#9290a2]">{c.merchant_name} · {c.product_category ?? 'Divers'}</p>
+                        </div>
+                        {c.product_image_url ? (
+                          <img src={c.product_image_url} alt={c.product_name ?? ''} className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={22} /></span>
+                        )}
+                      </div>
+                      <div className="mt-4"><PotentialBadge potential={potential} /></div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-[#f8f7fc] p-3 text-xs">
+                        <div><p className="text-[10px] text-[#9290a2]">Prix client</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</p></div>
+                        <div><p className="text-[10px] text-[#9290a2]">{c.model === 'commission' ? 'Commission' : 'Marge suggérée'}</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
+                      </div>
+                      {c.niche_name && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          <SellerBadge tone="violet">{c.niche_name}</SellerBadge>
+                        </div>
+                      )}
+                      <div className="mt-5 flex items-center gap-2">
+                        <Link href={`/seller/product/${c.campaign_id}`}>
+                          <Button variant="soft" testId={`view-${c.campaign_id}`}>Voir le détail <Icon glyph={ArrowUpRight01Icon} size={14} /></Button>
+                        </Link>
+                        {c.is_joined ? (
+                          <Link href="/seller/campaigns"><Button variant="success" testId={`joined-${c.campaign_id}`}>Rejointe <Icon glyph={Tick01Icon} size={14} /></Button></Link>
+                        ) : (
+                          <Button onClick={() => handleJoin(c)} disabled={joining === c.campaign_id} testId={`join-${c.campaign_id}`}>
+                            {joining === c.campaign_id ? '…' : 'Rejoindre'}
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Others */}
+          {others.length > 0 && (
+            <div className="mt-6">
+              <p className="text-sm font-bold text-[#292541]">Autres opportunités</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {others.map((c) => {
+                  const potential = potentialFromScore(c.match_score);
+                  return (
+                    <Card key={c.campaign_id} className="flex flex-col">
+                      <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.product_name ?? c.campaign_name}</p>
+                      <p className="mt-0.5 text-xs text-[#9290a2]">{c.merchant_name} · {c.product_category ?? 'Divers'}</p>
+                      <div className="mt-3"><PotentialBadge potential={potential} /></div>
+                      <div className="mt-3 flex items-center justify-between text-xs">
+                        <span className="font-[Space_Grotesk] font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</span>
+                        <span className="font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</span>
+                      </div>
+                      <div className="mt-4 flex items-center gap-2">
+                        <Link href={`/seller/product/${c.campaign_id}`}>
+                          <Button variant="ghost" testId={`view-other-${c.campaign_id}`}>Détail</Button>
+                        </Link>
+                        {c.is_joined ? (
+                          <SellerBadge tone="mint">Rejointe <Icon glyph={Tick01Icon} size={12} /></SellerBadge>
+                        ) : (
+                          <Button variant="soft" onClick={() => handleJoin(c)} disabled={joining === c.campaign_id} testId={`join-other-${c.campaign_id}`}>
+                            {joining === c.campaign_id ? '…' : 'Rejoindre'}
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && !loading && (
+            <Card className="mt-6">
+              <SellerEmptyState glyph={Search01Icon} title="Aucune opportunité trouvée" description="Modifiez votre recherche ou changez de catégorie pour découvrir de nouveaux produits." />
+            </Card>
+          )}
+        </>
       )}
     </Page>
   );

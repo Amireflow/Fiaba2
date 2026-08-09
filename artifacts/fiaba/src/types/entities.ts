@@ -50,6 +50,8 @@ export type Order = {
   phone?: string;
   address?: string;
   commissionAmount?: number;
+  platformFeeAmount?: number;
+  platformFeeRate?: number;
 };
 
 export type DeliveryZone = [name: string, active: boolean, fee: number];
@@ -266,3 +268,93 @@ export type AdminCountrySetting = {
   category: 'Pays' | 'Frais' | 'Intégration';
   status: 'Actif' | 'Inactif' | 'À configurer';
 };
+
+/* ── Modèle Économique & Monétisation Types ── */
+
+export type PlatformFeeRule = {
+  id: string;
+  category?: string | null;
+  ratePercent: number;
+  fixedAmount: number;
+  isActive: boolean;
+  effectiveFrom: string;
+};
+
+export type SubscriptionPlan = {
+  id: string;
+  name: 'Free' | 'Premium';
+  priceMonthly: number;
+  maxActiveProducts: number;
+  maxActiveCampaigns: number;
+  platformFeeRate: number;
+  features: string[];
+  isActive: boolean;
+};
+
+export type MerchantSubscription = {
+  id: string;
+  merchantId: string;
+  planId: string;
+  status: 'active' | 'expired' | 'cancelling' | 'past_due';
+  currentPeriodStart: string;
+  currentPeriodEnd?: string;
+  autoRenew: boolean;
+  plan?: SubscriptionPlan;
+};
+
+export type SubscriptionInvoice = {
+  id: string;
+  merchantSubscriptionId: string;
+  merchantId: string;
+  amount: number;
+  paymentMethod: string;
+  status: 'paid' | 'failed' | 'pending';
+  paidAt?: string;
+  invoiceUrl?: string;
+};
+
+export type SponsoredCampaign = {
+  id: string;
+  campaignId: string;
+  merchantId: string;
+  totalBudget: number;
+  spentBudget: number;
+  matchingBoostWeight: number;
+  status: 'active' | 'paused' | 'depleted' | 'suspended';
+  startDate: string;
+  endDate?: string;
+  campaignName?: string;
+};
+
+export type PayoutFeeRule = {
+  id: string;
+  feePercent: number;
+  fixedFee: number;
+  freeThreshold: number;
+  isActive: boolean;
+};
+
+export type LedgerEntryType =
+  | 'COMMISSION'
+  | 'MARGIN'
+  | 'PLATFORM_FEE'
+  | 'PLATFORM_FEE_REVERSAL'
+  | 'SUBSCRIPTION_FEE'
+  | 'SPONSORED_CAMPAIGN_FEE'
+  | 'PAYOUT_FEE'
+  | 'PAYOUT';
+
+export type FinancialLedgerEntry = {
+  id: string;
+  sellerId?: string | null;
+  merchantId?: string | null;
+  orderId?: string | null;
+  entryType: LedgerEntryType;
+  amount: number;
+  balanceAfter?: number | null;
+  description: string;
+  createdAt: string;
+  sellerName?: string;
+  merchantName?: string;
+};
+

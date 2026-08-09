@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "node -e \"const fs=require('fs');for(const f of ['package-lock.json','yarn.lock']){try{fs.rmSync(f,{force:true})}catch{}}const isPnpm=/pnpm/.test(process.env.npm_execpath||'')||/pnpm\\//.test(process.env.npm_config_user_agent||'');if(!isPnpm){console.error('Use pnpm instead');process.exit(1)}\"",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build && node -e \"const fs=require('fs'); fs.mkdirSync('dist',{recursive:true}); fs.cpSync('artifacts/fiaba/dist/public','dist/public',{recursive:true}); fs.cpSync('artifacts/fiaba/dist/public','public',{recursive:true});\"",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build && node -e \"const fs=require('fs'), p='artifacts/fiaba/dist/public'; if(fs.existsSync(p)){ ['dist/public','dist','public','artifacts/fiaba/dist'].forEach(d => { if(d!==p){ fs.mkdirSync(d,{recursive:true}); fs.cpSync(p,d,{recursive:true}); } }); }\"",
     "typecheck": "pnpm -r --filter \"./artifacts/**\" --if-present run typecheck"
   },
   "private": true,

@@ -47,6 +47,7 @@ import { SellerRouter } from "@/features/seller/seller-router";
 import { Checkout } from "@/features/shop/pages/checkout";
 import { ProductLinkRedirect } from "@/features/shop/pages/product-link-redirect";
 import { Onboarding } from "@/features/merchant/pages/onboarding";
+import { SellerOnboarding } from "@/features/seller/pages/onboarding";
 import { SignInPage, SignUpPage } from "@/pages/auth";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
@@ -1266,6 +1267,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/onboarding" component={Onboarding} />
+        <Route path="/seller/onboarding" component={SellerOnboarding} />
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/checkout/:id" component={Checkout} />

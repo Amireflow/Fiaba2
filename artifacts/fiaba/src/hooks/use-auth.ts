@@ -59,7 +59,13 @@ export function useAuth() {
     return supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, role } },
+      options: {
+        data: {
+          full_name: fullName,
+          role,
+          phone: null,
+        },
+      },
     });
   }, []);
 
@@ -74,6 +80,7 @@ export function useAuth() {
     user: session?.user ?? null,
     profile,
     loading,
+    fetchProfile,
     signInWithOtp,
     verifyOtp,
     signInWithEmail,

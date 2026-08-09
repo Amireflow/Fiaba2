@@ -1,8 +1,9 @@
 ﻿import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { AlertCircleIcon, CheckmarkCircle02Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
+import { AlertCircleIcon, CheckmarkCircle02Icon, InformationCircleIcon, SmartPhone01Icon, Message01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
+import { haptic } from '@/lib/utils';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -27,7 +28,7 @@ function AlertModal({ open, onClose, tone, title, message }: { open: boolean; on
 
   return (
     <div className="fixed inset-0 z-[80] overflow-y-auto" role="alertdialog" aria-modal="true">
-      <div className="absolute inset-0 bg-[#201b3c]/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#201b3c]/50 backdrop-blur-sm" onClick={() => { haptic('light'); onClose(); }} />
       <div className="relative flex min-h-full items-center justify-center p-4">
         <div className="relative w-full max-w-sm rounded-[24px] bg-[#fbfaff] p-6 shadow-xl">
           <div className="flex flex-col items-center text-center">
@@ -37,7 +38,7 @@ function AlertModal({ open, onClose, tone, title, message }: { open: boolean; on
             <h3 className="mt-5 font-[Space_Grotesk] text-lg font-bold tracking-[-.02em] text-[#292541]">{title}</h3>
             <p className="mt-2 text-sm leading-6 text-[#77738a]">{message}</p>
           </div>
-          <button onClick={onClose} className="mt-6 w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5]" data-testid="alert-ok">
+          <button onClick={() => { haptic('light'); onClose(); }} className="mt-6 w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5]" data-testid="alert-ok">
             OK
           </button>
         </div>
@@ -65,24 +66,78 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
   );
 }
 
+/* ── Role-based redirect ── */
+function redirectByRole(role: string, setLocation: (path: string) => void) {
+  if (role === 'marchand') setLocation('/merchant');
+  else if (role === 'vendeur') setLocation('/seller');
+  else if (role === 'admin') setLocation('/admin');
+  else setLocation('/onboarding');
+}
+
+/* ── Sign In ── */
+
+type SignInMethod = 'email' | 'phone';
+
 export function SignInPage() {
-  const { signInWithEmail } = useAuth();
+  const { signInWithEmail, signInWithOtp, verifyOtp, profile } = useAuth();
   const [, setLocation] = useLocation();
+  const [method, setMethod] = useState<SignInMethod>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ tone: AlertTone; title: string; message: string } | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* Redirect if already logged in */
+  useEffect(() => {
+    if (profile) redirectByRole(profile.role, setLocation);
+  }, [profile, setLocation]);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    haptic('medium');
     const { error } = await signInWithEmail(email, password);
     setLoading(false);
     if (error) {
+      haptic('error');
       setAlert({ tone: 'error', title: 'Connexion impossible', message: error.message });
     } else {
+      haptic('success');
       setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Vous êtes connecté.' });
-      setLocation('/onboarding');
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    haptic('medium');
+    const { error } = await signInWithOtp(phone);
+    setLoading(false);
+    if (error) {
+      haptic('error');
+      setAlert({ tone: 'error', title: 'Envoi impossible', message: error.message });
+    } else {
+      haptic('success');
+      setOtpSent(true);
+      setAlert({ tone: 'info', title: 'Code envoyé', message: `Un code de vérification a été envoyé au ${phone}.` });
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    haptic('medium');
+    const { error } = await verifyOtp(phone, otp);
+    setLoading(false);
+    if (error) {
+      haptic('error');
+      setAlert({ tone: 'error', title: 'Code invalide', message: error.message });
+    } else {
+      haptic('success');
+      setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Vous êtes connecté.' });
     }
   };
 
@@ -91,17 +146,60 @@ export function SignInPage() {
       <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md">
         <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Bon retour parmi nous</h1>
         <p className="mt-2 text-sm text-[#77738a]">Connectez-vous à votre espace Fiaba</p>
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <label className="block text-xs font-bold text-[#514b71]">Email
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-email" />
-          </label>
-          <label className="block text-xs font-bold text-[#514b71]">Mot de passe
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-password" />
-          </label>
-          <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signin-submit">
-            {loading ? 'Connexion…' : 'Se connecter'}
+
+        {/* Method tabs */}
+        <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-[#f4f3f8] p-1">
+          <button
+            type="button"
+            onClick={() => { haptic('light'); setMethod('email'); setOtpSent(false); }}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            data-testid="tab-signin-email"
+          >
+            <Icon glyph={Message01Icon} size={14} /> Email
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => { haptic('light'); setMethod('phone'); setOtpSent(false); }}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            data-testid="tab-signin-phone"
+          >
+            <Icon glyph={SmartPhone01Icon} size={14} /> Téléphone
+          </button>
+        </div>
+
+        {method === 'email' ? (
+          <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit}>
+            <label className="block text-xs font-bold text-[#514b71]">Email
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-email" />
+            </label>
+            <label className="block text-xs font-bold text-[#514b71]">Mot de passe
+              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-password" />
+            </label>
+            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signin-submit">
+              {loading ? 'Connexion…' : 'Se connecter'}
+            </button>
+          </form>
+        ) : (
+          <form className="mt-4 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+            <label className="block text-xs font-bold text-[#514b71]">Numéro de téléphone
+              <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="+221 77 123 45 67" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-phone" />
+            </label>
+            {otpSent && (
+              <label className="block text-xs font-bold text-[#514b71]">Code de vérification
+                <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-otp" />
+              </label>
+            )}
+            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid={otpSent ? 'button-signin-verify' : 'button-signin-send-otp'}>
+              {loading ? 'Vérification…' : otpSent ? 'Vérifier le code' : 'Recevoir un code'}
+            </button>
+            {otpSent && (
+              <button type="button" onClick={() => { haptic('light'); setOtpSent(false); setOtp(''); }} className="w-full text-center text-xs font-bold text-[#77738a] hover:text-[#5b49e8]" data-testid="button-signin-change-phone">
+                Changer de numéro
+              </button>
+            )}
+          </form>
+        )}
+
         <p className="mt-5 text-center text-sm text-[#77738a]">Pas encore de compte ? <Link href={`${basePath}/sign-up`} className="font-bold text-[#5b49e8]" data-testid="link-to-signup">Créer un compte</Link></p>
       </div>
       <AlertModal open={alert !== null} onClose={() => setAlert(null)} tone={alert?.tone ?? 'info'} title={alert?.title ?? ''} message={alert?.message ?? ''} />
@@ -109,26 +207,70 @@ export function SignInPage() {
   );
 }
 
+/* ── Sign Up ── */
+
 export function SignUpPage() {
-  const { signUpWithEmail } = useAuth();
+  const { signUpWithEmail, signInWithOtp, verifyOtp, profile } = useAuth();
   const [, setLocation] = useLocation();
+  const [method, setMethod] = useState<SignInMethod>('email');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [role, setRole] = useState<'marchand' | 'vendeur'>('vendeur');
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ tone: AlertTone; title: string; message: string } | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (profile) redirectByRole(profile.role, setLocation);
+  }, [profile, setLocation]);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    haptic('medium');
     const { error } = await signUpWithEmail(email, password, fullName, role);
     setLoading(false);
     if (error) {
+      haptic('error');
       setAlert({ tone: 'error', title: 'Inscription impossible', message: error.message });
     } else {
+      haptic('success');
       setAlert({ tone: 'success', title: 'Compte créé !', message: 'Vérifiez votre email pour confirmer votre compte.' });
       setLocation('/sign-in');
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    haptic('medium');
+    const { error } = await signInWithOtp(phone);
+    setLoading(false);
+    if (error) {
+      haptic('error');
+      setAlert({ tone: 'error', title: 'Envoi impossible', message: error.message });
+    } else {
+      haptic('success');
+      setOtpSent(true);
+      setAlert({ tone: 'info', title: 'Code envoyé', message: `Un code de vérification a été envoyé au ${phone}.` });
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    haptic('medium');
+    const { error } = await verifyOtp(phone, otp);
+    setLoading(false);
+    if (error) {
+      haptic('error');
+      setAlert({ tone: 'error', title: 'Code invalide', message: error.message });
+    } else {
+      haptic('success');
+      setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Votre compte a été créé. Complétez votre profil pour commencer.' });
     }
   };
 
@@ -137,33 +279,76 @@ export function SignUpPage() {
       <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md">
         <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Créer votre compte Fiaba</h1>
         <p className="mt-2 text-sm text-[#77738a]">Le commerce avance ensemble</p>
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <label className="block text-xs font-bold text-[#514b71]">Nom complet
-            <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aminata Ndiaye" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-name" />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {(['vendeur', 'marchand'] as const).map(r => (
-              <button
-                type="button"
-                key={r}
-                onClick={() => setRole(r)}
-                className={`rounded-xl border p-3 text-xs font-bold ${role === r ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] text-[#757185]'}`}
-                data-testid={`button-signup-role-${r}`}
-              >
-                {r === 'vendeur' ? 'Je vends' : 'Je distribue'}
-              </button>
-            ))}
-          </div>
-          <label className="block text-xs font-bold text-[#514b71]">Email
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-email" />
-          </label>
-          <label className="block text-xs font-bold text-[#514b71]">Mot de passe
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-password" />
-          </label>
-          <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signup-submit">
-            {loading ? 'Création…' : 'Créer mon compte'}
+
+        {/* Role selection */}
+        <div className="mt-6 grid grid-cols-2 gap-2">
+          {(['vendeur', 'marchand'] as const).map(r => (
+            <button
+              type="button"
+              key={r}
+              onClick={() => { haptic('light'); setRole(r); }}
+              className={`rounded-xl border p-3 text-xs font-bold ${role === r ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] text-[#757185]'}`}
+              data-testid={`button-signup-role-${r}`}
+            >
+              {r === 'vendeur' ? 'Je vends' : 'Je distribue'}
+            </button>
+          ))}
+        </div>
+
+        {/* Method tabs */}
+        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-[#f4f3f8] p-1">
+          <button
+            type="button"
+            onClick={() => { haptic('light'); setMethod('email'); setOtpSent(false); }}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            data-testid="tab-signup-email"
+          >
+            <Icon glyph={Message01Icon} size={14} /> Email
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => { haptic('light'); setMethod('phone'); setOtpSent(false); }}
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            data-testid="tab-signup-phone"
+          >
+            <Icon glyph={SmartPhone01Icon} size={14} /> Téléphone
+          </button>
+        </div>
+
+        {method === 'email' ? (
+          <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit}>
+            <label className="block text-xs font-bold text-[#514b71]">Nom complet
+              <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aminata Ndiaye" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-name" />
+            </label>
+            <label className="block text-xs font-bold text-[#514b71]">Email
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-email" />
+            </label>
+            <label className="block text-xs font-bold text-[#514b71]">Mot de passe
+              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-password" />
+            </label>
+            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signup-submit">
+              {loading ? 'Création…' : 'Créer mon compte'}
+            </button>
+          </form>
+        ) : (
+          <form className="mt-4 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+            <label className="block text-xs font-bold text-[#514b71]">Nom complet
+              <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aminata Ndiaye" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-name-phone" />
+            </label>
+            <label className="block text-xs font-bold text-[#514b71]">Numéro de téléphone
+              <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="+221 77 123 45 67" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-phone" />
+            </label>
+            {otpSent && (
+              <label className="block text-xs font-bold text-[#514b71]">Code de vérification
+                <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-otp" />
+              </label>
+            )}
+            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid={otpSent ? 'button-signup-verify' : 'button-signup-send-otp'}>
+              {loading ? 'Vérification…' : otpSent ? 'Vérifier et créer' : 'Recevoir un code'}
+            </button>
+          </form>
+        )}
+
         <p className="mt-5 text-center text-sm text-[#77738a]">Déjà un compte ? <Link href={`${basePath}/sign-in`} className="font-bold text-[#5b49e8]" data-testid="link-to-signin">Se connecter</Link></p>
       </div>
       <AlertModal open={alert !== null} onClose={() => setAlert(null)} tone={alert?.tone ?? 'info'} title={alert?.title ?? ''} message={alert?.message ?? ''} />

@@ -8,7 +8,11 @@ if (!anonKey) {
   console.warn('[Fiaba] VITE_SUPABASE_ANON_KEY n\'est pas défini. Auth et DB seront indisponibles.');
 }
 
-export const supabase = createClient<Database>(url, anonKey, {
+// Supabase SDK throws if the key is empty. Use a placeholder so the app
+// can still load (auth/DB calls will fail gracefully downstream).
+const safeKey = anonKey || 'placeholder-anon-key-for-local-dev';
+
+export const supabase = createClient<Database>(url, safeKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

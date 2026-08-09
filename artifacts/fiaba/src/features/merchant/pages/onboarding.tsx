@@ -44,7 +44,7 @@ export function Onboarding() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [role, setRole] = useState<'marchand' | 'vendeur'>('marchand');
 
-  // Identity pre-filled from auth profile (No redundancy)
+  // Identity pre-filled from auth profile
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [storeName, setStoreName] = useState('');
@@ -140,7 +140,6 @@ export function Onboarding() {
       toast({ title: 'Profil configuré !', description: 'Bienvenue sur Fiaba.' });
       setSubmitting(false);
 
-      // ALWAYS perform target navigation (never stuck on button click!)
       const targetRole = profile?.role || role;
       if (targetRole === 'marchand') {
         setLocation('/merchant');
@@ -154,7 +153,7 @@ export function Onboarding() {
 
   return (
     <div className="merchant-grid flex min-h-[100dvh] items-center justify-center bg-[#f8f8fc] px-4 py-10">
-      <div className="w-full max-w-[540px]">
+      <div className="w-full max-w-[540px] min-w-0">
         {/* Header Logo */}
         <div className="mb-6 text-center">
           <Link href={`${basePath || ''}/`} className="inline-flex items-center gap-2 text-[#211c42]">
@@ -166,21 +165,18 @@ export function Onboarding() {
         </div>
 
         {/* Wizard Card */}
-        <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md border border-[#f1effa]">
-          {/* Identity Summary Bar (Prevents re-typing) */}
-          <div className="mb-5 flex items-center justify-between rounded-2xl bg-[#efedff] px-4 py-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#5b49e8] text-white font-bold">
+        <div className="rounded-[28px] bg-[#fffefd] p-5 sm:p-7 shadow-md border border-[#f1effa] min-w-0">
+          {/* Clean User Banner (Removed badge, single-line truncated to prevent wrap) */}
+          <div className="mb-5 flex items-center rounded-2xl bg-[#efedff] px-4 py-3 text-xs min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-bold">
                 <Icon glyph={role === 'marchand' ? Store01Icon : UserGroupIcon} size={16} />
               </span>
-              <div>
-                <p className="font-bold text-[#292541]">{fullName || profile?.full_name || 'Utilisateur Fiaba'}</p>
-                <p className="text-[11px] text-[#5040cf]">{role === 'marchand' ? 'Compte Commerçant / Marque' : 'Compte Vendeur Social'}</p>
+              <div className="min-w-0">
+                <p className="font-bold text-[#292541] truncate">{fullName || profile?.full_name || 'Utilisateur Fiaba'}</p>
+                <p className="text-[11px] text-[#5040cf] truncate">{role === 'marchand' ? 'Compte Commerçant / Marque' : 'Compte Vendeur Social'}</p>
               </div>
             </div>
-            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#278e69]">
-              Identité vérifiée
-            </span>
           </div>
 
           {/* Progress bar */}
@@ -197,23 +193,23 @@ export function Onboarding() {
 
           {/* Step 1: Location */}
           {step === 1 && (
-            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0">
               <div>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Votre Ville d'activité 📍</h1>
-                <p className="mt-1.5 text-sm text-[#77738a]">Où êtes-vous basé pour la livraison ou les opportunités ?</p>
+                <h1 className="font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#282441] leading-tight">Votre Ville d'activité 📍</h1>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#77738a]">Où êtes-vous basé pour la livraison ou les opportunités ?</p>
               </div>
 
               <div className="space-y-3">
                 <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Ville principale</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 min-w-0">
                   {CITIES.map((c) => (
                     <button
                       type="button"
                       key={c}
                       onClick={() => { haptic('light'); setCity(c); }}
-                      className={`rounded-xl border p-3 text-xs font-bold transition ${
+                      className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition truncate whitespace-nowrap text-center ${
                         city === c
-                          ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf] ring-2 ring-[#5b49e8]/20'
+                          ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]'
                           : 'border-[#e7e5ef] bg-white text-[#757185] hover:bg-[#f8f8fc]'
                       }`}
                     >
@@ -235,16 +231,16 @@ export function Onboarding() {
 
           {/* Step 2: Niches & Channels */}
           {step === 2 && (
-            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0">
               <div>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Niches & Canaux 🛍️</h1>
-                <p className="mt-1.5 text-sm text-[#77738a]">Quels produits souhaitez-vous cibler et sur quels réseaux ?</p>
+                <h1 className="font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#282441] leading-tight">Niches & Canaux 🛍️</h1>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#77738a]">Quels produits souhaitez-vous cibler et sur quels réseaux ?</p>
               </div>
 
               {/* Niches */}
               <div className="space-y-3">
                 <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Secteurs & Niches d'intérêt</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
                   {NICHES.map((niche) => {
                     const active = selectedNiches.includes(niche);
                     return (
@@ -252,14 +248,14 @@ export function Onboarding() {
                         type="button"
                         key={niche}
                         onClick={() => toggleNiche(niche)}
-                        className={`flex items-center justify-between rounded-xl border p-3 text-xs font-bold transition text-left ${
+                        className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-bold transition text-left min-w-0 ${
                           active
                             ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]'
                             : 'border-[#e7e5ef] bg-white text-[#757185] hover:bg-[#f8f8fc]'
                         }`}
                       >
-                        <span>{niche}</span>
-                        {active && <Icon glyph={CheckmarkCircle02Icon} size={16} />}
+                        <span className="truncate pr-2">{niche}</span>
+                        {active && <Icon glyph={CheckmarkCircle02Icon} size={16} className="shrink-0" />}
                       </button>
                     );
                   })}
@@ -270,7 +266,7 @@ export function Onboarding() {
               {role === 'vendeur' && (
                 <div className="space-y-3 pt-2">
                   <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Vos réseaux sociaux principaux</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 min-w-0">
                     {CHANNELS.map((ch) => {
                       const active = selectedChannels.includes(ch.id);
                       return (
@@ -278,12 +274,12 @@ export function Onboarding() {
                           type="button"
                           key={ch.id}
                           onClick={() => toggleChannel(ch.id)}
-                          className={`flex items-center justify-between rounded-xl border p-3 text-xs font-bold transition ${
+                          className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-bold transition min-w-0 ${
                             active ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] bg-white text-[#757185]'
                           }`}
                         >
-                          <span>{ch.name}</span>
-                          {active && <Icon glyph={CheckmarkCircle02Icon} size={16} />}
+                          <span className="truncate pr-1">{ch.name}</span>
+                          {active && <Icon glyph={CheckmarkCircle02Icon} size={16} className="shrink-0" />}
                         </button>
                       );
                     })}
@@ -295,7 +291,7 @@ export function Onboarding() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="rounded-full bg-[#f4f3f8] p-3 text-[#514b71] hover:bg-[#eeeaf7]"
+                  className="rounded-full bg-[#f4f3f8] p-3 text-[#514b71] hover:bg-[#eeeaf7] shrink-0"
                 >
                   <Icon glyph={ArrowLeft01Icon} size={18} />
                 </button>
@@ -312,30 +308,30 @@ export function Onboarding() {
 
           {/* Step 3: Confirmation */}
           {step === 3 && (
-            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="mt-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300 min-w-0">
               <div className="text-center">
-                <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#e7faf2] text-[#278e69]">
-                  <Icon glyph={SparklesIcon} size={32} />
+                <span className="mx-auto grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-2xl bg-[#e7faf2] text-[#278e69]">
+                  <Icon glyph={SparklesIcon} size={28} />
                 </span>
-                <h1 className="mt-4 font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Tout est prêt ! 🚀</h1>
-                <p className="mt-1.5 text-sm text-[#77738a]">
-                  Votre espace Fiaba est configuré pour {fullName || profile?.full_name}.
+                <h1 className="mt-4 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#282441]">Tout est prêt ! 🚀</h1>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#77738a]">
+                  Votre espace Fiaba est prêt pour {fullName || profile?.full_name}.
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-[#f8f7fc] p-4 space-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-[#efedf5]">
-                  <span className="text-[#8b88a0]">Ville</span>
-                  <strong className="text-[#292541]">{city}</strong>
+              <div className="rounded-2xl bg-[#f8f7fc] p-4 space-y-2.5 text-xs min-w-0">
+                <div className="flex justify-between items-center py-1 border-b border-[#efedf5] min-w-0 gap-2">
+                  <span className="text-[#8b88a0] shrink-0">Ville</span>
+                  <strong className="text-[#292541] truncate">{city}</strong>
                 </div>
-                <div className="flex justify-between py-1 border-b border-[#efedf5]">
-                  <span className="text-[#8b88a0]">Niches cibles</span>
-                  <strong className="text-[#292541]">{selectedNiches.join(', ')}</strong>
+                <div className="flex justify-between items-center py-1 border-b border-[#efedf5] min-w-0 gap-2">
+                  <span className="text-[#8b88a0] shrink-0">Niches cibles</span>
+                  <strong className="text-[#292541] truncate">{selectedNiches.join(', ')}</strong>
                 </div>
                 {role === 'vendeur' && (
-                  <div className="flex justify-between py-1">
-                    <span className="text-[#8b88a0]">Canaux</span>
-                    <strong className="text-[#292541]">{selectedChannels.join(', ')}</strong>
+                  <div className="flex justify-between items-center py-1 min-w-0 gap-2">
+                    <span className="text-[#8b88a0] shrink-0">Canaux</span>
+                    <strong className="text-[#292541] truncate">{selectedChannels.join(', ')}</strong>
                   </div>
                 )}
               </div>
@@ -344,7 +340,7 @@ export function Onboarding() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="rounded-full bg-[#f4f3f8] p-3 text-[#514b71] hover:bg-[#eeeaf7]"
+                  className="rounded-full bg-[#f4f3f8] p-3 text-[#514b71] hover:bg-[#eeeaf7] shrink-0"
                 >
                   <Icon glyph={ArrowLeft01Icon} size={18} />
                 </button>

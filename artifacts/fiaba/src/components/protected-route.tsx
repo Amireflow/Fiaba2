@@ -7,11 +7,12 @@ type AllowedRole = 'marchand' | 'vendeur' | 'admin';
 /**
  * Route guard that checks:
  * 1. User has an active session
- * 2. User's profile role matches the allowed role for this route
+ * 2. User has a valid profile
+ * 3. User's profile role matches the allowed role for this route
  *
  * If no session → redirect to /sign-in
+ * If no profile → redirect to /onboarding
  * If session but wrong role → redirect to the user's correct interface
- * If loading → show a spinner
  */
 export function ProtectedRoute({
   children,
@@ -37,12 +38,11 @@ export function ProtectedRoute({
     return <Redirect to="/sign-in" />;
   }
 
-  if (!profile || !profile.phone || !profile.city) {
+  if (!profile) {
     return <Redirect to="/onboarding" />;
   }
 
-  if (profile.role !== allowedRole) {
-    // Redirect to the correct interface for this user's role
+  if (profile.role !== allowedRole && profile.role !== 'admin') {
     const rolePath: Record<AllowedRole, string> = {
       marchand: '/merchant',
       vendeur: '/seller',

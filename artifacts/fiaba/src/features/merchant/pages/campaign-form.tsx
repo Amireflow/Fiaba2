@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
-import { money } from '@/lib/utils';
+import { money, haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { useMerchantId, useSupabaseQuery, supabaseInsert, supabaseUpdate } from '@/hooks/use-supabase-query';
 import {
   Field,
   MerchantButton as Button,
@@ -14,18 +15,17 @@ import {
   selectClass,
   textareaClass,
 } from '../components/merchant-ui';
-import { seedCampaigns, seedProducts } from '@/config/seeds';
-import type { Campaign, CommissionType, CommissionModel, Product } from '@/types/entities';
+
+type ProductOption = { id: string; name: string; price: number };
 
 type FormState = {
   name: string;
   description: string;
   commission: string;
-  commissionType: CommissionType;
-  model: CommissionModel;
+  commissionType: 'percentage' | 'fixed';
+  model: 'commission' | 'marge';
   goal: string;
-  product: string;
-  startDate: string;
+  productId: string;
   endDate: string;
 };
 
@@ -34,10 +34,9 @@ const emptyForm: FormState = {
   description: '',
   commission: '10',
   commissionType: 'percentage',
-  model: 'Commission',
+  model: 'commission',
   goal: '50',
-  product: '',
-  startDate: '',
+  productId: '',
   endDate: '',
 };
 
@@ -45,83 +44,146 @@ export function CampaignForm() {
   const { id } = useParams<{ id?: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { merchantId } = useMerchantId();
   const isEdit = !!id;
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() => read('campaigns', seedCampaigns));
-  const [products] = useState<Product[]>(() => read('products', seedProducts));
-  const existing = isEdit ? campaigns.find((c) => c.id === id) : undefined;
+  const { data: products } = useSupabaseQuery<ProductOption>('products', {
+    select: 'id, name, price',
+    filter: { merchant_id: merchantId, status: 'actif' },
+    order: { column: 'name', ascending: true },
+    enabled: !!merchantId,
+  });
 
-  const [form, setForm] = useState<FormState>(
-    existing
-      ? {
-          name: existing.name,
-          description: existing.description ?? '',
-          commission: String(existing.commission),
-          commissionType: existing.commissionType ?? 'percentage',
-          model: existing.model ?? 'Commission',
-          goal: String(existing.goal ?? 50),
-          product: existing.product ?? '',
-          startDate: existing.startDate ?? '',
-          endDate: existing.endDate ?? '',
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+
+  // Load existing campaign
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    setLoading(true);
+    supabase
+      .from('campaigns')
+      .select('name, description, commission, commission_type, model, goal, product_id, ends_at')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const c = data as {
+            name: string; description: string | null; commission: number;
+            commission_type: string | null; model: string; goal: number | null;
+            product_id: string | null; ends_at: string | null;
+          };
+          setForm({
+            name: c.name,
+            description: c.description ?? '',
+            commission: String(c.commission),
+            commissionType: (c.commission_type as 'percentage' | 'fixed') ?? 'percentage',
+            model: (c.model as 'commission' | 'marge') ?? 'commission',
+            goal: String(c.goal ?? 50),
+            productId: c.product_id ?? '',
+            endDate: c.ends_at ? c.ends_at.slice(0, 10) : '',
+          });
         }
-      : { ...emptyForm, product: products[0]?.name ?? '' }
-  );
+        setLoading(false);
+      });
+  }, [id, isEdit]);
+
+  // Auto-select first product if creating
+  useEffect(() => {
+    if (!isEdit && !form.productId && products.length > 0) {
+      setForm((prev) => ({ ...prev, productId: products[0].id }));
+    }
+  }, [products, isEdit, form.productId]);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const selectedProduct = products.find((p) => p.name === form.product);
+  const selectedProduct = products.find((p) => p.id === form.productId);
   const commissionPreview = selectedProduct
     ? form.commissionType === 'percentage'
       ? Math.round((selectedProduct.price * Number(form.commission || 0)) / 100)
       : Number(form.commission || 0)
     : 0;
 
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!merchantId) {
+      toast({ title: 'Erreur', description: 'Impossible de trouver votre boutique.' });
+      return;
+    }
     const commission = Number(form.commission);
     if (!form.name.trim()) {
+      haptic('error');
       toast({ title: 'Nom requis', description: 'Donnez un nom à votre campagne.' });
       return;
     }
     if (isNaN(commission) || commission < 0) {
+      haptic('error');
       toast({ title: 'Commission invalide', description: 'Vérifiez le montant de la commission.' });
       return;
     }
     if (form.commissionType === 'percentage' && commission > 50) {
+      haptic('error');
       toast({ title: 'Commission trop élevée', description: 'Le pourcentage maximum est 50%.' });
       return;
     }
     if (form.commissionType === 'fixed' && commission > (selectedProduct?.price ?? 0)) {
+      haptic('error');
       toast({ title: 'Commission trop élevée', description: `Le montant ne peut pas dépasser le prix du produit (${money(selectedProduct?.price ?? 0)}).` });
       return;
     }
 
-    const data = {
+    setSaving(true);
+    haptic('medium');
+
+    const payload = {
+      merchant_id: merchantId,
       name: form.name.trim(),
-      description: form.description.trim(),
+      description: form.description.trim() || null,
       commission,
-      commissionType: form.commissionType,
+      commission_type: form.commissionType,
       model: form.model,
-      goal: Number(form.goal),
-      product: form.product,
-      startDate: form.startDate,
-      endDate: form.endDate,
+      goal: Number(form.goal) || null,
+      product_id: form.productId || null,
+      ends_at: form.endDate ? new Date(form.endDate).toISOString() : null,
+      status: 'active',
     };
 
-    if (isEdit && existing) {
-      const updated = campaigns.map((c) => (c.id === existing.id ? { ...c, ...data } : c));
-      setCampaigns(updated);
-      write('campaigns', updated);
-      toast({ title: 'Campagne modifiée', description: `${data.name} a été mise à jour.` });
+    if (isEdit && id) {
+      const { error } = await supabaseUpdate('campaigns', id, payload);
+      setSaving(false);
+      if (error) {
+        haptic('error');
+        toast({ title: 'Erreur', description: error });
+      } else {
+        haptic('success');
+        toast({ title: 'Campagne modifiée', description: `${payload.name} a été mise à jour.` });
+        navigate('/merchant/campaigns');
+      }
     } else {
-      const updated = [...campaigns, { id: crypto.randomUUID(), ...data, sellers: 0, sales: 0, status: 'Active' as const } as Campaign];
-      setCampaigns(updated);
-      write('campaigns', updated);
-      toast({ title: 'Campagne lancée', description: `${data.name} est active dans votre réseau.` });
+      const { error } = await supabaseInsert('campaigns', payload);
+      setSaving(false);
+      if (error) {
+        haptic('error');
+        toast({ title: 'Erreur', description: error });
+      } else {
+        haptic('success');
+        toast({ title: 'Campagne lancée', description: `${payload.name} est active dans votre réseau.` });
+        navigate('/merchant/campaigns');
+      }
     }
-    navigate('/merchant/campaigns');
+  }
+
+  if (loading) {
+    return (
+      <Page eyebrow="Chargement" title="…" description="">
+        <div className="mt-6 flex items-center justify-center py-12">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+        </div>
+      </Page>
+    );
   }
 
   return (
@@ -144,8 +206,9 @@ export function CampaignForm() {
             <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Décrivez l'objectif et les produits mis en avant…" className={`${textareaClass} min-h-20`} data-testid="input-description" />
           </Field>
           <Field label="Produit mis en avant">
-            <select value={form.product} onChange={(e) => setField('product', e.target.value)} className={selectClass} data-testid="input-product">
-              {products.map((p) => <option key={p.id} value={p.name}>{p.name} — {money(p.price)}</option>)}
+            <select value={form.productId} onChange={(e) => setField('productId', e.target.value)} className={selectClass} data-testid="input-product">
+              <option value="">— Sélectionnez —</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {money(p.price)}</option>)}
             </select>
           </Field>
 
@@ -154,7 +217,7 @@ export function CampaignForm() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setField('commissionType', 'percentage')}
+                onClick={() => { haptic('light'); setField('commissionType', 'percentage'); }}
                 className={`rounded-2xl border-2 p-4 text-left transition ${form.commissionType === 'percentage' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#eeeaf6] bg-white hover:border-[#d4ceff]'}`}
                 data-testid="button-commission-percentage"
               >
@@ -168,7 +231,7 @@ export function CampaignForm() {
               </button>
               <button
                 type="button"
-                onClick={() => setField('commissionType', 'fixed')}
+                onClick={() => { haptic('light'); setField('commissionType', 'fixed'); }}
                 className={`rounded-2xl border-2 p-4 text-left transition ${form.commissionType === 'fixed' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#eeeaf6] bg-white hover:border-[#d4ceff]'}`}
                 data-testid="button-commission-fixed"
               >
@@ -197,9 +260,9 @@ export function CampaignForm() {
               />
             </Field>
             <Field label="Modèle" hint="Commission = sur vente, Marge = sur marge brute">
-              <select value={form.model} onChange={(e) => setField('model', e.target.value as CommissionModel)} className={selectClass} data-testid="input-model">
-                <option value="Commission">Commission (sur vente)</option>
-                <option value="Marge">Marge (sur marge brute)</option>
+              <select value={form.model} onChange={(e) => setField('model', e.target.value as 'commission' | 'marge')} className={selectClass} data-testid="input-model">
+                <option value="commission">Commission (sur vente)</option>
+                <option value="marge">Marge (sur marge brute)</option>
               </select>
             </Field>
           </div>
@@ -226,13 +289,13 @@ export function CampaignForm() {
               <input type="number" min="1" value={form.goal} onChange={(e) => setField('goal', e.target.value)} className={inputClass} data-testid="input-goal" />
             </Field>
             <Field label="Date de fin" hint="Optionnel">
-              <input type="text" value={form.endDate} onChange={(e) => setField('endDate', e.target.value)} placeholder="Ex. 30 sept 2024" className={inputClass} data-testid="input-end-date" />
+              <input type="date" value={form.endDate} onChange={(e) => setField('endDate', e.target.value)} className={inputClass} data-testid="input-end-date" />
             </Field>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Link href="/merchant/campaigns"><Button variant="ghost" type="button">Annuler</Button></Link>
-            <Button type="submit" testId="button-save-campaign">{isEdit ? 'Enregistrer' : 'Lancer la campagne'}</Button>
+            <Button type="submit" disabled={saving} testId="button-save-campaign">{saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Lancer la campagne'}</Button>
           </div>
         </form>
       </Card>

@@ -29,9 +29,10 @@ begin
     ])
   loop
     execute format(
-      'create trigger trg_%s_updated before update on public.%s
+      'drop trigger if exists trg_%s_updated on public.%s;
+       create trigger trg_%s_updated before update on public.%s
        for each row execute function public.set_updated_at();',
-      t, t
+      t, t, t, t
     );
   end loop;
 end;

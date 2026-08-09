@@ -360,9 +360,10 @@ begin
     ])
   loop
     execute format(
-      'create trigger trg_%s_updated before update on public.%s
+      'drop trigger if exists trg_%s_updated on public.%s;
+       create trigger trg_%s_updated before update on public.%s
        for each row execute function public.set_updated_at();',
-      t, t
+      t, t, t, t
     );
   end loop;
 end;
@@ -667,21 +668,21 @@ on conflict do nothing;
 
 -- 7e. Niches initiales (§8)
 insert into public.niches (name, type, tags) values
-  ('Tech', 'category', '{"smartphones", "laptop", "accessoires", "gaming"}'),
-  ('Mode', 'category', '{"vetements", "chaussures", "accessoires", "sacs"}'),
-  ('Beauté', 'category', '{"cosmetiques", "soins", "parfums", "cheveux"}'),
-  ('Maison', 'category', '{"decoration", "electromenager", "mobilier"}'),
-  ('Food', 'category', '{"epicerie", "boissons", "snacks", "bio"}'),
-  ('Sport', 'category', '{"fitness", "running", "mma", "football"}'),
-  ('Gaming', 'category', '{"consoles", "jeux", "streaming", "esport"}'),
-  ('Bébé', 'category', '{"couche", "vetements", "jouets", "soins"}'),
-  ('Éducation', 'category', '{"livres", "formation", "cours", "e-learning"}'),
-  ('Luxe', 'category', '{"montres", "bijoux", "maroquinerie"}')
+  ('Tech', 'category', ARRAY['smartphones', 'laptop', 'accessoires', 'gaming']),
+  ('Mode', 'category', ARRAY['vetements', 'chaussures', 'accessoires', 'sacs']),
+  ('Beauté', 'category', ARRAY['cosmetiques', 'soins', 'parfums', 'cheveux']),
+  ('Maison', 'category', ARRAY['decoration', 'electromenager', 'mobilier']),
+  ('Food', 'category', ARRAY['epicerie', 'boissons', 'snacks', 'bio']),
+  ('Sport', 'category', ARRAY['fitness', 'running', 'mma', 'football']),
+  ('Gaming', 'category', ARRAY['consoles', 'jeux', 'streaming', 'esport']),
+  ('Bébé', 'category', ARRAY['couche', 'vetements', 'jouets', 'soins']),
+  ('Éducation', 'category', ARRAY['livres', 'formation', 'cours', 'e-learning']),
+  ('Luxe', 'category', ARRAY['montres', 'bijoux', 'maroquinerie'])
 on conflict do nothing;
 
 -- 7f. Sous-niches Tech
 insert into public.niches (name, type, parent_id, tags)
-  select s.name, 'sub_niche', p.id, s.tags
+  select s.name, 'sub_niche', p.id, s.tags::text[]
   from public.niches p
   cross join (values
     ('Smartphones', '{"iphone", "samsung", "xiaomi", "oppo"}'),
@@ -692,7 +693,7 @@ on conflict do nothing;
 
 -- 7g. Sous-niches Mode
 insert into public.niches (name, type, parent_id, tags)
-  select s.name, 'sub_niche', p.id, s.tags
+  select s.name, 'sub_niche', p.id, s.tags::text[]
   from public.niches p
   cross join (values
     ('Vêtements', '{"homme", "femme", "enfant", "traditionnel"}'),
@@ -703,7 +704,7 @@ on conflict do nothing;
 
 -- 7h. Sous-niches Beauté
 insert into public.niches (name, type, parent_id, tags)
-  select s.name, 'sub_niche', p.id, s.tags
+  select s.name, 'sub_niche', p.id, s.tags::text[]
   from public.niches p
   cross join (values
     ('Cosmétiques', '{"maquillage", "teint", "levres", "yeux"}'),

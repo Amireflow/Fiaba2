@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
+import { haptic } from '@/lib/utils';
+import { useSupabaseQuery, supabaseInsert } from '@/hooks/use-supabase-query';
 import {
   AdminField,
   AdminButton as Button,
@@ -12,43 +13,69 @@ import {
   adminInputClass,
   adminSelectClass,
 } from '../components/admin-ui';
-import { seedAdminNiches } from '@/config/admin-seeds';
-import type { AdminNiche } from '@/types/entities';
 
-const emptyForm = { name: '', type: 'Sous-niche' as 'Catégorie' | 'Sous-niche', parent: 'Beauté', tags: '' };
-type FormState = typeof emptyForm;
+type NicheRef = { id: string; name: string; type: string };
+
+type FormState = {
+  name: string;
+  type: 'category' | 'sub_niche';
+  parentId: string;
+  tags: string;
+};
+
+const emptyForm: FormState = { name: '', type: 'sub_niche', parentId: '', tags: '' };
 
 export function AdminNicheNew() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [niches, setNiches] = useState<AdminNiche[]>(() => read('admin-niches', seedAdminNiches));
+  const { data: niches } = useSupabaseQuery<NicheRef>('niches', {
+    select: 'id, name, type',
+    order: { column: 'name', ascending: true },
+  });
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  const parentOptions = niches.filter((n) => n.type === 'Catégorie').map((c) => c.name);
+  const parentOptions = niches.filter((n) => n.type === 'category');
 
-  function save(e: React.FormEvent) {
+  // Auto-select first parent
+  useEffect(() => {
+    if (form.type === 'sub_niche' && !form.parentId && parentOptions.length > 0) {
+      setForm((prev) => ({ ...prev, parentId: parentOptions[0].id }));
+    }
+    if (form.type === 'category') {
+      setForm((prev) => ({ ...prev, parentId: '' }));
+    }
+  }, [form.type]);
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     const trimmedName = form.name.trim();
     if (!trimmedName) {
+      haptic('error');
       toast({ title: 'Champs invalides', description: 'Saisissez un nom de niche.' });
       return;
     }
-    const id = `n-${Date.now()}`;
-    const newNiche: AdminNiche = {
-      id,
+
+    setSaving(true);
+    haptic('medium');
+    const tags = form.tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const { error } = await supabaseInsert('niches', {
       name: trimmedName,
       type: form.type,
-      parent: form.type === 'Catégorie' ? '—' : form.parent,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-      sellers: 0,
-      products: 0,
-      active: true,
-    };
-    const updated = [...niches, newNiche];
-    setNiches(updated);
-    write('admin-niches', updated);
-    toast({ title: 'Niche ajoutée', description: `${newNiche.name} (${newNiche.type}) ajoutée à la taxonomie.` });
-    navigate('/admin/niches');
+      parent_id: form.parentId || null,
+      tags,
+      is_active: true,
+    });
+    setSaving(false);
+
+    if (error) {
+      haptic('error');
+      toast({ title: 'Erreur', description: error });
+    } else {
+      haptic('success');
+      toast({ title: 'Niche ajoutée', description: `${trimmedName} ajoutée à la taxonomie.` });
+      navigate('/admin/niches');
+    }
   }
 
   return (
@@ -70,18 +97,18 @@ export function AdminNicheNew() {
           <AdminField label="Type">
             <select
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as 'Catégorie' | 'Sous-niche', parent: e.target.value === 'Catégorie' ? '—' : form.parent })}
+              onChange={(e) => setForm({ ...form, type: e.target.value as FormState['type'] })}
               className={adminSelectClass}
               data-testid="select-niche-type"
             >
-              <option value="Catégorie">Catégorie</option>
-              <option value="Sous-niche">Sous-niche</option>
+              <option value="category">Catégorie</option>
+              <option value="sub_niche">Sous-niche</option>
             </select>
           </AdminField>
-          {form.type === 'Sous-niche' && (
+          {form.type === 'sub_niche' && (
             <AdminField label="Catégorie parente">
-              <select value={form.parent} onChange={(e) => setForm({ ...form, parent: e.target.value })} className={adminSelectClass} data-testid="select-niche-parent">
-                {parentOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+              <select value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })} className={adminSelectClass} data-testid="select-niche-parent">
+                {parentOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </AdminField>
           )}
@@ -93,7 +120,7 @@ export function AdminNicheNew() {
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <Link href="/admin/niches"><Button variant="ghost" type="button">Annuler</Button></Link>
-            <Button type="submit" testId="button-save-niche">Ajouter la niche</Button>
+            <Button type="submit" disabled={saving} testId="button-save-niche">{saving ? 'Ajout…' : 'Ajouter la niche'}</Button>
           </div>
         </form>
       </Card>

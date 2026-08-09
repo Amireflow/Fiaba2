@@ -12,10 +12,18 @@ declare
   v_role user_role;
   v_full_name text;
   v_phone text;
+  v_display_name text;
+  v_merchant_name text;
+  v_slug text;
 begin
   v_role := coalesce((new.raw_user_meta_data ->> 'role')::user_role, 'vendeur');
   v_full_name := coalesce(new.raw_user_meta_data ->> 'full_name', '');
   v_phone := new.raw_user_meta_data ->> 'phone';
+
+  -- Calculer des noms d'affichage fiables (fallback si full_name est vide)
+  v_display_name := coalesce(nullif(trim(v_full_name), ''), split_part(coalesce(new.email, 'utilisateur'), '@', 1));
+  v_merchant_name := coalesce(nullif(trim(v_full_name), ''), 'Ma boutique');
+  v_slug := replace(lower(v_merchant_name), ' ', '-') || '-' || substr(new.id::text, 1, 8);
 
   insert into public.profiles (id, email, full_name, phone, role)
   values (
@@ -24,16 +32,21 @@ begin
     v_full_name,
     v_phone,
     v_role
-  );
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = case when excluded.full_name <> '' then excluded.full_name else profiles.full_name end,
+    phone = coalesce(excluded.phone, profiles.phone),
+    role = excluded.role;
 
   -- Créer un seller_profile si le rôle est vendeur
   if v_role = 'vendeur' then
     insert into public.sellers (profile_id, display_name, phone, status, joined_at)
-    values (new.id, v_full_name, v_phone, 'actif', now())
+    values (new.id, v_display_name, v_phone, 'actif', now())
     on conflict do nothing;
 
     insert into public.seller_profiles (profile_id, display_name)
-    values (new.id, v_full_name)
+    values (new.id, v_display_name)
     on conflict (profile_id) do nothing;
   end if;
 
@@ -42,8 +55,8 @@ begin
     insert into public.merchants (owner_id, name, slug, description)
     values (
       new.id,
-      coalesce(v_full_name, 'Ma boutique'),
-      replace(lower(coalesce(v_full_name, 'boutique')), ' ', '-') || '-' || substr(new.id::text, 1, 8),
+      v_merchant_name,
+      v_slug,
       ''
     )
     on conflict do nothing;

@@ -3,7 +3,8 @@ import { Link } from 'wouter';
 import { Add01Icon, MapPinIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
+import { haptic } from '@/lib/utils';
+import { useSupabaseQuery, supabaseUpdate } from '@/hooks/use-supabase-query';
 import {
   AdminBadge,
   AdminButton as Button,
@@ -13,28 +14,52 @@ import {
   AdminScrollTable,
   AdminToggle,
 } from '../components/admin-ui';
-import { seedAdminZones } from '@/config/admin-seeds';
-import type { AdminZone, ZoneLevel } from '@/types/entities';
 
-const levelTone = (l: ZoneLevel) => (l === 'Région' ? 'violet' : l === 'Département' ? 'mint' : 'amber');
+type ZoneRow = {
+  id: string;
+  name: string;
+  level: string;
+  parent_id: string | null;
+  is_active: boolean;
+};
+
+type ZoneLevelFilter = 'Tous' | 'Région' | 'Département' | 'Commune';
+
+const levelMap: Record<string, ZoneLevelFilter> = {
+  region: 'Région',
+  department: 'Département',
+  commune: 'Commune',
+};
+
+const levelTone = (l: string) => (l === 'region' ? 'violet' : l === 'department' ? 'mint' : 'amber');
 
 export function AdminZones() {
   const { toast } = useToast();
-  const [zones, setZones] = useState<AdminZone[]>(() => read('admin-zones', seedAdminZones));
-  const [levelFilter, setLevelFilter] = useState<'Tous' | ZoneLevel>('Tous');
+  const { data: zones, loading, refetch } = useSupabaseQuery<ZoneRow>('zones', {
+    select: 'id, name, level, parent_id, is_active',
+    order: { column: 'name', ascending: true },
+  });
+  const [levelFilter, setLevelFilter] = useState<ZoneLevelFilter>('Tous');
 
-  const filtered = zones.filter((z) => levelFilter === 'Tous' || z.level === levelFilter);
+  const filtered = zones.filter((z) => levelFilter === 'Tous' || levelMap[z.level] === levelFilter);
 
-  function toggleActive(zone: AdminZone) {
-    const updated = zones.map((z) => (z.id === zone.id ? { ...z, active: !z.active } : z));
-    setZones(updated);
-    write('admin-zones', updated);
-    toast({ title: `${zone.name} · ${!zone.active ? 'activée' : 'désactivée'}`, description: 'Référentiel de zones mis à jour.' });
+  // Build parent name lookup
+  const zoneNameMap = new Map(zones.map((z) => [z.id, z.name]));
+
+  async function toggleActive(zone: ZoneRow) {
+    haptic('light');
+    const { error } = await supabaseUpdate('zones', zone.id, { is_active: !zone.is_active });
+    if (error) {
+      toast({ title: 'Erreur', description: error });
+    } else {
+      toast({ title: `${zone.name} · ${!zone.is_active ? 'activée' : 'désactivée'}`, description: 'Référentiel de zones mis à jour.' });
+      refetch();
+    }
   }
 
-  const regions = zones.filter((z) => z.level === 'Région');
-  const departments = zones.filter((z) => z.level === 'Département');
-  const communes = zones.filter((z) => z.level === 'Commune');
+  const regions = zones.filter((z) => z.level === 'region');
+  const departments = zones.filter((z) => z.level === 'department');
+  const communes = zones.filter((z) => z.level === 'commune');
 
   return (
     <AdminPage
@@ -59,13 +84,17 @@ export function AdminZones() {
       {/* Filters */}
       <div className="mt-5 flex flex-wrap gap-2">
         {(['Tous', 'Région', 'Département', 'Commune'] as const).map((l) => (
-          <button key={l} onClick={() => setLevelFilter(l)} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${levelFilter === l ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-zone-${l}`}>{l}</button>
+          <button key={l} onClick={() => { haptic('light'); setLevelFilter(l); }} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${levelFilter === l ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-zone-${l}`}>{l}</button>
         ))}
       </div>
 
       {/* Table */}
       <Card className="mt-5 p-0">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        ) : filtered.length === 0 ? (
           <AdminEmptyState
             glyph={MapPinIcon}
             title="Aucune zone"
@@ -80,7 +109,6 @@ export function AdminZones() {
                   <th className="px-5 py-3">Zone</th>
                   <th className="px-5 py-3">Niveau</th>
                   <th className="px-5 py-3">Parent</th>
-                  <th className="px-5 py-3 text-right">Sous-zones</th>
                   <th className="px-5 py-3">Active</th>
                 </tr>
               </thead>
@@ -88,10 +116,9 @@ export function AdminZones() {
                 {filtered.map((z) => (
                   <tr key={z.id} className="transition hover:bg-[#faf9fd]" data-testid={`row-zone-${z.id}`}>
                     <td className="px-5 py-4 font-bold text-[#292541]">{z.name}</td>
-                    <td className="px-5 py-4"><AdminBadge tone={levelTone(z.level)}>{z.level}</AdminBadge></td>
-                    <td className="px-5 py-4 text-[#77738a]">{z.parent}</td>
-                    <td className="px-5 py-4 text-right font-bold text-[#292541]">{z.communes}</td>
-                    <td className="px-5 py-4"><AdminToggle checked={z.active} onChange={() => toggleActive(z)} testId={`toggle-zone-${z.id}`} /></td>
+                    <td className="px-5 py-4"><AdminBadge tone={levelTone(z.level)}>{levelMap[z.level] ?? z.level}</AdminBadge></td>
+                    <td className="px-5 py-4 text-[#77738a]">{z.parent_id ? (zoneNameMap.get(z.parent_id) ?? '—') : '—'}</td>
+                    <td className="px-5 py-4"><AdminToggle checked={z.is_active} onChange={() => toggleActive(z)} testId={`toggle-zone-${z.id}`} /></td>
                   </tr>
                 ))}
               </tbody>

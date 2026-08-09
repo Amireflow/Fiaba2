@@ -31,7 +31,7 @@ type PaymentRow = {
 const accounts = [
   { id: 'wave', label: 'Wave' },
   { id: 'orange_money', label: 'Orange Money' },
-  { id: 'bank', label: 'Compte bancaire' },
+  { id: 'cash', label: 'Espèces / Bank transfer' },
 ];
 
 export function PaymentWithdraw() {

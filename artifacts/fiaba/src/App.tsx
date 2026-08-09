@@ -697,7 +697,6 @@ function Home() {
       <main>
         {/* Hero */}
         <section className="fiaba-grid relative overflow-hidden px-5 pb-20 pt-36 lg:pb-28 lg:pt-48">
-          <div className="pointer-events-none absolute -right-24 top-20 h-80 w-80 rounded-full bg-[#dcd7ff] blur-2xl" />
           <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1.02fr_.98fr]">
             <div className="relative z-10 reveal">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-[11px] font-bold text-[#5e51c9]">

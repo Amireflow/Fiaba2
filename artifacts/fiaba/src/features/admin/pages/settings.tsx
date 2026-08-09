@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings01Icon, Tick01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
+import { haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import {
   AdminBadge,
   AdminButton as Button,
@@ -12,23 +13,88 @@ import {
   AdminSectionTitle,
   adminInputClass,
 } from '../components/admin-ui';
-import { seedAdminSettings } from '@/config/admin-seeds';
-import type { AdminCountrySetting } from '@/types/entities';
 
-const statusTone = (s: AdminCountrySetting['status']) => (s === 'Actif' ? 'mint' : s === 'À configurer' ? 'amber' : 'slate');
-const categoryTone = (c: AdminCountrySetting['category']) => (c === 'Pays' ? 'violet' : c === 'Frais' ? 'amber' : 'mint');
+type SettingRow = {
+  id: string;
+  key: string;
+  label: string;
+  value: string;
+  category: string;
+  is_active: boolean;
+};
+
+const statusTone = (isActive: boolean): 'mint' | 'amber' => (isActive ? 'mint' : 'amber');
+const categoryTone = (c: string): 'violet' | 'amber' | 'mint' => (c === 'Pays' ? 'violet' : c === 'Frais' ? 'amber' : 'mint');
 
 export function AdminSettings() {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<AdminCountrySetting[]>(() => read('admin-settings', seedAdminSettings));
+  const [settings, setSettings] = useState<SettingRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [platformFee, setPlatformFee] = useState('5');
-  const [safetyPeriod, setSafetyPeriod] = useState('7');
+  const [safetyPeriod, setSafetyPeriod] = useState('14');
   const [codLimit, setCodLimit] = useState('75000');
+  const [saving, setSaving] = useState(false);
 
-  function saveSetting(key: string, value: string) {
-    const updated = settings.map((s) => (s.key === key ? { ...s, value } : s));
-    setSettings(updated);
-    write('admin-settings', updated);
+  useEffect(() => {
+    async function loadData() {
+      const { data } = await supabase
+        .from('country_settings')
+        .select('id, key, label, value, category, is_active')
+        .order('category', { ascending: true })
+        .order('label', { ascending: true });
+      const rows = (data as SettingRow[] | null) ?? [];
+      setSettings(rows);
+
+      // Load financial rules from settings if they exist
+      const feeSetting = rows.find((s) => s.key === 'platform_fee_rate');
+      const safetySetting = rows.find((s) => s.key === 'safety_period_days');
+      const codSetting = rows.find((s) => s.key === 'cod_limit');
+      if (feeSetting) setPlatformFee(feeSetting.value);
+      if (safetySetting) setSafetyPeriod(safetySetting.value);
+      if (codSetting) setCodLimit(codSetting.value);
+
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  async function saveFinancialRules() {
+    haptic('medium');
+    setSaving(true);
+
+    const rules = [
+      { key: 'platform_fee_rate', label: 'Frais de plateforme (%)', value: platformFee, category: 'Frais' },
+      { key: 'safety_period_days', label: 'Période de sécurité (jours)', value: safetyPeriod, category: 'Frais' },
+      { key: 'cod_limit', label: 'Plafond COD (FCFA)', value: codLimit, category: 'Frais' },
+    ];
+
+    for (const rule of rules) {
+      const existing = settings.find((s) => s.key === rule.key);
+      if (existing) {
+        await (supabase.from('country_settings') as any).update({ value: rule.value } as never).eq('id', existing.id);
+      } else {
+        await (supabase.from('country_settings') as any).insert({
+          key: rule.key,
+          label: rule.label,
+          value: rule.value,
+          category: rule.category,
+          is_active: true,
+        });
+      }
+    }
+
+    // Refresh settings
+    const { data: refreshed } = await supabase.from('country_settings').select('id, key, label, value, category, is_active').order('category', { ascending: true }).order('label', { ascending: true });
+    setSettings((refreshed as SettingRow[] | null) ?? []);
+
+    setSaving(false);
+    toast({ title: 'Règles financières enregistrées', description: `Frais ${platformFee}% · sécurité ${safetyPeriod}j · COD ${codLimit} F. Tracé dans l'audit.` });
+  }
+
+  async function saveSetting(id: string, value: string) {
+    haptic('light');
+    await (supabase.from('country_settings') as any).update({ value } as never).eq('id', id);
+    setSettings((prev) => prev.map((s) => (s.id === id ? { ...s, value } : s)));
     toast({ title: 'Paramètre enregistré', description: "La modification est tracée dans le journal d'audit." });
   }
 
@@ -59,35 +125,47 @@ export function AdminSettings() {
           </AdminField>
         </div>
         <div className="mt-4 flex justify-end">
-          <Button variant="primary" onClick={() => toast({ title: 'Règles financières enregistrées', description: `Frais ${platformFee}% · sécurité ${safetyPeriod}j · COD ${codLimit} F. Tracé dans l'audit.` })} testId="button-save-financial">
-            <Icon glyph={Tick01Icon} size={15} /> Enregistrer
+          <Button variant="primary" onClick={saveFinancialRules} disabled={saving} testId="button-save-financial">
+            <Icon glyph={Tick01Icon} size={15} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
           </Button>
         </div>
       </Card>
 
       {/* Reference settings grouped */}
-      {Object.entries(grouped).map(([category, items]) => (
-        <Card key={category} className="mt-4">
-          <AdminSectionTitle title={category} />
-          <div className="mt-4 divide-y divide-[#f1eef7]">
-            {items.map((s) => (
-              <div key={s.key} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#292541]">{s.label}</p>
-                  <p className="mt-0.5 truncate text-xs text-[#9290a2]">{s.value}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <AdminBadge tone={categoryTone(s.category)}>{s.category}</AdminBadge>
-                  <AdminBadge tone={statusTone(s.status)}>{s.status}</AdminBadge>
-                  {s.status === 'À configurer' && (
-                    <Button variant="soft" onClick={() => saveSetting(s.key, 'En cours de configuration')} testId={`button-configure-${s.key}`}>Configurer</Button>
-                  )}
-                </div>
-              </div>
-            ))}
+      {loading ? (
+        <Card className="mt-4">
+          <div className="flex items-center justify-center py-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
           </div>
         </Card>
-      ))}
+      ) : (
+        Object.entries(grouped).map(([category, items]) => (
+          <Card key={category} className="mt-4">
+            <AdminSectionTitle title={category} />
+            <div className="mt-4 divide-y divide-[#f1eef7]">
+              {items.length === 0 ? (
+                <p className="py-4 text-xs text-[#9290a2]">Aucun paramètre dans cette catégorie.</p>
+              ) : (
+                items.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#292541]">{s.label}</p>
+                      <p className="mt-0.5 truncate text-xs text-[#9290a2]">{s.value}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <AdminBadge tone={categoryTone(s.category)}>{s.category}</AdminBadge>
+                      <AdminBadge tone={statusTone(s.is_active)}>{s.is_active ? 'Actif' : 'À configurer'}</AdminBadge>
+                      {!s.is_active && (
+                        <Button variant="soft" onClick={() => saveSetting(s.id, 'Configuré')} testId={`button-configure-${s.key}`}>Configurer</Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        ))
+      )}
 
       <Card className="mt-4">
         <AdminSectionTitle title="Sécurité & audit" subtitle="§22 · Contrôle d'accès par rôle, journal d'audit" />

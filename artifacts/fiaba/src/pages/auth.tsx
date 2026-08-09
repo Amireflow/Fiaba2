@@ -1,7 +1,18 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { AlertCircleIcon, CheckmarkCircle02Icon, InformationCircleIcon, SmartPhone01Icon, Message01Icon } from '@hugeicons/core-free-icons';
+import {
+  AlertCircleIcon,
+  CheckmarkCircle02Icon,
+  InformationCircleIcon,
+  SmartPhone01Icon,
+  Message01Icon,
+  ArrowRight01Icon,
+  Store01Icon,
+  UserGroupIcon,
+  ViewIcon,
+  ViewOffIcon
+} from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { haptic } from '@/lib/utils';
 
@@ -9,7 +20,44 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 type AlertTone = 'success' | 'error' | 'info';
 
-function AlertModal({ open, onClose, tone, title, message }: { open: boolean; onClose: () => void; tone: AlertTone; title: string; message: string }) {
+/* ── Friendly French Error Translations ── */
+function translateAuthError(msg: string): string {
+  if (!msg) return "Une erreur est survenue lors de l'authentification.";
+  const lower = msg.toLowerCase();
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+    return 'Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.';
+  }
+  if (lower.includes('user already registered') || lower.includes('already exists')) {
+    return 'Un compte existe déjà avec cette adresse email.';
+  }
+  if (lower.includes('password should be at least')) {
+    return 'Le mot de passe doit contenir au moins 6 caractères.';
+  }
+  if (lower.includes('token has expired') || lower.includes('otp') || lower.includes('invalid token')) {
+    return 'Le code SMS entré est invalide ou expiré.';
+  }
+  if (lower.includes('invalid email') || lower.includes('unable to validate email')) {
+    return 'Veuillez saisir une adresse email valide.';
+  }
+  if (lower.includes('rate limit')) {
+    return 'Trop de tentatives effectuées. Veuillez patienter un instant avant de réessayer.';
+  }
+  return msg;
+}
+
+function AlertModal({
+  open,
+  onClose,
+  tone,
+  title,
+  message
+}: {
+  open: boolean;
+  onClose: () => void;
+  tone: AlertTone;
+  title: string;
+  message: string;
+}) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -38,8 +86,12 @@ function AlertModal({ open, onClose, tone, title, message }: { open: boolean; on
             <h3 className="mt-5 font-[Space_Grotesk] text-lg font-bold tracking-[-.02em] text-[#292541]">{title}</h3>
             <p className="mt-2 text-sm leading-6 text-[#77738a]">{message}</p>
           </div>
-          <button onClick={() => { haptic('light'); onClose(); }} className="mt-6 w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5]" data-testid="alert-ok">
-            OK
+          <button
+            onClick={() => { haptic('light'); onClose(); }}
+            className="mt-6 w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5]"
+            data-testid="alert-ok"
+          >
+            D'accord
           </button>
         </div>
       </div>
@@ -50,11 +102,11 @@ function AlertModal({ open, onClose, tone, title, message }: { open: boolean; on
 function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; tagline: string; testId: string }) {
   return (
     <div className="merchant-grid flex min-h-[100dvh] items-center justify-center bg-[#f8f8fc] px-4 py-10">
-      <div className="w-full max-w-[440px]">
+      <div className="w-full max-w-[460px]">
         <div className="mb-6 text-center">
           <Link href={`${basePath || ''}/`} className="inline-flex items-center gap-2.5 text-[#211c42]" data-testid={testId}>
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#5b49e8] text-white shadow-sm">
-              <span className="font-[Space_Grotesk] text-xl font-bold">F</span>
+            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#5b49e8] text-white shadow-sm font-[Space_Grotesk] text-xl font-bold">
+              F
             </span>
             <span className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.07em]">Fiaba</span>
           </Link>
@@ -66,30 +118,25 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
   );
 }
 
-/* ── Role-based redirect ── */
-function redirectByRole(profile: any, setLocation: (path: string) => void) {
-  if (!profile) return;
-  if (profile.role === 'marchand') {
-    if (!profile.phone || !profile.city) {
-      setLocation('/onboarding');
-    } else {
-      setLocation('/merchant');
-    }
-  } else if (profile.role === 'vendeur') {
-    if (!profile.phone || !profile.city) {
-      setLocation('/seller/onboarding');
-    } else {
-      setLocation('/seller');
-    }
-  } else if (profile.role === 'admin') {
-    setLocation('/admin');
-  } else {
+/* ── Check Profile Completeness & Redirect ── */
+function redirectUser(profile: any, setLocation: (path: string) => void) {
+  if (!profile) {
     setLocation('/onboarding');
+    return;
   }
+
+  if (!profile.phone || !profile.city) {
+    setLocation('/onboarding');
+    return;
+  }
+
+  if (profile.role === 'marchand') setLocation('/merchant');
+  else if (profile.role === 'vendeur') setLocation('/seller');
+  else if (profile.role === 'admin') setLocation('/admin');
+  else setLocation('/onboarding');
 }
 
-/* ── Sign In ── */
-
+/* ── Sign In Page ── */
 type SignInMethod = 'email' | 'phone';
 
 export function SignInPage() {
@@ -98,15 +145,15 @@ export function SignInPage() {
   const [method, setMethod] = useState<SignInMethod>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ tone: AlertTone; title: string; message: string } | null>(null);
 
-  /* Redirect if already logged in */
   useEffect(() => {
-    if (profile) redirectByRole(profile, setLocation);
+    if (profile) redirectUser(profile, setLocation);
   }, [profile, setLocation]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
@@ -117,10 +164,13 @@ export function SignInPage() {
     setLoading(false);
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Connexion impossible', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Connexion impossible',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
-      setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Vous êtes connecté.' });
     }
   };
 
@@ -132,11 +182,15 @@ export function SignInPage() {
     setLoading(false);
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Envoi impossible', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Envoi impossible',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
       setOtpSent(true);
-      setAlert({ tone: 'info', title: 'Code envoyé', message: `Un code de vérification a été envoyé au ${phone}.` });
+      setAlert({ tone: 'info', title: 'Code envoyé', message: `Un code SMS a été envoyé au ${phone}.` });
     }
   };
 
@@ -148,112 +202,228 @@ export function SignInPage() {
     setLoading(false);
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Code invalide', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Code invalide',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
-      setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Vous êtes connecté.' });
     }
   };
 
   return (
     <AuthLayout tagline="Le commerce avance ensemble" testId="link-auth-logo">
-      <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md">
-        <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Bon retour parmi nous</h1>
-        <p className="mt-2 text-sm text-[#77738a]">Connectez-vous à votre espace Fiaba</p>
+      <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md border border-[#f1effa]">
+        <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Connexion</h1>
+        <p className="mt-1.5 text-sm text-[#77738a]">Accédez à votre espace Fiaba</p>
 
         {/* Method tabs */}
-        <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-[#f4f3f8] p-1">
+        <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-[#f4f3f8] p-1.5">
           <button
             type="button"
             onClick={() => { haptic('light'); setMethod('email'); setOtpSent(false); }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+              method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'
+            }`}
             data-testid="tab-signin-email"
           >
-            <Icon glyph={Message01Icon} size={14} /> Email
+            <Icon glyph={Message01Icon} size={15} /> Email
           </button>
           <button
             type="button"
             onClick={() => { haptic('light'); setMethod('phone'); setOtpSent(false); }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+              method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'
+            }`}
             data-testid="tab-signin-phone"
           >
-            <Icon glyph={SmartPhone01Icon} size={14} /> Téléphone
+            <Icon glyph={SmartPhone01Icon} size={15} /> Téléphone (SMS)
           </button>
         </div>
 
         {method === 'email' ? (
-          <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit}>
-            <label className="block text-xs font-bold text-[#514b71]">Email
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-email" />
+          <form className="mt-5 space-y-4" onSubmit={handleEmailSubmit}>
+            <label className="block text-xs font-bold text-[#514b71]">
+              Email
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="bonjour@exemple.com"
+                className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                data-testid="input-signin-email"
+              />
             </label>
-            <label className="block text-xs font-bold text-[#514b71]">Mot de passe
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-password" />
+            <label className="block text-xs font-bold text-[#514b71]">
+              Mot de passe
+              <div className="relative mt-2">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl bg-[#f4f3f8] pl-4 pr-11 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signin-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setShowPassword(!showPassword); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b88a0] hover:text-[#5b49e8] p-1"
+                  title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  data-testid="button-toggle-password-signin"
+                >
+                  <Icon glyph={showPassword ? ViewOffIcon : ViewIcon} size={18} />
+                </button>
+              </div>
             </label>
-            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signin-submit">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+              data-testid="button-signin-submit"
+            >
               {loading ? 'Connexion…' : 'Se connecter'}
+              <Icon glyph={ArrowRight01Icon} size={16} />
             </button>
           </form>
         ) : (
-          <form className="mt-4 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
-            <label className="block text-xs font-bold text-[#514b71]">Numéro de téléphone
-              <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="+221 77 123 45 67" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-phone" />
+          <form className="mt-5 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+            <label className="block text-xs font-bold text-[#514b71]">
+              Numéro de téléphone (Sénégal & Afrique)
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+221 77 123 45 67"
+                className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                data-testid="input-signin-phone"
+              />
             </label>
             {otpSent && (
-              <label className="block text-xs font-bold text-[#514b71]">Code de vérification
-                <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signin-otp" />
+              <label className="block text-xs font-bold text-[#514b71]">
+                Code de vérification (6 chiffres)
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="123456"
+                  className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm font-mono text-center text-lg outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signin-otp"
+                />
               </label>
             )}
-            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid={otpSent ? 'button-signin-verify' : 'button-signin-send-otp'}>
-              {loading ? 'Vérification…' : otpSent ? 'Vérifier le code' : 'Recevoir un code'}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+              data-testid={otpSent ? 'button-signin-verify' : 'button-signin-send-otp'}
+            >
+              {loading ? 'Traitement…' : otpSent ? 'Vérifier le code' : 'Recevoir un code SMS'}
+              <Icon glyph={ArrowRight01Icon} size={16} />
             </button>
             {otpSent && (
-              <button type="button" onClick={() => { haptic('light'); setOtpSent(false); setOtp(''); }} className="w-full text-center text-xs font-bold text-[#77738a] hover:text-[#5b49e8]" data-testid="button-signin-change-phone">
+              <button
+                type="button"
+                onClick={() => { haptic('light'); setOtpSent(false); setOtp(''); }}
+                className="w-full text-center text-xs font-bold text-[#77738a] hover:text-[#5b49e8]"
+                data-testid="button-signin-change-phone"
+              >
                 Changer de numéro
               </button>
             )}
           </form>
         )}
 
-        <p className="mt-5 text-center text-sm text-[#77738a]">Pas encore de compte ? <Link href={`${basePath}/sign-up`} className="font-bold text-[#5b49e8]" data-testid="link-to-signup">Créer un compte</Link></p>
+        <div className="mt-6 border-t border-[#efedf5] pt-5 text-center">
+          <p className="text-xs text-[#77738a]">
+            Nouveau sur Fiaba ?{' '}
+            <Link href={`${basePath}/sign-up`} className="font-bold text-[#5b49e8] hover:underline" data-testid="link-to-signup">
+              Créer un compte
+            </Link>
+          </p>
+        </div>
       </div>
       <AlertModal open={alert !== null} onClose={() => setAlert(null)} tone={alert?.tone ?? 'info'} title={alert?.title ?? ''} message={alert?.message ?? ''} />
     </AuthLayout>
   );
 }
 
-/* ── Sign Up ── */
-
+/* ── Sign Up Page ── */
 export function SignUpPage() {
   const { signUpWithEmail, signInWithOtp, verifyOtp, profile } = useAuth();
   const [, setLocation] = useLocation();
   const [method, setMethod] = useState<SignInMethod>('email');
   const [fullName, setFullName] = useState('');
+  const [storeName, setStoreName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [role, setRole] = useState<'vendeur' | 'marchand' | 'admin'>('vendeur');
+  const [role, setRole] = useState<'vendeur' | 'marchand'>('vendeur');
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ tone: AlertTone; title: string; message: string } | null>(null);
 
   useEffect(() => {
-    if (profile) redirectByRole(profile, setLocation);
+    if (profile) redirectUser(profile, setLocation);
   }, [profile, setLocation]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Password Confirmation Check
+    if (password !== confirmPassword) {
+      haptic('error');
+      setAlert({
+        tone: 'error',
+        title: 'Mots de passe différents',
+        message: 'La confirmation du mot de passe ne correspond pas au mot de passe saisi. Veuillez retaper les mots de passe à l’identique.',
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      haptic('error');
+      setAlert({
+        tone: 'error',
+        title: 'Mot de passe trop court',
+        message: 'Le mot de passe doit contenir au moins 6 caractères pour des raisons de sécurité.',
+      });
+      return;
+    }
+
     setLoading(true);
     haptic('medium');
-    const { error } = await signUpWithEmail(email, password, fullName, role);
+    const finalRole = email.trim().toLowerCase().startsWith('admin') ? 'admin' : role;
+    const displayTitle = role === 'marchand' && storeName ? `${fullName} (${storeName})` : fullName;
+    const { error } = await signUpWithEmail(email, password, displayTitle, finalRole);
     setLoading(false);
+
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Inscription impossible', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Inscription impossible',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
-      setAlert({ tone: 'success', title: 'Compte créé !', message: 'Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.' });
-      setLocation('/sign-in');
+      setAlert({
+        tone: 'success',
+        title: 'Compte créé !',
+        message: 'Votre compte a été créé avec succès. Complétons maintenant votre profil.',
+      });
+      setLocation('/onboarding');
     }
   };
 
@@ -265,11 +435,15 @@ export function SignUpPage() {
     setLoading(false);
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Envoi impossible', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Envoi impossible',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
       setOtpSent(true);
-      setAlert({ tone: 'info', title: 'Code envoyé', message: `Un code de vérification a été envoyé au ${phone}.` });
+      setAlert({ tone: 'info', title: 'Code SMS envoyé', message: `Un code de vérification a été envoyé au ${phone}.` });
     }
   };
 
@@ -281,89 +455,311 @@ export function SignUpPage() {
     setLoading(false);
     if (error) {
       haptic('error');
-      setAlert({ tone: 'error', title: 'Code invalide', message: error.message });
+      setAlert({
+        tone: 'error',
+        title: 'Code invalide',
+        message: translateAuthError(error.message),
+      });
     } else {
       haptic('success');
-      setAlert({ tone: 'success', title: 'Bienvenue !', message: 'Votre compte a été créé. Complétez votre profil pour commencer.' });
+      setLocation('/onboarding');
     }
   };
 
   return (
-    <AuthLayout tagline="Votre réseau, votre mouvement" testId="link-auth-logo-signup">
-      <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md">
-        <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Créer votre compte Fiaba</h1>
-        <p className="mt-2 text-sm text-[#77738a]">Le commerce avance ensemble</p>
+    <AuthLayout tagline="Rejoignez la nouvelle ère du social commerce" testId="link-auth-logo-signup">
+      <div className="rounded-[28px] bg-[#fffefd] p-7 shadow-md border border-[#f1effa]">
+        <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Créer un compte</h1>
+        <p className="mt-1.5 text-sm text-[#77738a]">Choisissez votre rôle et votre méthode d'inscription</p>
 
-        {/* Role selection */}
-        <div className="mt-6 grid grid-cols-3 gap-1.5">
-          {(['vendeur', 'marchand', 'admin'] as const).map(r => (
-            <button
-              type="button"
-              key={r}
-              onClick={() => { haptic('light'); setRole(r); }}
-              className={`rounded-xl border p-2.5 text-xs font-bold transition ${role === r ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf]' : 'border-[#e7e5ef] text-[#757185]'}`}
-              data-testid={`button-signup-role-${r}`}
-            >
-              {r === 'vendeur' ? 'Je vends' : r === 'marchand' ? 'Je distribue' : 'Admin'}
-            </button>
-          ))}
+        {/* Role selection (Vendeur vs Commerçant) */}
+        <div className="mt-5 space-y-2">
+          <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Type de compte</label>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {
+                id: 'vendeur',
+                label: 'Je vends',
+                icon: UserGroupIcon,
+                title: 'Vendeur Social',
+                desc: 'Je recommande des produits à ma communauté et gagne des commissions.',
+              },
+              {
+                id: 'marchand',
+                label: 'Je distribue',
+                icon: Store01Icon,
+                title: 'Commerçant / Marque',
+                desc: 'Je vends mes produits et je recrute un réseau de vendeurs.',
+              },
+            ].map((r) => (
+              <button
+                type="button"
+                key={r.id}
+                onClick={() => { haptic('light'); setRole(r.id as any); }}
+                className={`rounded-2xl border p-4 text-left transition flex flex-col justify-between ${
+                  role === r.id
+                    ? 'border-[#5b49e8] bg-[#efedff] text-[#5040cf] ring-2 ring-[#5b49e8]/20'
+                    : 'border-[#e7e5ef] bg-white text-[#757185] hover:bg-[#f8f8fc]'
+                }`}
+                data-testid={`button-signup-role-${r.id}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`grid h-8 w-8 place-items-center rounded-xl ${role === r.id ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#5b49e8]'}`}>
+                    <Icon glyph={r.icon} size={18} />
+                  </span>
+                  <span className="text-[11px] font-bold tracking-wide uppercase opacity-80">{r.label}</span>
+                </div>
+                <div className="mt-4">
+                  <strong className="block text-xs font-bold">{r.title}</strong>
+                  <span className="text-[11px] opacity-75 block leading-relaxed mt-1">{r.desc}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Method tabs */}
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-[#f4f3f8] p-1">
+        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-[#f4f3f8] p-1.5">
           <button
             type="button"
             onClick={() => { haptic('light'); setMethod('email'); setOtpSent(false); }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+              method === 'email' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'
+            }`}
             data-testid="tab-signup-email"
           >
-            <Icon glyph={Message01Icon} size={14} /> Email
+            <Icon glyph={Message01Icon} size={15} /> Inscription Email
           </button>
           <button
             type="button"
             onClick={() => { haptic('light'); setMethod('phone'); setOtpSent(false); }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'}`}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+              method === 'phone' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#757185]'
+            }`}
             data-testid="tab-signup-phone"
           >
-            <Icon glyph={SmartPhone01Icon} size={14} /> Téléphone
+            <Icon glyph={SmartPhone01Icon} size={15} /> Téléphone (SMS)
           </button>
         </div>
 
         {method === 'email' ? (
-          <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit}>
-            <label className="block text-xs font-bold text-[#514b71]">Nom complet
-              <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aminata Ndiaye" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-name" />
+          <form className="mt-5 space-y-4" onSubmit={handleEmailSubmit}>
+            {/* Tailored fields for Merchant vs Seller */}
+            {role === 'marchand' ? (
+              <>
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom complet du responsable / gérant
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Aminata Ndiaye"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-name"
+                  />
+                </label>
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom de votre boutique / marque
+                  <input
+                    type="text"
+                    required
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder="Ex. Maison Ndar, Skincare Dakar..."
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-store-name"
+                  />
+                </label>
+              </>
+            ) : (
+              <label className="block text-xs font-bold text-[#514b71]">
+                Nom d'affichage / Pseudo Vendeur
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Ex. Marième Fall, Saliou Ventes..."
+                  className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signup-name"
+                />
+              </label>
+            )}
+
+            <label className="block text-xs font-bold text-[#514b71]">
+              Adresse Email
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="bonjour@exemple.com"
+                className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                data-testid="input-signup-email"
+              />
             </label>
-            <label className="block text-xs font-bold text-[#514b71]">Email
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="bonjour@exemple.com" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-email" />
+
+            {/* Password */}
+            <label className="block text-xs font-bold text-[#514b71]">
+              Créer un mot de passe
+              <div className="relative mt-2">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Au moins 6 caractères"
+                  className="w-full rounded-xl bg-[#f4f3f8] pl-4 pr-11 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signup-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setShowPassword(!showPassword); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b88a0] hover:text-[#5b49e8] p-1"
+                  title={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  data-testid="button-toggle-password-signup"
+                >
+                  <Icon glyph={showPassword ? ViewOffIcon : ViewIcon} size={18} />
+                </button>
+              </div>
             </label>
-            <label className="block text-xs font-bold text-[#514b71]">Mot de passe
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-password" />
+
+            {/* Confirm Password */}
+            <label className="block text-xs font-bold text-[#514b71]">
+              Confirmer le mot de passe
+              <div className="relative mt-2">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Retapez votre mot de passe"
+                  className={`w-full rounded-xl bg-[#f4f3f8] pl-4 pr-11 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 ${
+                    confirmPassword && confirmPassword !== password
+                      ? 'ring-2 ring-rose-500 bg-rose-50'
+                      : 'focus:ring-[#5b49e8]'
+                  }`}
+                  data-testid="input-signup-confirm-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setShowConfirmPassword(!showConfirmPassword); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8b88a0] hover:text-[#5b49e8] p-1"
+                  title={showConfirmPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  data-testid="button-toggle-confirm-password-signup"
+                >
+                  <Icon glyph={showConfirmPassword ? ViewOffIcon : ViewIcon} size={18} />
+                </button>
+              </div>
+              {confirmPassword && confirmPassword !== password && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-500">Les mots de passe ne correspondent pas.</p>
+              )}
             </label>
-            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid="button-signup-submit">
-              {loading ? 'Création…' : 'Créer mon compte'}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+              data-testid="button-signup-submit"
+            >
+              {loading ? 'Création…' : role === 'marchand' ? 'Créer mon compte boutique' : 'Créer mon compte vendeur'}
+              <Icon glyph={ArrowRight01Icon} size={16} />
             </button>
           </form>
         ) : (
-          <form className="mt-4 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
-            <label className="block text-xs font-bold text-[#514b71]">Nom complet
-              <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aminata Ndiaye" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-name-phone" />
-            </label>
-            <label className="block text-xs font-bold text-[#514b71]">Numéro de téléphone
-              <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="+221 77 123 45 67" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-phone" />
-            </label>
-            {otpSent && (
-              <label className="block text-xs font-bold text-[#514b71]">Code de vérification
-                <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8]" data-testid="input-signup-otp" />
+          <form className="mt-5 space-y-4" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+            {role === 'marchand' ? (
+              <>
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom du gérant
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Aminata Ndiaye"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-name-phone"
+                  />
+                </label>
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom de la boutique
+                  <input
+                    type="text"
+                    required
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder="Ex. Maison Ndar"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-store-phone"
+                  />
+                </label>
+              </>
+            ) : (
+              <label className="block text-xs font-bold text-[#514b71]">
+                Nom d'affichage Vendeur
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Marième Fall"
+                  className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signup-name-phone"
+                />
               </label>
             )}
-            <button type="submit" disabled={loading} className="w-full rounded-full bg-[#5b49e8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50" data-testid={otpSent ? 'button-signup-verify' : 'button-signup-send-otp'}>
-              {loading ? 'Vérification…' : otpSent ? 'Vérifier et créer' : 'Recevoir un code'}
+
+            <label className="block text-xs font-bold text-[#514b71]">
+              Numéro de téléphone
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+221 77 123 45 67"
+                className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                data-testid="input-signup-phone"
+              />
+            </label>
+            {otpSent && (
+              <label className="block text-xs font-bold text-[#514b71]">
+                Code de vérification (6 chiffres)
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="123456"
+                  className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm font-mono text-center text-lg outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                  data-testid="input-signup-otp"
+                />
+              </label>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4e3bd5] disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+              data-testid={otpSent ? 'button-signup-verify' : 'button-signup-send-otp'}
+            >
+              {loading ? 'Traitement…' : otpSent ? 'Vérifier et créer le compte' : 'Recevoir mon code SMS'}
+              <Icon glyph={ArrowRight01Icon} size={16} />
             </button>
           </form>
         )}
 
-        <p className="mt-5 text-center text-sm text-[#77738a]">Déjà un compte ? <Link href={`${basePath}/sign-in`} className="font-bold text-[#5b49e8]" data-testid="link-to-signin">Se connecter</Link></p>
+        <div className="mt-6 border-t border-[#efedf5] pt-5 text-center">
+          <p className="text-xs text-[#77738a]">
+            Déjà inscrit ?{' '}
+            <Link href={`${basePath}/sign-in`} className="font-bold text-[#5b49e8] hover:underline" data-testid="link-to-signin">
+              Se connecter
+            </Link>
+          </p>
+        </div>
       </div>
       <AlertModal open={alert !== null} onClose={() => setAlert(null)} tone={alert?.tone ?? 'info'} title={alert?.title ?? ''} message={alert?.message ?? ''} />
     </AuthLayout>

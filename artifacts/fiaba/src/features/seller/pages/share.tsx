@@ -5,7 +5,7 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { read, write } from '@/lib/storage';
 import { money } from '@/lib/utils';
-import { linkToCheckoutPath } from '@/lib/link';
+import { linkToCheckoutPath, getFullShareableUrl } from '@/lib/link';
 import { trackClick } from '@/lib/attribution';
 import {
   SellerBadge,
@@ -48,7 +48,7 @@ export function Share() {
     );
   }
 
-  const fullLink = `https://${campaign.link}`;
+  const fullLink = getFullShareableUrl(campaign.link);
   const isFixed = campaign.model === 'Marge';
   const commissionDisplay = isFixed ? money(campaign.commission) : `${campaign.commission}%`;
 

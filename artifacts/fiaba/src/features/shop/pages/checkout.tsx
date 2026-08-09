@@ -514,15 +514,15 @@ export function Checkout() {
               </div>
 
               {/* Trust badges */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {[
                   [ShieldKeyIcon, 'Paiement sécurisé'],
                   [DeliveryTruck01Icon, 'Livraison nationale'],
                   [CheckmarkCircle02Icon, 'Produit vérifié'],
                 ].map(([g, l]) => (
-                  <div key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 text-center">
+                  <div key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-2.5 sm:p-3 text-center min-w-0">
                     <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]"><Icon glyph={g as IconType} size={16} /></span>
-                    <span className="text-[9px] font-bold text-[#77738a]">{l as string}</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-[#77738a] leading-tight break-words">{l as string}</span>
                   </div>
                 ))}
               </div>

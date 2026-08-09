@@ -22,7 +22,7 @@ export const sellerPrimaryNav: NavItem[] = [
 ];
 
 export const sellerSecondaryNav: NavItem[] = [
-  { href: '/seller/profile', label: 'Profil & Paramètres', glyph: Settings02Icon },
+  { href: '/seller/profile', label: 'Profil', glyph: Settings02Icon },
 ];
 
 export const sellerAllNav: NavItem[] = [...sellerPrimaryNav, ...sellerSecondaryNav];

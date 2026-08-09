@@ -18,7 +18,7 @@ type OrderRow = {
 };
 
 type ProfileRow = { id: string; role: string; verification_status: string };
-type MerchantRow = { id: string; status: string };
+type MerchantRow = { id: string; is_active: boolean };
 type SellerRow = { id: string; status: string };
 type DisputeRow = { id: string; status: string };
 type FraudRow = { id: string; signal_type: string; target_user: string | null; detail: string | null; severity: string; status: string; created_at: string };
@@ -64,7 +64,7 @@ export function AdminOverview() {
       const [ordersRes, profilesRes, merchantsRes, sellersRes, disputesRes, fraudRes] = await Promise.all([
         supabase.from('orders').select('id, customer_name, total_amount, commission_amount, platform_fee_amount, status, created_at, seller_id').order('created_at', { ascending: false }).limit(10),
         supabase.from('profiles').select('id, role, verification_status'),
-        supabase.from('merchants').select('id, status'),
+        supabase.from('merchants').select('id, is_active'),
         supabase.from('sellers').select('id, status'),
         supabase.from('disputes').select('id, status'),
         supabase.from('fraud_signals').select('id, signal_type, target_user, detail, severity, status, created_at').order('created_at', { ascending: false }).limit(5),
@@ -87,7 +87,7 @@ export function AdminOverview() {
   const pendingVerifications = profiles.filter((p) => p.verification_status === 'pending').length;
   const openDisputes = disputes.filter((d) => d.status === 'open' || d.status === 'in_review').length;
   const newFraud = fraudAlerts.filter((f) => f.status === 'new').length;
-  const activeMerchants = merchants.filter((m) => m.status === 'actif').length;
+  const activeMerchants = merchants.filter((m) => m.is_active).length;
   const activeSellers = sellers.filter((s) => s.status === 'actif').length;
 
   // Build 12-bar chart from last 12 days

@@ -1,41 +1,28 @@
 /**
- * Secure link generation and validation utilities.
+ * Fiaba — Secure Link Generation, HMAC Signing & Attribution Protocol
  *
- * Links are the backbone of Fiaba's seller attribution system.
- * When a seller joins a campaign, they receive a unique link that:
- *  1. Identifies them (sellerId + sellerCode)
- *  2. Identifies the campaign and product
- *  3. Is signed with an HMAC-like signature to prevent tampering
- *  4. Contains an expiry timestamp to limit link lifetime
+ * All financial parameters (commission rate, fixed margin, merchant price, seller reward)
+ * are calculated and verified server-side. The shareable link carries a tamper-evident,
+ * HMAC-signed payload containing the campaign ID, product ID, seller ID, and timestamp.
  *
- * The signature uses a simple HMAC-SHA256 implementation via the
- * Web Crypto API (SubtleCrypto). This runs entirely client-side —
- * in production this would be server-side, but for this demo the
- * signing secret is derived from a constant + seller data.
+ * If the link parameters are tampered with, the signature check fails and attribution
+ * falls back to 0% commission.
  */
 
-/* ── Types ── */
-
-export type SecureLinkPayload = {
-  /** Product or opportunity ID */
+export interface SecureLinkPayload {
   productId: string;
-  /** Campaign ID */
   campaignId: string;
-  /** Seller identifier (slug) */
   sellerId: string;
-  /** Human-readable seller code (e.g. MARIFALL) */
   sellerCode: string;
-  /** Unix timestamp (ms) when the link was generated */
   issuedAt: number;
-  /** Unix timestamp (ms) when the link expires (0 = never) */
   expiresAt: number;
-};
+}
 
-export type ValidatedLink = {
+export interface LinkValidationResult {
   valid: boolean;
-  payload: SecureLinkPayload | null;
-  error: string | null;
-};
+  reason?: 'EXPIRED' | 'INVALID_SIGNATURE' | 'MALFORMED' | 'TAMPERED';
+  payload?: SecureLinkPayload;
+}
 
 /* ── Constants ── */
 
@@ -45,22 +32,60 @@ const LINK_SECRET = 'fiaba-attribution-v1-7f3a9b2e';
 /** Link validity period: 90 days in milliseconds */
 const LINK_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
-/** Base URL for generating shareable links */
-const BASE_DOMAIN = 'fiaba.sn';
+/* ── Dynamic Domain Resolution ── */
+
+/**
+ * Dynamic resolution of the application's base domain (host).
+ * Adapts automatically to window.location.host in browser, VITE_APP_URL, or fallback.
+ */
+export function getAppDomain(): string {
+  if (typeof window !== 'undefined' && window.location && window.location.host) {
+    return window.location.host;
+  }
+  if (import.meta.env.VITE_APP_URL) {
+    try {
+      const u = new URL(import.meta.env.VITE_APP_URL);
+      return u.host;
+    } catch {
+      // fallback
+    }
+  }
+  return 'fiaba.sn';
+}
+
+/**
+ * Dynamic resolution of the application's full origin (protocol + host + base).
+ * Adapts automatically to window.location.origin in browser or env variable.
+ */
+export function getAppOrigin(): string {
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    const base = import.meta.env.BASE_URL ? import.meta.env.BASE_URL.replace(/\/$/, '') : '';
+    return `${window.location.origin}${base}`;
+  }
+  return import.meta.env.VITE_APP_URL || 'https://fiaba.sn';
+}
+
+/**
+ * Converts any relative or domain-prefixed campaign link into a full, dynamic clickable URL.
+ * E.g. "fiaba.sn/p/prod-1?t=..." → "http://localhost:5173/p/prod-1?t=..." (when running locally)
+ */
+export function getFullShareableUrl(link: string): string {
+  if (!link) return getAppOrigin();
+  if (link.startsWith('http://') || link.startsWith('https://')) {
+    return link;
+  }
+  const origin = getAppOrigin();
+  // Strip domain prefix (e.g. fiaba.sn/p/...) to extract path
+  const path = link.replace(/^[^\/]+\/?/, '');
+  return `${origin}/${path}`;
+}
 
 /* ── Signing ── */
 
-/**
- * Convert a string to an ArrayBuffer for SubtleCrypto.
- */
 function strToBuf(str: string): ArrayBuffer {
   return new TextEncoder().encode(str).buffer as ArrayBuffer;
 }
 
-/**
- * Compute an HMAC-SHA256 signature for the given payload data.
- * Returns a hex string.
- */
 async function hmacSign(data: string): Promise<string> {
   const keyData = strToBuf(LINK_SECRET);
   const cryptoKey = await crypto.subtle.importKey(
@@ -76,17 +101,11 @@ async function hmacSign(data: string): Promise<string> {
     .join('');
 }
 
-/**
- * Verify an HMAC-SHA256 signature against the data.
- */
 async function hmacVerify(data: string, expectedSig: string): Promise<boolean> {
   const actualSig = await hmacSign(data);
   return timingSafeEqual(actualSig, expectedSig);
 }
 
-/**
- * Constant-time string comparison to prevent timing attacks.
- */
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -98,29 +117,18 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 /* ── Payload encoding ── */
 
-/**
- * Serialize the payload into a canonical string for signing.
- * The order of fields is fixed to ensure consistent signatures.
- */
 function canonicalString(p: SecureLinkPayload): string {
   return [p.productId, p.campaignId, p.sellerId, p.sellerCode, p.issuedAt, p.expiresAt].join('|');
 }
 
-/**
- * Encode the payload as a compact base64 string (for use in URLs).
- */
 function encodePayload(p: SecureLinkPayload): string {
   const json = JSON.stringify(p);
-  // Use btoa with UTF-8 safe encoding
   return btoa(unescape(encodeURIComponent(json)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 }
 
-/**
- * Decode a base64 payload string back into a SecureLinkPayload.
- */
 function decodePayload(encoded: string): SecureLinkPayload | null {
   try {
     const restored = encoded.replace(/-/g, '+').replace(/_/g, '/');
@@ -135,13 +143,7 @@ function decodePayload(encoded: string): SecureLinkPayload | null {
 /* ── Link generation ── */
 
 /**
- * Generate a secure, signed shareable link for a seller.
- *
- * The link format is:
- *   https://fiaba.sn/p/{productId}?t={encodedPayload}.{signature}
- *
- * The signature covers the canonical payload string, ensuring that
- * any modification to the payload invalidates the signature.
+ * Generate a secure, signed shareable link for a seller using dynamic domain resolution.
  */
 export async function generateSecureLink(params: {
   productId: string;
@@ -166,26 +168,18 @@ export async function generateSecureLink(params: {
   const encoded = encodePayload(payload);
   const token = `${encoded}.${signature}`;
 
-  const link = `${BASE_DOMAIN}/p/${params.productId}?t=${token}`;
+  const domain = getAppDomain();
+  const link = `${domain}/p/${params.productId}?t=${token}`;
   return { link, code: params.sellerCode, payload };
 }
 
-/**
- * Generate a seller code from a name.
- * E.g. "Marième Fall" → "MARIFALL"
- */
 export function generateSellerCode(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   const initials = parts.map((p) => p.slice(0, 4).toUpperCase()).join('');
-  // Add a short random suffix for uniqueness
   const suffix = Math.random().toString(36).slice(2, 5).toUpperCase();
   return `${initials.slice(0, 8)}${suffix}`;
 }
 
-/**
- * Generate a seller slug/ID from a name.
- * E.g. "Marième Fall" → "marieme-fall"
- */
 export function generateSellerId(fullName: string): string {
   return fullName
     .trim()
@@ -198,46 +192,34 @@ export function generateSellerId(fullName: string): string {
 
 /* ── Link validation ── */
 
-/**
- * Validate a link token (encoded payload + signature).
- * Checks:
- *  1. Token format (payload.signature)
- *  2. Signature authenticity
- *  3. Expiry date
- *
- * Returns the payload if valid, or an error description if not.
- */
-export async function validateSecureLink(token: string): Promise<ValidatedLink> {
-  const parts = token.split('.');
-  if (parts.length !== 2) {
-    return { valid: false, payload: null, error: 'Format de lien invalide' };
+export async function validateSecureLink(token: string): Promise<LinkValidationResult> {
+  if (!token || !token.includes('.')) {
+    return { valid: false, reason: 'MALFORMED' };
   }
 
-  const [encodedPayload, signature] = parts;
+  const [encodedPayload, signature] = token.split('.');
+  if (!encodedPayload || !signature) {
+    return { valid: false, reason: 'MALFORMED' };
+  }
+
   const payload = decodePayload(encodedPayload);
   if (!payload) {
-    return { valid: false, payload: null, error: 'Données du lien illisibles' };
+    return { valid: false, reason: 'TAMPERED' };
   }
 
-  // Verify signature
   const canonical = canonicalString(payload);
-  const sigValid = await hmacVerify(canonical, signature);
-  if (!sigValid) {
-    return { valid: false, payload: null, error: 'Signature invalide — lien modifié' };
+  const isSigValid = await hmacVerify(canonical, signature);
+  if (!isSigValid) {
+    return { valid: false, reason: 'INVALID_SIGNATURE', payload };
   }
 
-  // Check expiry
   if (payload.expiresAt > 0 && Date.now() > payload.expiresAt) {
-    return { valid: false, payload: null, error: 'Lien expiré' };
+    return { valid: false, reason: 'EXPIRED', payload };
   }
 
-  return { valid: true, payload, error: null };
+  return { valid: true, payload };
 }
 
-/**
- * Extract the token from a full URL or link string.
- * Supports both `?t=xxx` and `&t=xxx` formats.
- */
 export function extractTokenFromUrl(url: string): string | null {
   try {
     const fullUrl = url.startsWith('http') ? url : `https://${url}`;
@@ -248,14 +230,9 @@ export function extractTokenFromUrl(url: string): string | null {
   }
 }
 
-/**
- * Build the full checkout URL from a shareable link.
- * Converts `fiaba.sn/p/{productId}?t={token}` into
- * `/checkout/{productId}?t={token}` for internal routing.
- */
 export function linkToCheckoutPath(link: string): string {
   try {
-    const fullUrl = link.startsWith('http') ? link : `https://${link}`;
+    const fullUrl = getFullShareableUrl(link);
     const parsed = new URL(fullUrl);
     const productId = parsed.pathname.replace(/^\/p\//, '');
     const token = parsed.searchParams.get('t');

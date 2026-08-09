@@ -1,9 +1,10 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { ArrowDown01Icon, CheckmarkCircle02Icon, Search01Icon, Store01Icon, DeliveryTruck01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { money, haptic } from '@/lib/utils';
 import { useMerchantId, useSupabaseQuery, supabaseUpdate } from '@/hooks/use-supabase-query';
+import { supabase } from '@/lib/supabase';
 import {
   Badge,
   EmptyState,
@@ -26,6 +27,7 @@ type OrderRow = {
   delivery_fee: number;
   payment_method: string | null;
   created_at: string;
+  seller_id: string | null;
   seller_code: string | null;
 };
 
@@ -44,25 +46,47 @@ const filters: StatusFilter[] = ['Tous', ...statusKeys];
 export function Orders() {
   const { merchantId } = useMerchantId();
   const { data: orders, loading, refetch } = useSupabaseQuery<OrderRow>('orders', {
-    select: 'id, customer_name, customer_phone, total_amount, commission_amount, status, zone_name, delivery_fee, payment_method, created_at',
+    select: 'id, customer_name, customer_phone, total_amount, commission_amount, status, zone_name, delivery_fee, payment_method, created_at, seller_id',
     filter: { merchant_id: merchantId },
     order: { column: 'created_at', ascending: false },
     enabled: !!merchantId,
   });
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('Tous');
+  const [sellerCodes, setSellerCodes] = useState<Map<string, string>>(new Map());
 
-  // Fetch seller codes for orders that have seller_id
-  // We'll do this via a separate query joining tracking_links
-  const filtered = orders.filter((o) => {
+  // Fetch seller codes via tracking_links when orders change
+  useEffect(() => {
+    async function fetchSellerCodes() {
+      const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))] as string[];
+      if (sellerIds.length === 0) return;
+      const { data: links } = await supabase
+        .from('tracking_links')
+        .select('seller_id, seller_code')
+        .in('seller_id', sellerIds);
+      const map = new Map<string, string>();
+      ((links as { seller_id: string; seller_code: string }[] | null) ?? []).forEach((l) => {
+        if (!map.has(l.seller_id)) map.set(l.seller_id, l.seller_code);
+      });
+      setSellerCodes(map);
+    }
+    fetchSellerCodes();
+  }, [orders]);
+
+  // Enrich orders with seller codes
+  const ordersWithCodes = orders.map((o) => ({
+    ...o,
+    seller_code: o.seller_id ? (sellerCodes.get(o.seller_id) ?? null) : null,
+  }));
+  const filtered = ordersWithCodes.filter((o) => {
     const matchesFilter = filter === 'Tous' || o.status === filter;
     const q = query.trim().toLowerCase();
-    const matchesQuery = q === '' || o.id.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q);
+    const matchesQuery = q === '' || o.id.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q) || (o.seller_code?.toLowerCase().includes(q) ?? false);
     return matchesFilter && matchesQuery;
   });
 
   const statusCounts = statusKeys.reduce<Record<string, number>>((acc, s) => {
-    acc[s] = orders.filter((o) => o.status === s).length;
+    acc[s] = ordersWithCodes.filter((o) => o.status === s).length;
     return acc;
   }, {});
 

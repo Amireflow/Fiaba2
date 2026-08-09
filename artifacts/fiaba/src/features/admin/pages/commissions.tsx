@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Wallet01Icon } from '@hugeicons/core-free-icons';
 import { money } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 import {
   AdminBadge,
   AdminCard as Card,
@@ -8,23 +9,88 @@ import {
   AdminPage,
   AdminScrollTable,
 } from '../components/admin-ui';
-import { seedAdminCommissions } from '@/config/admin-seeds';
-import type { AdminCommission } from '@/types/entities';
 
-const statusTone = (s: AdminCommission['status']) => (s === 'Disponible' ? 'mint' : s === 'Versée' ? 'violet' : s === 'En attente' ? 'amber' : 'rose');
+type CommissionRow = {
+  id: string;
+  order_id: string;
+  seller_id: string;
+  campaign_id: string | null;
+  amount: number;
+  status: string;
+  model: string | null;
+  created_at: string;
+};
 
-const filters = ['Tous', 'En attente', 'Disponible', 'Versée', 'Reprise'] as const;
+type SellerName = { id: string; display_name: string };
+type MerchantName = { id: string; name: string };
+type OrderMerchant = { id: string; merchant_id: string };
+
+const statusToneMap: Record<string, 'mint' | 'amber' | 'rose' | 'violet'> = {
+  pending: 'amber',
+  available: 'mint',
+  paid: 'violet',
+  reversed: 'rose',
+};
+
+const statusLabelMap: Record<string, string> = {
+  pending: 'En attente',
+  available: 'Disponible',
+  paid: 'Versée',
+  reversed: 'Reprise',
+};
+
+const filters = ['Tous', 'pending', 'available', 'paid', 'reversed'] as const;
 
 export function AdminCommissions() {
-  const [commissions] = useState<AdminCommission[]>(seedAdminCommissions);
-  const [filter, setFilter] = useState('Tous');
+  const [commissions, setCommissions] = useState<CommissionRow[]>([]);
+  const [sellerNames, setSellerNames] = useState<Map<string, string>>(new Map());
+  const [merchantNames, setMerchantNames] = useState<Map<string, string>>(new Map());
+  const [ordMerchantMap, setOrdMerchantMap] = useState<Map<string, string>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('Tous');
+
+  useEffect(() => {
+    async function loadData() {
+      const { data: commData } = await supabase
+        .from('commissions')
+        .select('id, order_id, seller_id, campaign_id, amount, status, model, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      const rows = (commData as CommissionRow[] | null) ?? [];
+      setCommissions(rows);
+
+      // Fetch seller names
+      const sellerIds = [...new Set(rows.map((r) => r.seller_id))];
+      if (sellerIds.length > 0) {
+        const { data: sNames } = await supabase.from('sellers').select('id, display_name').in('id', sellerIds);
+        setSellerNames(new Map<string, string>(((sNames as SellerName[] | null) ?? []).map((s) => [s.id, s.display_name])));
+      }
+
+      // Fetch order → merchant mapping
+      const orderIds = [...new Set(rows.map((r) => r.order_id))];
+      if (orderIds.length > 0) {
+        const { data: orders } = await supabase.from('orders').select('id, merchant_id').in('id', orderIds);
+        const orderMap = new Map<string, string>(((orders as OrderMerchant[] | null) ?? []).map((o) => [o.id, o.merchant_id]));
+        setOrdMerchantMap(orderMap);
+        const merchantIds = [...new Set(orderMap.values())];
+        if (merchantIds.length > 0) {
+          const { data: mNames } = await supabase.from('merchants').select('id, name').in('id', merchantIds);
+          const mMap = new Map<string, string>(((mNames as MerchantName[] | null) ?? []).map((m) => [m.id, m.name]));
+          setMerchantNames(mMap);
+        }
+      }
+
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
   const filtered = commissions.filter((c) => filter === 'Tous' || c.status === filter);
 
-  const total = commissions.reduce((sum, c) => sum + (c.status === 'Reprise' ? 0 : c.amount), 0);
-  const pending = commissions.filter((c) => c.status === 'En attente').reduce((sum, c) => sum + c.amount, 0);
-  const available = commissions.filter((c) => c.status === 'Disponible').reduce((sum, c) => sum + c.amount, 0);
-  const reversed = commissions.filter((c) => c.status === 'Reprise').reduce((sum, c) => sum + c.amount, 0);
+  const total = commissions.reduce((sum, c) => sum + (c.status === 'reversed' ? 0 : c.amount), 0);
+  const pending = commissions.filter((c) => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
+  const available = commissions.filter((c) => c.status === 'available').reduce((sum, c) => sum + c.amount, 0);
+  const reversed = commissions.filter((c) => c.status === 'reversed').reduce((sum, c) => sum + c.amount, 0);
 
   return (
     <AdminPage
@@ -43,13 +109,17 @@ export function AdminCommissions() {
       {/* Filters */}
       <div className="mt-5 flex flex-wrap gap-2">
         {filters.map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${filter === f ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-commission-${f}`}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${filter === f ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`} data-testid={`filter-commission-${f}`}>{f === 'Tous' ? 'Tous' : statusLabelMap[f] ?? f}</button>
         ))}
       </div>
 
       {/* Table */}
       <Card className="mt-5 p-0">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        ) : filtered.length === 0 ? (
           <AdminEmptyState glyph={Wallet01Icon} title="Aucune écriture" description="Aucune commission ne correspond à ce filtre." />
         ) : (
           <AdminScrollTable minWidth={720} testId="scroll-admin-commissions">
@@ -66,17 +136,20 @@ export function AdminCommissions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f1eef7]">
-                {filtered.map((c) => (
-                  <tr key={c.id} className="transition hover:bg-[#faf9fd]" data-testid={`row-commission-${c.id}`}>
-                    <td className="px-5 py-4 text-[11px] text-[#9290a2]">{c.id}</td>
-                    <td className="px-5 py-4 font-bold text-[#292541]">{c.orderId}</td>
-                    <td className="px-5 py-4 text-[#77738a]">{c.seller}</td>
-                    <td className="px-5 py-4 text-[#77738a]">{c.merchant}</td>
-                    <td className="px-5 py-4"><AdminBadge tone={c.model === 'Commission' ? 'violet' : 'amber'}>{c.model}</AdminBadge></td>
-                    <td className="px-5 py-4 text-right font-bold text-[#292541]">{money(c.amount)}</td>
-                    <td className="px-5 py-4"><AdminBadge tone={statusTone(c.status)}>{c.status}</AdminBadge></td>
-                  </tr>
-                ))}
+                {filtered.map((c) => {
+                  const merchantId = ordMerchantMap?.get(c.order_id);
+                  return (
+                    <tr key={c.id} className="transition hover:bg-[#faf9fd]" data-testid={`row-commission-${c.id}`}>
+                      <td className="px-5 py-4 text-[11px] text-[#9290a2]">{c.id.slice(-8)}</td>
+                      <td className="px-5 py-4 font-bold text-[#292541]">CMD-{c.order_id.slice(-6).toUpperCase()}</td>
+                      <td className="px-5 py-4 text-[#77738a]">{sellerNames.get(c.seller_id) ?? '—'}</td>
+                      <td className="px-5 py-4 text-[#77738a]">{merchantId ? (merchantNames.get(merchantId) ?? '—') : '—'}</td>
+                      <td className="px-5 py-4"><AdminBadge tone={c.model === 'marge' ? 'amber' : 'violet'}>{c.model === 'marge' ? 'Marge' : 'Commission'}</AdminBadge></td>
+                      <td className="px-5 py-4 text-right font-bold text-[#292541]">{money(c.amount)}</td>
+                      <td className="px-5 py-4"><AdminBadge tone={statusToneMap[c.status] ?? 'amber'}>{statusLabelMap[c.status] ?? c.status}</AdminBadge></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </AdminScrollTable>

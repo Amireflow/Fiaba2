@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import {
   Alert01Icon,
@@ -10,7 +10,8 @@ import {
   ShieldKeyIcon,
 } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
-import { read, write } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
+import { haptic } from '@/lib/utils';
 import {
   AdminBadge,
   AdminButton as Button,
@@ -18,69 +19,85 @@ import {
   AdminPage,
 } from '../components/admin-ui';
 
-type NotificationType = 'fraud' | 'dispute' | 'user' | 'payout' | 'order' | 'system';
-type NotificationStatus = 'unread' | 'read';
-
-type Notification = {
+type NotificationRow = {
   id: string;
-  type: NotificationType;
+  user_id: string;
+  type: string;
   title: string;
-  description: string;
-  time: string;
-  status: NotificationStatus;
-  link?: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
 };
 
-const seedAdminNotifications: Notification[] = [
-  { id: 'an-1', type: 'fraud', title: 'Signal de fraude critique', description: 'Multi-comptes détectés sur l\'IP 41.82.x.x. 3 comptes concernés.', time: 'Il y a 8 min', status: 'unread', link: '/admin/fraud' },
-  { id: 'an-2', type: 'dispute', title: 'Nouveau litige ouvert', description: 'CMD-2024-031 : retard de livraison signalé par le client.', time: 'Il y a 25 min', status: 'unread', link: '/admin/disputes' },
-  { id: 'an-3', type: 'payout', title: 'Demande de retrait en attente', description: 'Maison Ndar demande 23 750 F vers Wave. Validation requise.', time: 'Il y a 1 h', status: 'unread', link: '/admin/payouts' },
-  { id: 'an-4', type: 'user', title: 'Nouveau marchand inscrit', description: 'Boutique Téranga a rejoint la plateforme. Compte à valider.', time: 'Il y a 2 h', status: 'unread', link: '/admin/users' },
-  { id: 'an-5', type: 'fraud', title: 'Volume anormal détecté', description: 'Vendeur Saliou Kane : +300% de ventes en 24h. Vérification recommandée.', time: 'Il y a 3 h', status: 'read', link: '/admin/fraud' },
-  { id: 'an-6', type: 'order', title: 'Spike de commandes', description: '127 commandes dans la dernière heure. Pic de trafic normal.', time: 'Il y a 5 h', status: 'read', link: '/admin/orders' },
-  { id: 'an-7', type: 'system', title: 'Sauvegarde automatique', description: 'La base de données a été sauvegardée avec succès.', time: 'Hier', status: 'read' },
-  { id: 'an-8', type: 'payout', title: 'Versement traité', description: '48 800 F versés à Maison Ndar sur Wave · · · 38 42.', time: 'Hier', status: 'read', link: '/admin/payouts' },
-];
-
-const typeConfig: Record<NotificationType, { glyph: IconType; bg: string; color: string; label: string; tone: 'rose' | 'amber' | 'violet' | 'mint' }> = {
-  fraud: { glyph: ShieldKeyIcon, bg: 'bg-[#fff0f1]', color: 'text-[#c45667]', label: 'Fraude', tone: 'rose' },
-  dispute: { glyph: Alert01Icon, bg: 'bg-[#fff4de]', color: 'text-[#ac741e]', label: 'Litige', tone: 'amber' },
-  user: { glyph: UserGroupIcon, bg: 'bg-[#efedff]', color: 'text-[#5b49e8]', label: 'Utilisateur', tone: 'violet' },
-  payout: { glyph: Wallet01Icon, bg: 'bg-[#e7faf2]', color: 'text-[#278e69]', label: 'Paiement', tone: 'mint' },
-  order: { glyph: Store01Icon, bg: 'bg-[#efedff]', color: 'text-[#5b49e8]', label: 'Commande', tone: 'violet' },
-  system: { glyph: CheckmarkCircle02Icon, bg: 'bg-[#f0eff5]', color: 'text-[#67627b]', label: 'Système', tone: 'amber' },
+const typeConfig: Record<string, { glyph: IconType; bg: string; color: string; label: string; tone: 'rose' | 'amber' | 'violet' | 'mint' }> = {
+  fraude: { glyph: ShieldKeyIcon, bg: 'bg-[#fff0f1]', color: 'text-[#c45667]', label: 'Fraude', tone: 'rose' },
+  systeme: { glyph: Alert01Icon, bg: 'bg-[#fff4de]', color: 'text-[#ac741e]', label: 'Système', tone: 'amber' },
+  vendeur: { glyph: UserGroupIcon, bg: 'bg-[#efedff]', color: 'text-[#5b49e8]', label: 'Vendeur', tone: 'violet' },
+  paiement: { glyph: Wallet01Icon, bg: 'bg-[#e7faf2]', color: 'text-[#278e69]', label: 'Paiement', tone: 'mint' },
+  commande: { glyph: Store01Icon, bg: 'bg-[#efedff]', color: 'text-[#5b49e8]', label: 'Commande', tone: 'violet' },
+  campagne: { glyph: Store01Icon, bg: 'bg-[#f0eff5]', color: 'text-[#67627b]', label: 'Campagne', tone: 'amber' },
 };
 
 const filters = ['Tous', 'Non lues', 'Lues'] as const;
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'À l\'instant';
+  if (min < 60) return `Il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'Hier';
+  return `Il y a ${d} jours`;
+}
+
 export function AdminNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>(() => read('admin-notifications', seedAdminNotifications));
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('Tous');
 
+  useEffect(() => {
+    async function loadData() {
+      // Admin sees all notifications via RLS policy
+      const { data } = await supabase
+        .from('notifications')
+        .select('id, user_id, type, title, body, link, is_read, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      setNotifications((data as NotificationRow[] | null) ?? []);
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
   const filtered = notifications.filter((n) => {
-    if (filter === 'Non lues') return n.status === 'unread';
-    if (filter === 'Lues') return n.status === 'read';
+    if (filter === 'Non lues') return !n.is_read;
+    if (filter === 'Lues') return n.is_read;
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => n.status === 'unread').length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  function markAsRead(id: string) {
-    const updated = notifications.map((n) => (n.id === id ? { ...n, status: 'read' as const } : n));
-    setNotifications(updated);
-    write('admin-notifications', updated);
+  async function markAsRead(id: string) {
+    haptic('light');
+    await (supabase.from('notifications') as any).update({ is_read: true }).eq('id', id);
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   }
 
-  function markAllRead() {
-    const updated = notifications.map((n) => ({ ...n, status: 'read' as const }));
-    setNotifications(updated);
-    write('admin-notifications', updated);
+  async function markAllRead() {
+    haptic('medium');
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    await (supabase.from('notifications') as any).update({ is_read: true }).in('id', unreadIds);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
-  function deleteNotification(id: string) {
-    const updated = notifications.filter((n) => n.id !== id);
-    setNotifications(updated);
-    write('admin-notifications', updated);
+  async function deleteNotification(id: string) {
+    haptic('light');
+    await supabase.from('notifications').delete().eq('id', id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   }
 
   return (
@@ -107,7 +124,13 @@ export function AdminNotifications() {
 
       {/* Notifications list */}
       <div className="mt-5 space-y-3">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <Card className="p-12">
+            <div className="flex items-center justify-center">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+            </div>
+          </Card>
+        ) : filtered.length === 0 ? (
           <Card className="p-12 text-center">
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#f0eff5] text-[#9290a2]"><Icon glyph={CheckmarkCircle02Icon} size={28} /></span>
             <p className="mt-4 text-sm font-bold text-[#292541]">Aucune notification</p>
@@ -115,26 +138,26 @@ export function AdminNotifications() {
           </Card>
         ) : (
           filtered.map((n) => {
-            const cfg = typeConfig[n.type];
+            const cfg = typeConfig[n.type] ?? typeConfig.systeme;
             return (
-              <Card key={n.id} className={`flex items-start gap-4 transition ${n.status === 'unread' ? 'bg-[#f6f5ff]' : ''}`}>
+              <Card key={n.id} className={`flex items-start gap-4 transition ${!n.is_read ? 'bg-[#f6f5ff]' : ''}`}>
                 <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${cfg.bg} ${cfg.color}`}>
                   <Icon glyph={cfg.glyph} size={20} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-[#292541]">{n.title}</p>
-                    {n.status === 'unread' && <span className="h-2 w-2 shrink-0 rounded-full bg-[#ef6d78]" />}
+                    {!n.is_read && <span className="h-2 w-2 shrink-0 rounded-full bg-[#ef6d78]" />}
                   </div>
-                  <p className="mt-1 text-xs leading-5 text-[#77738a]">{n.description}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#77738a]">{n.body ?? ''}</p>
                   <div className="mt-2 flex items-center gap-3">
-                    <span className="text-[10px] text-[#9290a2]">{n.time}</span>
+                    <span className="text-[10px] text-[#9290a2]">{timeAgo(n.created_at)}</span>
                     <AdminBadge tone={cfg.tone}>{cfg.label}</AdminBadge>
                     {n.link && <Link href={n.link}><span className="text-[10px] font-bold text-[#5b49e8] hover:underline" data-testid={`link-${n.id}`}>Voir →</span></Link>}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1">
-                  {n.status === 'unread' && (
+                  {!n.is_read && (
                     <button onClick={() => markAsRead(n.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]" data-testid={`read-${n.id}`} title="Marquer comme lu">
                       <Icon glyph={CheckmarkCircle02Icon} size={15} />
                     </button>
@@ -151,4 +174,3 @@ export function AdminNotifications() {
     </AdminPage>
   );
 }
-

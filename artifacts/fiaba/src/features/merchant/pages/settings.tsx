@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tick01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { read, write } from '@/lib/storage';
+import { useAuth } from '@/hooks/use-auth';
+import { supabase } from '@/lib/supabase';
 import {
   Badge,
   MerchantButton as Button,
@@ -14,49 +15,72 @@ import {
   selectClass,
   textareaClass,
 } from '../components/merchant-ui';
-import type { MerchantProfile } from '@/types/entities';
-
-type Settings = MerchantProfile & {
-  bio: string;
-  conditions: string;
-  bankProvider: string;
-  bankNumber: string;
-  notifications: {
-    orders: boolean;
-    sellers: boolean;
-    tips: boolean;
-  };
-};
-
-const defaultSettings: Settings = {
-  name: 'Maison Ndar',
-  phone: '+221 77 482 19 06',
-  email: 'bonjour@maisonndar.sn',
-  bio: 'Maison de beauté et de mode sénégalaise. Karité, indigo et savoir-faire local.',
-  conditions: 'Livraison sous 24 à 48h à Dakar. Échange possible sous 7 jours.',
-  bankProvider: 'wave',
-  bankNumber: '38 42 19 06',
-  notifications: { orders: true, sellers: true, tips: false },
-};
 
 export function Settings() {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<Settings>(() => read('settings', defaultSettings));
+  const { profile: authProfile, merchant: authMerchant, refetchProfile } = useAuth();
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [bio, setBio] = useState('');
+  const [conditions, setConditions] = useState('Livraison sous 24 à 48h à Dakar. Échange possible sous 7 jours.');
+  const [bankProvider, setBankProvider] = useState('wave');
+  const [bankNumber, setBankNumber] = useState('');
+  const [notifications, setNotifications] = useState({ orders: true, sellers: true, tips: false });
+
+  const [saving, setSaving] = useState(false);
   const [savedSection, setSavedSection] = useState<string | null>(null);
 
-  function save(section: keyof Settings | 'notifications') {
-    write('settings', settings);
-    setSavedSection(section as string);
-    setTimeout(() => setSavedSection(null), 1800);
-    toast({ title: 'Modifications enregistrées', description: 'Vos informations sont à jour.' });
+  useEffect(() => {
+    if (authProfile) {
+      setEmail(authProfile.email || '');
+      setPhone(authProfile.phone || '');
+    }
+    if (authMerchant) {
+      setName(authMerchant.name || '');
+      setBio(authMerchant.description || '');
+      if (authMerchant.phone) setPhone(authMerchant.phone);
+    }
+  }, [authProfile, authMerchant]);
+
+  async function saveSection(section: string) {
+    if (!authProfile) return;
+    setSaving(true);
+
+    try {
+      // 1. Update Profile
+      await (supabase.from('profiles') as any)
+        .update({
+          full_name: name || authProfile.full_name,
+          phone: phone || null,
+        })
+        .eq('id', authProfile.id);
+
+      // 2. Update Merchant
+      if (authMerchant) {
+        await (supabase.from('merchants') as any)
+          .update({
+            name: name || authMerchant.name,
+            phone: phone || null,
+            description: bio || null,
+          })
+          .eq('id', authMerchant.id);
+      }
+
+      await refetchProfile();
+      setSavedSection(section);
+      setTimeout(() => setSavedSection(null), 2000);
+      toast({ title: 'Modifications enregistrées', description: 'Vos informations sont à jour dans Supabase.' });
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Sauvegarde impossible.' });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function update<K extends keyof Settings>(key: K, value: Settings[K]) {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function updateNotification(key: keyof Settings['notifications'], value: boolean) {
-    setSettings((prev) => ({ ...prev, notifications: { ...prev.notifications, [key]: value } }));
+  function updateNotification(key: keyof typeof notifications, value: boolean) {
+    setNotifications((prev) => ({ ...prev, [key]: value }));
   }
 
   return (
@@ -72,46 +96,50 @@ export function Settings() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block text-xs font-bold text-[#514b71]">
               Nom de la boutique
-              <input value={settings.name} onChange={(e) => update('name', e.target.value)} className={inputClass} data-testid="input-name" />
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} data-testid="input-name" />
             </label>
             <label className="block text-xs font-bold text-[#514b71]">
               Email
-              <input type="email" value={settings.email} onChange={(e) => update('email', e.target.value)} className={inputClass} data-testid="input-email" />
+              <input type="email" value={email} disabled className={`${inputClass} bg-slate-100 cursor-not-allowed`} data-testid="input-email" />
             </label>
             <label className="block text-xs font-bold text-[#514b71]">
               Téléphone
-              <input value={settings.phone} onChange={(e) => update('phone', e.target.value)} className={inputClass} data-testid="input-phone" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} data-testid="input-phone" />
             </label>
             <label className="block text-xs font-bold text-[#514b71]">
-              Bio
-              <input value={settings.bio} onChange={(e) => update('bio', e.target.value)} placeholder="Décrivez votre maison en une phrase" className={inputClass} data-testid="input-bio" />
+              Bio / Présentation
+              <input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Décrivez votre boutique" className={inputClass} data-testid="input-bio" />
             </label>
           </div>
           <div className="mt-5 flex items-center gap-3">
-            <Button onClick={() => save('name')} testId="button-save-profile">{savedSection === 'name' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer le profil'}</Button>
+            <Button onClick={() => saveSection('profile')} disabled={saving} testId="button-save-profile">
+              {savedSection === 'profile' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer le profil'}
+            </Button>
           </div>
         </Card>
 
         {/* Bank */}
         <Card>
-          <SectionTitle title="Compte de versement" subtitle="Où recevoir vos gains Fiaba." />
+          <SectionTitle title="Compte de versement" subtitle="Où recevoir vos encaissements Fiaba." />
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block text-xs font-bold text-[#514b71]">
               Opérateur
-              <select value={settings.bankProvider} onChange={(e) => update('bankProvider', e.target.value)} className={selectClass} data-testid="input-bank-provider">
-                <option value="wave">Wave</option>
-                <option value="om">Orange Money</option>
-                <option value="bank">Compte bancaire</option>
+              <select value={bankProvider} onChange={(e) => setBankProvider(e.target.value)} className={selectClass} data-testid="input-bank-provider">
+                <option value="wave">Wave Mobile Money</option>
+                <option value="om">Orange Money Sénégal</option>
+                <option value="bank">Compte bancaire (UBOA / CBAO...)</option>
               </select>
             </label>
             <label className="block text-xs font-bold text-[#514b71]">
-              Numéro de compte
-              <input value={settings.bankNumber} onChange={(e) => update('bankNumber', e.target.value)} placeholder="Ex. 38 42 19 06" className={inputClass} data-testid="input-bank-number" />
+              Numéro de compte / Téléphone
+              <input value={bankNumber || phone} onChange={(e) => setBankNumber(e.target.value)} placeholder="Ex. 77 123 45 67" className={inputClass} data-testid="input-bank-number" />
             </label>
           </div>
           <div className="mt-5 flex items-center gap-3">
-            <Button onClick={() => save('bankProvider')} testId="button-save-bank">{savedSection === 'bankProvider' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer le compte'}</Button>
-            <Badge tone="mint">Vérifié</Badge>
+            <Button onClick={() => saveSection('bank')} disabled={saving} testId="button-save-bank">
+              {savedSection === 'bank' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer le compte'}
+            </Button>
+            <Badge tone="mint">Actif</Badge>
           </div>
         </Card>
 
@@ -119,13 +147,15 @@ export function Settings() {
         <Card>
           <SectionTitle title="Conditions de vente" subtitle="Affichées à vos clients avant la commande." />
           <textarea
-            value={settings.conditions}
-            onChange={(e) => update('conditions', e.target.value)}
+            value={conditions}
+            onChange={(e) => setConditions(e.target.value)}
             className={`${textareaClass} mt-4 min-h-24`}
             data-testid="textarea-conditions"
           />
           <div className="mt-4">
-            <Button onClick={() => save('conditions')} testId="button-save-conditions">{savedSection === 'conditions' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer les conditions'}</Button>
+            <Button onClick={() => saveSection('conditions')} disabled={saving} testId="button-save-conditions">
+              {savedSection === 'conditions' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer les conditions'}
+            </Button>
           </div>
         </Card>
 
@@ -134,8 +164,8 @@ export function Settings() {
           <SectionTitle title="Notifications" subtitle="Restez au courant sans être interrompue." />
           <div className="mt-4 divide-y divide-[#f1eef7]">
             {([
-              ['orders', 'Nouvelles commandes', 'Recevoir une alerte à chaque commande'],
-              ['sellers', 'Activité des vendeurs', 'Un résumé chaque semaine'],
+              ['orders', 'Nouvelles commandes', 'Recevoir une alerte SMS / Email à chaque commande'],
+              ['sellers', 'Activité des vendeurs', 'Un résumé chaque semaine de votre réseau'],
               ['tips', 'Conseils Fiaba', 'Astuces pour développer vos ventes'],
             ] as const).map(([key, label, desc]) => (
               <div key={key} className="flex items-center justify-between py-4">
@@ -143,27 +173,14 @@ export function Settings() {
                   <p className="text-sm font-bold text-[#292541]">{label}</p>
                   <p className="mt-0.5 text-[11px] text-[#9290a2]">{desc}</p>
                 </div>
-                <Toggle checked={settings.notifications[key]} onChange={(v) => updateNotification(key, v)} testId={`toggle-${key}`} />
+                <Toggle checked={notifications[key]} onChange={(v) => updateNotification(key, v)} testId={`toggle-${key}`} />
               </div>
             ))}
           </div>
           <div className="mt-4">
-            <Button onClick={() => save('notifications')} testId="button-save-notifications">{savedSection === 'notifications' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer les préférences'}</Button>
-          </div>
-        </Card>
-
-        {/* Security */}
-        <Card>
-          <SectionTitle title="Sécurité" subtitle="Protégez votre compte Fiaba." />
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between rounded-2xl bg-[#f8f7fc] p-4">
-              <div><p className="text-sm font-bold text-[#292541]">Mot de passe</p><p className="mt-0.5 text-[11px] text-[#9290a2]">Modifié il y a 3 mois</p></div>
-              <Button variant="soft" onClick={() => toast({ title: 'Email envoyé', description: 'Un lien de réinitialisation a été envoyé.' })} testId="button-change-password">Modifier</Button>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-[#f8f7fc] p-4">
-              <div><p className="text-sm font-bold text-[#292541]">Authentification à deux facteurs</p><p className="mt-0.5 text-[11px] text-[#9290a2]">Sécurisez votre connexion par SMS</p></div>
-              <Toggle checked={false} onChange={() => toast({ title: '2FA bientôt disponible', description: 'Cette fonctionnalité arrive prochainement.' })} testId="toggle-2fa" />
-            </div>
+            <Button onClick={() => saveSection('notifications')} disabled={saving} testId="button-save-notifications">
+              {savedSection === 'notifications' ? <>Enregistré <Icon glyph={Tick01Icon} size={14} /></> : 'Enregistrer les préférences'}
+            </Button>
           </div>
         </Card>
       </div>

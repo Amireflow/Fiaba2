@@ -3,6 +3,9 @@
 -- Allow admin to read all notifications (for admin console)
 -- ============================================================================
 
+-- Add 'fraude' to notification_type enum for fraud alerts
+alter type public.notification_type add value if not exists 'fraude';
+
 -- Admin can select all notifications
 create policy "notifications_select_admin" on public.notifications
   for select using (public.is_admin());

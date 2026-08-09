@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AlertCircleIcon,
   ArrowRight02Icon,
@@ -12,8 +12,8 @@ import {
 import { Icon } from '@/components/shared/icon';
 import { money, haptic } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { SubscriptionPlan } from '../../../types/entities';
-import { DEFAULT_SUBSCRIPTION_PLANS } from '../../../lib/monetization';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Badge,
   MerchantButton as Button,
@@ -23,30 +23,132 @@ import {
   SectionTitle,
 } from '../components/merchant-ui';
 
+type PlanRow = {
+  id: string;
+  name: string;
+  price_monthly: number;
+  max_active_products: number;
+  max_active_campaigns: number;
+  platform_fee_rate: number;
+  features: string[] | null;
+  is_active: boolean;
+};
+
+type SubscriptionRow = {
+  id: string;
+  plan_id: string;
+  status: string;
+};
+
 export const MerchantSubscriptionPage: React.FC = () => {
   const { toast } = useToast();
-  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>(DEFAULT_SUBSCRIPTION_PLANS[0]); // Plan Free initial
-  const [activeProductsCount] = useState(4); // 4 / 5 produits
-  const [activeCampaignsCount] = useState(2); // 2 / 2 campagnes (limite atteinte)
+  const { merchantId } = useAuth();
+  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
+  const [activeProductsCount, setActiveProductsCount] = useState(0);
+  const [activeCampaignsCount, setActiveCampaignsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
 
-  const productPct = Math.round((activeProductsCount / currentPlan.maxActiveProducts) * 100);
-  const campaignPct = Math.round((activeCampaignsCount / currentPlan.maxActiveCampaigns) * 100);
-  const productsNearLimit = activeProductsCount >= currentPlan.maxActiveProducts - 1;
-  const campaignsAtLimit = activeCampaignsCount >= currentPlan.maxActiveCampaigns;
+  useEffect(() => {
+    async function loadData() {
+      if (!merchantId) {
+        setLoading(false);
+        return;
+      }
 
-  const handleUpgrade = () => {
+      // Fetch all active subscription plans
+      const { data: planRows } = await supabase
+        .from('subscription_plans')
+        .select('id, name, price_monthly, max_active_products, max_active_campaigns, platform_fee_rate, features, is_active')
+        .eq('is_active', true)
+        .order('price_monthly', { ascending: true });
+      setPlans((planRows as PlanRow[] | null) ?? []);
+
+      // Fetch merchant's current subscription
+      const { data: subRow } = await supabase
+        .from('merchant_subscriptions')
+        .select('id, plan_id, status')
+        .eq('merchant_id', merchantId)
+        .maybeSingle();
+      setSubscription((subRow as SubscriptionRow | null) ?? null);
+
+      // Count active products
+      const { count: productCount } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('merchant_id', merchantId)
+        .in('status', ['actif', 'active']);
+      setActiveProductsCount(productCount ?? 0);
+
+      // Count active campaigns
+      const { count: campaignCount } = await supabase
+        .from('campaigns')
+        .select('id', { count: 'exact', head: true })
+        .eq('merchant_id', merchantId)
+        .eq('status', 'active');
+      setActiveCampaignsCount(campaignCount ?? 0);
+
+      setLoading(false);
+    }
+    loadData();
+  }, [merchantId]);
+
+  const currentPlan = plans.find((p) => p.id === subscription?.plan_id) ?? plans[0] ?? null;
+
+  const productPct = currentPlan ? Math.round((activeProductsCount / currentPlan.max_active_products) * 100) : 0;
+  const campaignPct = currentPlan ? Math.round((activeCampaignsCount / currentPlan.max_active_campaigns) * 100) : 0;
+  const productsNearLimit = currentPlan ? activeProductsCount >= currentPlan.max_active_products - 1 : false;
+  const campaignsAtLimit = currentPlan ? activeCampaignsCount >= currentPlan.max_active_campaigns : false;
+
+  async function handleUpgrade(plan: PlanRow) {
+    if (!merchantId || !currentPlan || plan.id === currentPlan.id) return;
     haptic('medium');
     setIsUpgrading(true);
-    setTimeout(() => {
-      setCurrentPlan(DEFAULT_SUBSCRIPTION_PLANS[1]); // Upgrade vers Premium
-      setIsUpgrading(false);
+
+    try {
+      if (subscription) {
+        // Update existing subscription
+        const { error } = await (supabase.from('merchant_subscriptions') as any)
+          .update({ plan_id: plan.id, status: 'active', current_period_start: new Date().toISOString() })
+          .eq('id', subscription.id);
+        if (error) throw error;
+      } else {
+        // Insert new subscription
+        const { error } = await (supabase.from('merchant_subscriptions') as any)
+          .insert({
+            merchant_id: merchantId,
+            plan_id: plan.id,
+            status: 'active',
+            current_period_start: new Date().toISOString(),
+            auto_renew: true,
+          });
+        if (error) throw error;
+      }
+
+      setSubscription((prev) => prev ? { ...prev, plan_id: plan.id, status: 'active' } : { id: 'new', plan_id: plan.id, status: 'active' });
       toast({
-        title: 'Bienvenue dans le Plan Premium',
-        description: 'Votre commission plateforme passe à 3 % et vos quotas sont débloqués.',
+        title: `Bienvenue dans le Plan ${plan.name}`,
+        description: `Votre commission plateforme passe à ${plan.platform_fee_rate}% et vos quotas sont débloqués.`,
       });
-    }, 1000);
-  };
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message ?? 'Échec de la mise à niveau.' });
+    } finally {
+      setIsUpgrading(false);
+    }
+  }
+
+  if (loading || !currentPlan) {
+    return (
+      <Page eyebrow="Votre formule" title="Abonnement & Capacités" description="">
+        <Card className="mt-6 p-12">
+          <div className="flex items-center justify-center">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+          </div>
+        </Card>
+      </Page>
+    );
+  }
 
   return (
     <Page
@@ -83,13 +185,13 @@ export const MerchantSubscriptionPage: React.FC = () => {
             <div>
               <p className="text-[10px] text-[#d0caff]">Tarif mensuel</p>
               <p className="mt-1 font-[Space_Grotesk] text-xl font-bold">
-                {currentPlan.priceMonthly === 0 ? 'Gratuit' : `${money(currentPlan.priceMonthly).replace(' F', '')}`}
-                {currentPlan.priceMonthly > 0 && <small className="ml-1 text-xs font-sans text-[#d0caff]">FCFA</small>}
+                {currentPlan.price_monthly === 0 ? 'Gratuit' : `${money(currentPlan.price_monthly).replace(' F', '')}`}
+                {currentPlan.price_monthly > 0 && <small className="ml-1 text-xs font-sans text-[#d0caff]">FCFA</small>}
               </p>
             </div>
             <div>
               <p className="text-[10px] text-[#d0caff]">Commission plateforme</p>
-              <p className="mt-1 font-[Space_Grotesk] text-xl font-bold">{currentPlan.platformFeeRate}%</p>
+              <p className="mt-1 font-[Space_Grotesk] text-xl font-bold">{Number(currentPlan.platform_fee_rate)}%</p>
             </div>
           </div>
         </div>
@@ -100,13 +202,13 @@ export const MerchantSubscriptionPage: React.FC = () => {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
               <Icon glyph={PercentIcon} size={18} />
             </span>
-            <Badge tone={currentPlan.platformFeeRate <= 3 ? 'mint' : 'amber'}>
-              {currentPlan.platformFeeRate <= 3 ? 'Réduit' : 'Standard'}
+            <Badge tone={Number(currentPlan.platform_fee_rate) <= 3 ? 'mint' : 'amber'}>
+              {Number(currentPlan.platform_fee_rate) <= 3 ? 'Réduit' : 'Standard'}
             </Badge>
           </div>
           <p className="mt-5 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">Commission plateforme</p>
           <strong className="mt-1 block font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] text-[#292541]">
-            {currentPlan.platformFeeRate}%
+            {Number(currentPlan.platform_fee_rate)}%
           </strong>
           <p className="mt-3 text-[11px] leading-5 text-[#77738a]">
             Prélevée sur chaque commande validée. Passez à Premium pour descendre à 3 %.
@@ -120,7 +222,7 @@ export const MerchantSubscriptionPage: React.FC = () => {
         <Card>
           <SectionTitle
             title="Produits actifs"
-            subtitle={`${activeProductsCount} / ${currentPlan.maxActiveProducts} utilisés`}
+            subtitle={`${activeProductsCount} / ${currentPlan.max_active_products} utilisés`}
             action={
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${productsNearLimit ? 'bg-[#fff4de] text-[#ac741e]' : 'bg-[#e7faf2] text-[#278e69]'}`}>
                 <Icon glyph={Store01Icon} size={18} />
@@ -131,7 +233,7 @@ export const MerchantSubscriptionPage: React.FC = () => {
             <ProgressBar value={productPct} tone={productsNearLimit ? 'amber' : 'mint'} />
             <div className="mt-2 flex items-center justify-between text-[11px] text-[#9290a2]">
               <span>{activeProductsCount} en ligne</span>
-              <span>{currentPlan.maxActiveProducts - activeProductsCount} restant(s)</span>
+              <span>{Math.max(0, currentPlan.max_active_products - activeProductsCount)} restant(s)</span>
             </div>
           </div>
           {productsNearLimit && (
@@ -145,7 +247,7 @@ export const MerchantSubscriptionPage: React.FC = () => {
         <Card>
           <SectionTitle
             title="Campagnes actives"
-            subtitle={`${activeCampaignsCount} / ${currentPlan.maxActiveCampaigns} utilisées`}
+            subtitle={`${activeCampaignsCount} / ${currentPlan.max_active_campaigns} utilisées`}
             action={
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${campaignsAtLimit ? 'bg-[#fff0f1] text-[#c45667]' : 'bg-[#e7faf2] text-[#278e69]'}`}>
                 <Icon glyph={Chart02Icon} size={18} />
@@ -156,7 +258,7 @@ export const MerchantSubscriptionPage: React.FC = () => {
             <ProgressBar value={campaignPct} tone={campaignsAtLimit ? 'amber' : 'mint'} />
             <div className="mt-2 flex items-center justify-between text-[11px] text-[#9290a2]">
               <span>{activeCampaignsCount} en cours</span>
-              <span>{Math.max(0, currentPlan.maxActiveCampaigns - activeCampaignsCount)} restante(s)</span>
+              <span>{Math.max(0, currentPlan.max_active_campaigns - activeCampaignsCount)} restante(s)</span>
             </div>
           </div>
           {campaignsAtLimit && (
@@ -174,9 +276,10 @@ export const MerchantSubscriptionPage: React.FC = () => {
           subtitle="Choisissez la formule adaptée à la taille de votre activité."
         />
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {DEFAULT_SUBSCRIPTION_PLANS.map((plan) => {
+          {plans.map((plan) => {
             const isSelected = currentPlan.id === plan.id;
             const isPremium = plan.name === 'Premium';
+            const features = plan.features ?? [];
             return (
               <div
                 key={plan.id}
@@ -209,14 +312,14 @@ export const MerchantSubscriptionPage: React.FC = () => {
                 {/* Prix */}
                 <div className="mt-5 flex items-end gap-1">
                   <strong className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] text-[#292541]">
-                    {plan.priceMonthly === 0 ? 'Gratuit' : money(plan.priceMonthly).replace(' F', '')}
+                    {plan.price_monthly === 0 ? 'Gratuit' : money(plan.price_monthly).replace(' F', '')}
                   </strong>
-                  {plan.priceMonthly > 0 && <span className="mb-1 text-xs text-[#9290a2]">FCFA / mois</span>}
+                  {plan.price_monthly > 0 && <span className="mb-1 text-xs text-[#9290a2]">FCFA / mois</span>}
                 </div>
 
                 {/* Features */}
                 <ul className="mt-5 space-y-2.5">
-                  {plan.features.map((feat, idx) => (
+                  {features.map((feat, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-[13px] text-[#292541]">
                       <Icon glyph={CheckmarkCircle02Icon} size={16} className="mt-0.5 shrink-0 text-[#278e69]" />
                       <span>{feat}</span>
@@ -234,13 +337,13 @@ export const MerchantSubscriptionPage: React.FC = () => {
                     <Button
                       variant="primary"
                       className="w-full"
-                      onClick={handleUpgrade}
+                      onClick={() => handleUpgrade(plan)}
                       disabled={isUpgrading}
                       testId={`plan-${plan.id}-upgrade`}
                     >
                       {isUpgrading ? 'Traitement…' : (
                         <>
-                          Passer à Premium · {money(plan.priceMonthly).replace(' F', '')} FCFA
+                          Passer à {plan.name} · {money(plan.price_monthly).replace(' F', '')} FCFA
                           <Icon glyph={ArrowRight02Icon} size={15} />
                         </>
                       )}

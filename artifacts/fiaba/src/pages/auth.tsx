@@ -11,8 +11,7 @@ import {
   Store01Icon,
   UserGroupIcon,
   ViewIcon,
-  ViewOffIcon,
-  ShieldKeyIcon
+  ViewOffIcon
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { haptic } from '@/lib/utils';
@@ -336,51 +335,6 @@ export function SignInPage() {
           </form>
         )}
 
-        <div className="mt-5 rounded-2xl bg-[#efedff]/60 p-4 border border-[#e2dffa]">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[#5040cf]">Accès Démo Rapide</p>
-          <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setMethod('email');
-                setEmail('admin@fiaba.sn');
-                setPassword('password123');
-                haptic('light');
-              }}
-              className="rounded-xl bg-white p-2 text-xs font-bold text-[#5b49e8] shadow-xs hover:bg-[#f3f0ff] transition"
-              data-testid="button-demo-admin"
-            >
-              👑 Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMethod('email');
-                setEmail('marchand@fiaba.sn');
-                setPassword('password123');
-                haptic('light');
-              }}
-              className="rounded-xl bg-white p-2 text-xs font-bold text-[#5b49e8] shadow-xs hover:bg-[#f3f0ff] transition"
-              data-testid="button-demo-merchant"
-            >
-              🛍️ Boutique
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMethod('email');
-                setEmail('vendeur@fiaba.sn');
-                setPassword('password123');
-                haptic('light');
-              }}
-              className="rounded-xl bg-white p-2 text-xs font-bold text-[#5b49e8] shadow-xs hover:bg-[#f3f0ff] transition"
-              data-testid="button-demo-seller"
-            >
-              ✨ Vendeur
-            </button>
-          </div>
-        </div>
-
         <div className="mt-6 border-t border-[#efedf5] pt-5 text-center">
           <p className="text-xs text-[#77738a]">
             Nouveau sur Fiaba ?{' '}
@@ -513,28 +467,22 @@ export function SignUpPage() {
         <h1 className="font-[Space_Grotesk] text-2xl font-bold text-[#282441]">Créer un compte</h1>
         <p className="mt-1.5 text-sm text-[#77738a]">Choisissez votre rôle et votre méthode d'inscription</p>
 
-        {/* Role selection (Vendeur vs Commerçant vs Admin) */}
+        {/* Role selection (Vendeur vs Commerçant) */}
         <div className="mt-5 space-y-2">
           <label className="block text-xs font-bold text-[#514b71] uppercase tracking-wider">Type de compte</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {[
               {
                 id: 'vendeur',
                 icon: UserGroupIcon,
-                title: 'Vendeur',
-                subtitle: 'Commissions',
+                title: 'Vendeur Social',
+                subtitle: 'Gagnez des commissions',
               },
               {
                 id: 'marchand',
                 icon: Store01Icon,
-                title: 'Boutique',
-                subtitle: 'Vente & Réseau',
-              },
-              {
-                id: 'admin',
-                icon: ShieldKeyIcon,
-                title: 'Admin',
-                subtitle: 'Gestion globale',
+                title: 'Commerçant / Marque',
+                subtitle: 'Vendez & recrutez',
               },
             ].map((r) => {
               const isSelected = role === r.id;
@@ -543,7 +491,7 @@ export function SignUpPage() {
                   type="button"
                   key={r.id}
                   onClick={() => { haptic('light'); setRole(r.id as any); }}
-                  className={`rounded-2xl border px-2.5 py-3 text-left transition ${
+                  className={`rounded-2xl border px-3.5 py-3 text-left transition ${
                     isSelected
                       ? 'border-[#5b49e8] bg-[#f7f6ff] text-[#292541]'
                       : 'border-[#e7e5ef] bg-white text-[#757185] hover:border-[#d0cbdc] hover:bg-[#fafafc]'
@@ -551,18 +499,18 @@ export function SignUpPage() {
                   data-testid={`button-signup-role-${r.id}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`grid h-7 w-7 place-items-center rounded-xl transition ${
+                    <span className={`grid h-8 w-8 place-items-center rounded-xl transition ${
                       isSelected ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#5b49e8]'
                     }`}>
-                      <Icon glyph={r.icon} size={15} />
+                      <Icon glyph={r.icon} size={16} />
                     </span>
                     {isSelected && (
-                      <span className="grid h-4 w-4 place-items-center rounded-full bg-[#5b49e8] text-white">
-                        <Icon glyph={CheckmarkCircle02Icon} size={11} />
+                      <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-[#5b49e8] text-white">
+                        <Icon glyph={CheckmarkCircle02Icon} size={12} />
                       </span>
                     )}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2.5">
                     <strong className="block text-xs font-bold text-[#292541] truncate">{r.title}</strong>
                     <span className="text-[10px] text-[#77738a] block truncate mt-0.5">{r.subtitle}</span>
                   </div>

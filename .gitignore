@@ -44,6 +44,18 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
+# Local caches
 .cache/
 .local/
+
+# Environment variables (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Vercel
+.vercel

@@ -1,0 +1,155 @@
+import { Link } from 'wouter';
+import { Alert01Icon, ArrowUpRightIcon, CheckmarkCircle02Icon, Shield01Icon, Store01Icon, UserGroupIcon, Wallet01Icon } from '@hugeicons/core-free-icons';
+import { Icon } from '@/components/shared/icon';
+import { money } from '@/lib/utils';
+import { AdminBadge, AdminButton as Button, AdminCard as Card, AdminPage, AdminStat, SeverityBadge } from '../components/admin-ui';
+import { seedAdminOrders, seedAdminFraudAlerts, seedAdminUsers } from '@/config/admin-seeds';
+
+export function AdminOverview() {
+  const bars = [31, 48, 38, 57, 46, 70, 62, 85, 75, 100, 88, 94];
+  const pendingVerifications = seedAdminUsers.filter((u) => u.status === 'En attente').length;
+  const openDisputes = 2;
+  const newFraud = seedAdminFraudAlerts.filter((f) => f.status === 'Nouveau').length;
+
+  return (
+    <AdminPage
+      eyebrow="Mercredi 19 juin 2024"
+      title="Vue d'ensemble"
+      description="L'état de la plateforme en un coup d'œil — adoption, liquidité et signaux de confiance."
+      action={
+        <Link href="/admin/fraud">
+          <Button variant="soft">
+            Examiner les risques <Icon glyph={Shield01Icon} size={15} />
+          </Button>
+        </Link>
+      }
+    >
+      {/* GMV + adoption */}
+      <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+        <div className="rounded-[22px] bg-[#5745df] p-5 text-white">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-white/80">GMV · juin</p>
+            <Link href="/admin/orders" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/25" data-testid="link-overview-orders">
+              Voir les commandes <Icon glyph={ArrowUpRightIcon} size={13} />
+            </Link>
+          </div>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] sm:text-4xl">4 218 750</span>
+            <span className="mb-1 text-sm text-white/70">FCFA</span>
+          </div>
+          <div className="mt-3"><AdminBadge tone="mint">+22,1% ce mois</AdminBadge></div>
+          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-4 text-sm">
+            <div>
+              <p className="text-white/70">Commissions générées</p>
+              <p className="mt-1 font-[Space_Grotesk] font-bold">312 480 F</p>
+            </div>
+            <div>
+              <p className="text-white/70">Frais de plateforme</p>
+              <p className="mt-1 font-[Space_Grotesk] font-bold">210 938 F</p>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-[#292541]">Commandes · 7 derniers jours</p>
+            <AdminBadge>184 au total</AdminBadge>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <strong className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.06em] text-[#292541]">142</strong>
+            <span className="text-sm text-[#77738a]">cette semaine</span>
+          </div>
+          <div className="mt-6 flex h-[120px] items-end justify-between gap-1.5 sm:gap-2">
+            {bars.map((h, i) => (
+              <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, backgroundColor: i >= bars.length - 3 ? '#5b49e8' : '#dedbfa' }} />
+            ))}
+          </div>
+          <div className="mt-2 flex justify-between text-[10px] text-[#9290a2]">
+            <span>13 juin</span><span>19 juin</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Stats */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStat label="Commerçants actifs" value="14" change="+2" glyph={Store01Icon} />
+        <AdminStat label="Vendeurs actifs" value="86" change="+11" glyph={UserGroupIcon} tone="mint" />
+        <AdminStat label="Taux livraison" value="91,4%" change="+1,8 pt" glyph={CheckmarkCircle02Icon} tone="amber" />
+        <AdminStat label="Vente validée / clic" value="7,8%" change="+0,9 pt" glyph={Wallet01Icon} />
+      </div>
+
+      {/* Action queue + recent orders */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+        <Card>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-[#292541]">Dernières commandes</p>
+            <Link href="/admin/orders" className="text-xs font-bold text-[#5b49e8] hover:text-[#4e3bd5]" data-testid="link-overview-all-orders">Voir tout <Icon glyph={ArrowUpRightIcon} size={13} /></Link>
+          </div>
+          <div className="mt-4 divide-y divide-[#f1eef7]">
+            {seedAdminOrders.slice(0, 4).map((order) => {
+              const tone = order.status === 'Payée' ? 'mint' : order.status === 'Livrée' ? 'violet' : order.status === 'Litige' || order.status === 'Refusée' || order.status === 'Annulée' ? 'rose' : 'amber';
+              return (
+                <div key={order.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[#292541]">{order.id}</p>
+                    <p className="truncate text-xs text-[#9290a2]">{order.customer} · {order.seller}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm font-bold text-[#292541]">{money(order.amount)}</span>
+                    <AdminBadge tone={tone}>{order.status}</AdminBadge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card>
+          <p className="text-sm font-bold text-[#292541]">File d'action</p>
+          <div className="mt-4 space-y-3">
+            <Link href="/admin/users" className="block rounded-2xl bg-[#fff4de] p-4 text-[#ac741e] transition hover:bg-[#fff3d0]" data-testid="link-overview-verifications">
+              <p className="text-sm font-bold">{pendingVerifications} comptes à vérifier</p>
+              <p className="mt-1 text-xs opacity-80">Marchands et vendeurs en attente <Icon glyph={ArrowUpRightIcon} size={13} /></p>
+            </Link>
+            <Link href="/admin/disputes" className="block rounded-2xl bg-[#fff0f1] p-4 text-[#c45667] transition hover:bg-[#ffe6e8]" data-testid="link-overview-disputes">
+              <p className="text-sm font-bold">{openDisputes} litiges ouverts</p>
+              <p className="mt-1 text-xs opacity-80">À arbitrer sous 48h <Icon glyph={ArrowUpRightIcon} size={13} /></p>
+            </Link>
+            <Link href="/admin/fraud" className="block rounded-2xl bg-[#5745df] p-4 text-white transition hover:opacity-95" data-testid="link-overview-fraud">
+              <p className="text-sm font-bold">{newFraud} signaux de fraude nouveaux</p>
+              <p className="mt-1 text-xs text-white/70">Examiner avant blocage <Icon glyph={ArrowUpRightIcon} size={13} /></p>
+            </Link>
+          </div>
+        </Card>
+      </div>
+
+      {/* Top fraud signals */}
+      <Card className="mt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#292541]">Signaux de fraude récents</p>
+            <p className="mt-1 text-[11px] text-[#9290a2]">Revue administrative avant tout blocage automatique.</p>
+          </div>
+          <Link href="/admin/fraud" className="text-xs font-bold text-[#5b49e8] hover:text-[#4e3bd5]" data-testid="link-overview-all-fraud">Tout examiner <Icon glyph={ArrowUpRightIcon} size={13} /></Link>
+        </div>
+        <div className="mt-4 divide-y divide-[#f1eef7]">
+          {seedAdminFraudAlerts.slice(0, 3).map((alert) => (
+            <div key={alert.id} className="flex items-center justify-between gap-3 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#fff0f1] text-[#c45667]"><Icon glyph={Alert01Icon} size={17} /></span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#292541]">{alert.type}</p>
+                  <p className="truncate text-xs text-[#9290a2]">{alert.target} · {alert.detail}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <SeverityBadge severity={alert.severity} />
+                <AdminBadge tone="slate">{alert.status}</AdminBadge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </AdminPage>
+  );
+}

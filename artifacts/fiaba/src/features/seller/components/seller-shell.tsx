@@ -1,0 +1,174 @@
+import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { Link, useLocation } from 'wouter';
+import { Cancel01Icon, Chart02Icon, CheckmarkCircle02Icon, Home01Icon, Logout01Icon, Menu02Icon, Notification01Icon, Search01Icon, Store01Icon, Wallet01Icon } from '@hugeicons/core-free-icons';
+import { Icon } from '@/components/shared/icon';
+import { useToast } from '@/hooks/use-toast';
+import { SellerLogo } from './seller-ui';
+import { sellerPrimaryNav, sellerSecondaryNav, sellerAllNav } from '@/config/seller-navigation';
+
+/* Bottom nav items (4 shortcuts + Plus button) */
+const bottomNav = [
+  { href: '/seller', label: 'Découvrir', glyph: Home01Icon },
+  { href: '/seller/campaigns', label: 'Campagnes', glyph: Chart02Icon },
+  { href: '/seller/sales', label: 'Ventes', glyph: Store01Icon },
+  { href: '/seller/earnings', label: 'Revenus', glyph: Wallet01Icon },
+];
+
+export function SellerShell({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  const [mobile, setMobile] = useState(false);
+  const { toast } = useToast();
+
+  const handleSignOut = () => {
+    window.location.href = import.meta.env.BASE_URL;
+  };
+
+  const navLink = (item: (typeof sellerAllNav)[number], isMobile = false) => {
+    const isActive = location === item.href;
+    const base = isMobile
+      ? `flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold transition ${isActive ? 'bg-[#5e4be7] text-white' : 'text-[#c1bdd8] hover:bg-white/10'}`
+      : `flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-bold transition ${isActive ? 'bg-[#5e4be7] text-white shadow-sm' : 'text-[#c1bdd8] hover:bg-white/10'}`;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => isMobile && setMobile(false)}
+        className={base}
+        data-testid={`link-${isMobile ? 'mobile-' : ''}seller-nav-${item.href.split('/').pop()}`}
+      >
+        <Icon glyph={item.glyph} size={isMobile ? 18 : 17} />
+        {item.label}
+        {item.href === '/seller/sales' && <span className="ml-auto rounded-full bg-[#e7faf2] px-1.5 py-0.5 text-[9px] text-[#278e69]">5</span>}
+      </Link>
+    );
+  };
+
+  return (
+    <div className="merchant-noise seller-shell min-h-[100dvh] text-[#282441]">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[242px] flex-col overflow-y-auto bg-[#242046] px-4 py-6 text-white lg:flex dark-scrollbar">
+        <div className="px-2"><SellerLogo /></div>
+        <div className="mt-12 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#9791c5]">Vendre et partager</div>
+        <nav className="mt-3 space-y-1">{sellerPrimaryNav.map((item) => navLink(item))}</nav>
+        <div className="mt-8 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#9791c5]">Votre espace</div>
+        <nav className="mt-3 space-y-1">{sellerSecondaryNav.map((item) => navLink(item))}</nav>
+        <div className="mt-auto rounded-2xl bg-white/5 p-3">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-[#e7faf2] text-[10px] font-bold text-[#278e69]">?</span>
+            <span className="text-[11px] font-bold">Besoin d'un coup de main ?</span>
+          </div>
+          <p className="mt-2 text-[10px] leading-4 text-[#b7b2d2]">Une équipe à Dakar pour vous répondre.</p>
+          <button
+            onClick={() => toast({ title: 'Notre équipe vous répondra sous peu.', description: 'Une équipe à Dakar est disponible du lundi au vendredi.' })}
+            className="mt-2 text-[10px] font-bold text-[#b5abff]"
+            data-testid="button-seller-support"
+          >
+            Parler à l'équipe
+          </button>
+        </div>
+        <button onClick={() => handleSignOut()} className="mt-4 flex items-center gap-3 px-3 py-2 text-xs font-bold text-[#c1bdd8] hover:text-white" data-testid="button-seller-logout">
+          Quitter l'espace <Icon glyph={Logout01Icon} size={16} className="ml-auto" />
+        </button>
+      </aside>
+
+      {/* Header */}
+      <header className="sticky top-0 z-30 flex h-[64px] items-center justify-between bg-[#f8f8fc] px-4 sm:px-5 lg:ml-[242px] lg:h-[70px] lg:px-9">
+        <div className="flex items-center gap-3">
+          <div className="lg:hidden">
+            <SellerLogo light={false} />
+          </div>
+          <div className="hidden lg:block">
+            <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8b88a0]">Espace vendeur</p>
+            <p className="mt-1 text-sm font-bold text-[#38324f]">Marième Fall</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="grid h-9 w-9 place-items-center rounded-full bg-white text-[#716e84] shadow-sm"
+            onClick={() => toast({ title: 'Recherche disponible prochainement', description: 'Cette fonctionnalité arrive dans une prochaine version.' })}
+            data-testid="button-seller-search"
+          >
+            <Icon glyph={Search01Icon} size={17} />
+          </button>
+          <button
+            className="relative grid h-9 w-9 place-items-center rounded-full bg-white text-[#716e84] shadow-sm"
+            onClick={() => toast({ title: '2 nouvelles notifications', description: '1 campagne recommandée et 1 vente validée.' })}
+            data-testid="button-seller-notifications"
+          >
+            <Icon glyph={Notification01Icon} size={17} />
+            <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />
+          </button>
+          <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-seller-initials">MF</span>
+        </div>
+      </header>
+
+      {/* Mobile drawer sidebar (opened by plus button) */}
+      {mobile && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-[#201b3c]/75" onClick={() => setMobile(false)} data-testid="seller-mobile-overlay" />
+          <div className="absolute left-0 top-0 flex h-full w-[300px] flex-col bg-[#242046] px-4 py-6 text-white shadow-2xl">
+            <div className="flex items-center justify-between">
+              <SellerLogo />
+              <button onClick={() => setMobile(false)} className="rounded-lg p-1.5 text-[#c1bdd8] hover:bg-white/10" data-testid="button-close-seller-mobile">
+                <Icon glyph={Cancel01Icon} size={22} />
+              </button>
+            </div>
+            <div className="mt-8 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#9791c5]">Vendre et partager</div>
+            <nav className="mt-3 space-y-1">{sellerPrimaryNav.map((item) => navLink(item, true))}</nav>
+            <div className="mt-6 px-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#9791c5]">Votre espace</div>
+            <nav className="mt-3 space-y-1">{sellerSecondaryNav.map((item) => navLink(item, true))}</nav>
+            <button onClick={() => handleSignOut()} className="mt-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-[#c1bdd8] hover:bg-white/10" data-testid="button-seller-mobile-logout">
+              Quitter l'espace <Icon glyph={Logout01Icon} size={16} className="ml-auto" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main content with bottom padding on mobile for the footer nav */}
+      <main className="min-h-[calc(100dvh-64px)] pb-[88px] lg:ml-[242px] lg:min-h-[calc(100dvh-70px)] lg:pb-0">{children}</main>
+
+      {/* Mobile floating bottom navigation — glassmorphism */}
+      <nav
+        className="fixed inset-x-4 bottom-4 z-30 flex h-[64px] items-center justify-around rounded-[24px] bg-white/90 shadow-[0_8px_32px_rgba(36,32,70,.12)] backdrop-blur-xl lg:hidden"
+        data-testid="seller-bottom-nav"
+      >
+        {/* Glow accent */}
+        <span className="pointer-events-none absolute inset-0 rounded-[24px] bg-gradient-to-b from-white/30 to-transparent" />
+
+        {bottomNav.map((item) => {
+          const isActive = location === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[9px] font-bold transition-all duration-200 ${isActive ? 'text-[#5b49e8]' : 'text-[#9290a2] active:scale-90'}`}
+              data-testid={`link-seller-bottom-${item.href.split('/').pop()}`}
+            >
+              <span className={`grid place-items-center rounded-xl transition-all duration-200 ${isActive ? 'h-8 w-8 bg-[#5b49e8]/10' : 'h-7 w-7'}`}>
+                <Icon glyph={item.glyph} size={isActive ? 20 : 18} strokeWidth={isActive ? 2.1 : 1.8} />
+              </span>
+              <span className={isActive ? 'opacity-100' : 'opacity-70'}>{item.label}</span>
+              {item.href === '/seller/sales' && (
+                <span className="absolute right-[26%] top-1.5 h-2 w-2 rounded-full bg-[#ef6d78] ring-2 ring-white/80" />
+              )}
+            </Link>
+          );
+        })}
+
+        {/* Plus button (opens full menu drawer) */}
+        <button
+          onClick={() => setMobile(true)}
+          className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[9px] font-bold text-[#9290a2] transition-all duration-200 active:scale-90"
+          data-testid="button-seller-bottom-plus"
+          aria-label="Ouvrir le menu"
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-xl bg-[#5b49e8] text-white shadow-[0_4px_14px_rgba(91,73,232,.3)]">
+            <Icon glyph={Menu02Icon} size={17} strokeWidth={2.2} />
+          </span>
+          <span className="opacity-70">Plus</span>
+        </button>
+      </nav>
+    </div>
+  );
+}

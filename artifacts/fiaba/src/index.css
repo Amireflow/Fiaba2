@@ -69,6 +69,8 @@
 
 /* LIGHT MODE */
 :root {
+  color-scheme: light;
+
   --button-outline: rgba(0, 0, 0, 0.1);
   --badge-outline: rgba(0, 0, 0, 0.05);
 
@@ -117,24 +119,24 @@
   --app-font-serif: 'Space Grotesk', sans-serif;
   --app-font-mono: 'Space Mono', monospace;
   --radius: 1.15rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0); /*replace with H S L */
+  --shadow-2xs: 0px 1px 2px 0px hsl(244 23% 16% / 0.04);
+  --shadow-xs: 0px 1px 2px 0px hsl(244 23% 16% / 0.05);
   --shadow-sm:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 1px 3px 0px hsl(244 23% 16% / 0.06),
+    0px 1px 2px -1px hsl(244 23% 16% / 0.04);
   --shadow:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 1px 3px 0px hsl(244 23% 16% / 0.07),
+    0px 1px 2px -1px hsl(244 23% 16% / 0.04);
   --shadow-md:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 2px 4px -1px hsl(244 23% 16% / 0.08),
+    0px 1px 2px -1px hsl(244 23% 16% / 0.04);
   --shadow-lg:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 4px 8px -2px hsl(244 23% 16% / 0.1),
+    0px 2px 4px -2px hsl(244 23% 16% / 0.04);
   --shadow-xl:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 8px 16px -4px hsl(244 23% 16% / 0.12),
+    0px 4px 8px -4px hsl(244 23% 16% / 0.04);
+  --shadow-2xl: 0px 16px 32px -8px hsl(244 23% 16% / 0.14);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -191,6 +193,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --button-outline: rgba(255, 255, 255, 0.1);
   --badge-outline: rgba(255, 255, 255, 0.05);
 
@@ -227,24 +231,24 @@
   --chart-4: 350 72% 68%;
   --chart-5: 195 66% 58%;
 
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.1);
+  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.12);
   --shadow-sm:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 1px 3px 0px hsl(0 0% 0% / 0.15),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.1);
   --shadow:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 1px 3px 0px hsl(0 0% 0% / 0.17),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.1);
   --shadow-md:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 2px 4px -1px hsl(0 0% 0% / 0.2),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.1);
   --shadow-lg:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 4px 8px -2px hsl(0 0% 0% / 0.25),
+    0px 2px 4px -2px hsl(0 0% 0% / 0.1);
   --shadow-xl:
-    0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0),
-    0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
+    0px 8px 16px -4px hsl(0 0% 0% / 0.3),
+    0px 4px 8px -4px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0px 16px 32px -8px hsl(0 0% 0% / 0.35);
 }
 
 @layer base {
@@ -262,11 +266,16 @@ body { min-width: 320px; overflow-x: hidden; }
 ::selection { background: hsl(var(--primary) / .18); color: hsl(var(--primary)); }
 .merchant-shell {
   background:
-    radial-gradient(circle at 90% -10%, hsl(247 76% 75% / .16), transparent 29rem),
+    radial-gradient(circle at 90% -10%, hsl(247 76% 75% / .08), transparent 20rem),
+    hsl(var(--background));
+}
+.admin-shell {
+  background:
+    radial-gradient(circle at 90% -10%, hsl(247 76% 75% / .06), transparent 20rem),
     hsl(var(--background));
 }
 .merchant-grid {
-  background-image: linear-gradient(hsl(247 30% 82% / .16) 1px, transparent 1px), linear-gradient(90deg, hsl(247 30% 82% / .16) 1px, transparent 1px);
+  background-image: linear-gradient(hsl(247 30% 82% / .08) 1px, transparent 1px), linear-gradient(90deg, hsl(247 30% 82% / .08) 1px, transparent 1px);
   background-size: 34px 34px;
 }
 .merchant-noise::after {
@@ -275,7 +284,7 @@ body { min-width: 320px; overflow-x: hidden; }
   position: fixed;
   inset: 0;
   z-index: 60;
-  opacity: .025;
+  opacity: .015;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E");
 }
 .cl-rootBox { width: 100%; }
@@ -283,8 +292,14 @@ body { min-width: 320px; overflow-x: hidden; }
 .cl-formFieldInput::placeholder { color: #9d99b2 !important; opacity: 1; }
 .merchant-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .merchant-scrollbar::-webkit-scrollbar-thumb { background: #d8d4f7; border-radius: 999px; }
+.merchant-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.merchant-scrollbar { scrollbar-width: thin; scrollbar-color: #d8d4f7 transparent; -webkit-overflow-scrolling: touch; }
+.dark-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+.dark-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 999px; }
+.dark-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.dark-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.12) transparent; -webkit-overflow-scrolling: touch; }
 .fiaba-grid {
-  background-image: linear-gradient(hsl(247 40% 80% / .12) 1px, transparent 1px), linear-gradient(90deg, hsl(247 40% 80% / .12) 1px, transparent 1px);
+  background-image: linear-gradient(hsl(247 40% 80% / .06) 1px, transparent 1px), linear-gradient(90deg, hsl(247 40% 80% / .06) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 .reveal { animation: reveal .7s cubic-bezier(.22,.7,.25,1) both; }

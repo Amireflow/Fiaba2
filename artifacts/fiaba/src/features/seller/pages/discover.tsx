@@ -505,17 +505,17 @@ function CampaignListRow({
   const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
 
   return (
-    <Card className="flex flex-col gap-3 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-3 sm:p-4">
+    <Card className="flex flex-col gap-2.5 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-3.5">
       <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
         <SafeImage
           src={imgUrl}
           alt={c.product_name ?? c.campaign_name}
-          className="h-16 w-16 rounded-xl object-cover sm:h-20 sm:w-20"
-          iconSize={22}
+          className="h-14 w-14 rounded-lg object-cover sm:h-16 sm:w-16"
+          iconSize={20}
         />
       </Link>
 
-      <div className="min-w-0 flex-auto sm:flex-1">
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
             {c.product_name ?? c.campaign_name}
@@ -534,29 +534,21 @@ function CampaignListRow({
         <p className="mt-0.5 truncate text-xs text-[#9290a2]">
           {c.merchant_name} · {c.product_category ?? 'Divers'}
         </p>
-        <div className="mt-2 flex items-center gap-3">
-          <div>
-            <p className="text-[9px] uppercase tracking-wider text-[#9290a2]">Prix</p>
-            <p className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</p>
-          </div>
-          <div className="h-8 w-px bg-[#f0eff5]" />
-          <div>
-            <p className="text-[9px] uppercase tracking-wider text-[#278e69]">Gain / vente</p>
-            <p className="text-xs font-bold text-[#278e69]">+{money(netGain)}</p>
-          </div>
+        <div className="mt-1 flex items-center gap-3">
+          <span className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</span>
+          <span className="text-xs font-bold text-[#278e69]">+{money(netGain)} / vente</span>
         </div>
       </div>
 
       <div className="flex items-center gap-2 sm:shrink-0">
         {c.is_joined ? (
-          <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 sm:flex-none">
-            <Button variant="success" className="w-full sm:w-auto" testId={`share-list-${c.campaign_id}`}>
+          <Link href={`/seller/share/${c.campaign_id}`}>
+            <Button variant="success" testId={`share-list-${c.campaign_id}`}>
               Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
             </Button>
           </Link>
         ) : (
           <Button
-            className="flex-1 sm:w-auto"
             onClick={() => onJoin(c)}
             disabled={joining === c.campaign_id}
             testId={`join-list-${c.campaign_id}`}
@@ -564,8 +556,8 @@ function CampaignListRow({
             {joining === c.campaign_id ? '…' : 'Rejoindre'}
           </Button>
         )}
-        <Link href={`/seller/product/${c.campaign_id}`} className="flex-1 sm:flex-none">
-          <Button variant="soft" className="w-full sm:w-auto" testId={`view-list-${c.campaign_id}`}>Détails</Button>
+        <Link href={`/seller/product/${c.campaign_id}`}>
+          <Button variant="soft" testId={`view-list-${c.campaign_id}`}>Détails</Button>
         </Link>
       </div>
     </Card>

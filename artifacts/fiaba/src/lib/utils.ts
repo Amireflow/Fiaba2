@@ -5,8 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function money(amount: number): string {
-  return `${new Intl.NumberFormat('fr-FR').format(amount)} F`;
+export function money(amount: number | null | undefined): string {
+  const num = Number(amount);
+  if (amount === undefined || amount === null || Number.isNaN(num)) return '0 F';
+  return `${new Intl.NumberFormat('fr-FR').format(num)} F`;
 }
 
 /* ── Haptic feedback ── */

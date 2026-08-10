@@ -133,28 +133,31 @@ export function SellerCampaigns() {
         }
       });
 
+      function unwrap<T>(val: T | T[] | null | undefined): T | null {
+        if (!val) return null;
+        return Array.isArray(val) ? (val[0] ?? null) : val;
+      }
+
       for (const j of joinedRows) {
         const c = (campaignData as unknown[] | null)?.find((r) => {
           const row = r as { id: string };
           return row.id === j.campaign_id;
-        }) as {
-          id: string; name: string; commission: number; commission_type: string | null;
-          model: string; status: string;
-          products: { name: string; image_url: string | null } | null;
-          merchants: { name: string } | null;
-        } | undefined;
+        }) as any;
 
         const link = linkMap.get(j.campaign_id);
         const agg = commissionAgg.get(j.campaign_id) ?? { earnings: 0, sales: 0 };
 
         if (c) {
+          const prodObj = unwrap<{ name: string; image_url: string | null }>(c.products);
+          const merchObj = unwrap<{ name: string }>(c.merchants);
+
           campaignMap.set(j.campaign_id, {
             campaign_seller_id: j.id,
             campaign_id: j.campaign_id,
             campaign_name: c.name,
-            product_name: c.products?.name ?? null,
-            product_image_url: c.products?.image_url ?? null,
-            merchant_name: c.merchants?.name ?? 'Boutique',
+            product_name: prodObj?.name ?? null,
+            product_image_url: prodObj?.image_url ?? null,
+            merchant_name: merchObj?.name ? formatShopName(merchObj.name) : 'Boutique',
             commission: c.commission,
             commission_type: c.commission_type,
             model: c.model,

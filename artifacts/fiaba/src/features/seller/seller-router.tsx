@@ -3,27 +3,16 @@ import { Route, Switch } from 'wouter';
 import { ProtectedRoute } from '@/components/protected-route';
 import { SellerShell } from './components/seller-shell';
 
-function lazyNamed<T extends Record<string, any>>(
-  factory: () => Promise<T>,
-  name: keyof T
-) {
-  return lazy(() =>
-    factory().then((m) => ({
-      default: m[name] || m.default || m,
-    }))
-  );
-}
-
-const Discover = lazyNamed(() => import('./pages/discover'), 'Discover');
-const ProductDetail = lazyNamed(() => import('./pages/product-detail'), 'ProductDetail');
-const SellerCampaigns = lazyNamed(() => import('./pages/campaigns'), 'SellerCampaigns');
-const Share = lazyNamed(() => import('./pages/share'), 'Share');
-const Sales = lazyNamed(() => import('./pages/sales'), 'Sales');
-const SaleDetail = lazyNamed(() => import('./pages/sale-detail'), 'SaleDetail');
-const Earnings = lazyNamed(() => import('./pages/earnings'), 'Earnings');
-const EarningWithdraw = lazyNamed(() => import('./pages/earning-withdraw'), 'EarningWithdraw');
-const SellerProfile = lazyNamed(() => import('./pages/profile'), 'SellerProfile');
-const SellerNotifications = lazyNamed(() => import('./pages/notifications'), 'SellerNotifications');
+const Discover = lazy(() => import('./pages/discover').then((m) => ({ default: m.Discover })));
+const ProductDetail = lazy(() => import('./pages/product-detail').then((m) => ({ default: m.ProductDetail })));
+const SellerCampaigns = lazy(() => import('./pages/campaigns').then((m) => ({ default: m.SellerCampaigns })));
+const Share = lazy(() => import('./pages/share').then((m) => ({ default: m.Share })));
+const Sales = lazy(() => import('./pages/sales').then((m) => ({ default: m.Sales })));
+const SaleDetail = lazy(() => import('./pages/sale-detail').then((m) => ({ default: m.SaleDetail })));
+const Earnings = lazy(() => import('./pages/earnings').then((m) => ({ default: m.Earnings })));
+const EarningWithdraw = lazy(() => import('./pages/earning-withdraw').then((m) => ({ default: m.EarningWithdraw })));
+const SellerProfile = lazy(() => import('./pages/profile').then((m) => ({ default: m.SellerProfile })));
+const SellerNotifications = lazy(() => import('./pages/notifications').then((m) => ({ default: m.SellerNotifications })));
 
 function RouteFallback() {
   return (

@@ -126,16 +126,16 @@ export function useSellerDiscovery() {
       const rawCampaigns = campRes.data ?? [];
       const rawProducts = prodRes.data ?? [];
 
+      function unwrap<T>(val: T | T[] | null | undefined): T | null {
+        if (!val) return null;
+        return Array.isArray(val) ? (val[0] ?? null) : val;
+      }
+
       const activeCampaignsList = (rawCampaigns as unknown[]).map((row): DiscoveryCampaign => {
-        const c = row as {
-          id: string; name: string; description: string | null;
-          commission: number; commission_type: string | null; model: string;
-          goal: number | null; product_id: string | null; niche_id: string | null;
-          merchant_id: string;
-          products: { id: string; name: string; price: number; image_url: string | null; category: string | null; type?: 'physique' | 'digital' | null; digital_file_url?: string | null; digital_access_instructions?: string | null } | null;
-          merchants: { id: string; name: string; slug: string | null } | null;
-          niches: { id: string; name: string } | null;
-        };
+        const c = row as any;
+        const prod = unwrap<{ id: string; name: string; price: number; image_url: string | null; category: string | null; type?: 'physique' | 'digital' | null; digital_file_url?: string | null; digital_access_instructions?: string | null }>(c.products);
+        const merch = unwrap<{ id: string; name: string; slug: string | null }>(c.merchants);
+        const niche = unwrap<{ id: string; name: string }>(c.niches);
 
         // ── Matching engine (CDC §10) ──
         let matchScore = 10;
@@ -165,8 +165,8 @@ export function useSellerDiscovery() {
 
         // Factor 4: Commission level (15 points max) — higher commission = more attractive
         const isFixed = c.commission_type === 'fixed' || c.model === 'marge' || (!c.commission_type && c.commission >= 100);
-        const commissionPct = isFixed && c.products?.price
-          ? (c.commission / c.products.price) * 100
+        const commissionPct = isFixed && prod?.price && prod.price > 0
+          ? (c.commission / prod.price) * 100
           : c.commission;
         if (commissionPct >= 15) matchScore += 15;
         else if (commissionPct >= 10) matchScore += 10;
@@ -183,18 +183,18 @@ export function useSellerDiscovery() {
           model: c.model,
           goal: c.goal,
           product_id: c.product_id,
-          product_name: c.products?.name ?? null,
-          product_price: c.products?.price ?? null,
-          product_image_url: c.products?.image_url ?? null,
-          product_category: c.products?.category ?? null,
-          product_type: c.products?.type ?? 'physique',
-          digital_file_url: c.products?.digital_file_url ?? null,
-          digital_access_instructions: c.products?.digital_access_instructions ?? null,
+          product_name: prod?.name ?? null,
+          product_price: prod?.price ?? null,
+          product_image_url: prod?.image_url ?? null,
+          product_category: prod?.category ?? null,
+          product_type: prod?.type ?? 'physique',
+          digital_file_url: prod?.digital_file_url ?? null,
+          digital_access_instructions: prod?.digital_access_instructions ?? null,
           merchant_id: c.merchant_id,
-          merchant_name: formatShopName(c.merchants?.name),
-          merchant_slug: c.merchants?.slug ?? null,
+          merchant_name: formatShopName(merch?.name),
+          merchant_slug: merch?.slug ?? null,
           niche_id: c.niche_id,
-          niche_name: c.niches?.name ?? null,
+          niche_name: niche?.name ?? null,
           match_score: matchScore,
           is_joined: joinedIds.includes(c.id) || (c.product_id ? joinedProductIds.has(c.product_id) : false),
         };
@@ -232,30 +232,31 @@ export function useSellerDiscovery() {
           synthScore += 10;
           synthScore = Math.min(100, synthScore);
 
-          return {
-            campaign_id: compId,
-            campaign_name: `Offre ${p.name}`,
-            campaign_description: p.description || `Recommandez ${p.name} auprès de vos proches.`,
-            commission: 10,
-            commission_type: 'percentage',
-            model: 'commission',
-            goal: 50,
-            product_id: p.id,
-            product_name: p.name,
-            product_price: p.price,
-            product_image_url: p.image_url,
-            product_category: p.category,
-            product_type: p.type ?? 'physique',
-            digital_file_url: p.digital_file_url ?? null,
-            digital_access_instructions: p.digital_access_instructions ?? null,
-            merchant_id: p.merchant_id,
-            merchant_name: formatShopName(p.merchants?.name),
-            merchant_slug: p.merchants?.slug ?? null,
-            niche_id: null,
-            niche_name: p.category ?? 'Général',
-            match_score: synthScore,
-            is_joined: joinedIds.includes(compId) || (p.id ? joinedProductIds.has(p.id) : false),
-          };
+            const pMerch = unwrap<{ id: string; name: string; slug: string | null }>(p.merchants);
+            return {
+              campaign_id: compId,
+              campaign_name: `Offre ${p.name}`,
+              campaign_description: p.description || `Recommandez ${p.name} auprès de vos proches.`,
+              commission: 10,
+              commission_type: 'percentage',
+              model: 'commission',
+              goal: 50,
+              product_id: p.id,
+              product_name: p.name,
+              product_price: p.price,
+              product_image_url: p.image_url,
+              product_category: p.category,
+              product_type: p.type ?? 'physique',
+              digital_file_url: p.digital_file_url ?? null,
+              digital_access_instructions: p.digital_access_instructions ?? null,
+              merchant_id: p.merchant_id,
+              merchant_name: formatShopName(pMerch?.name),
+              merchant_slug: pMerch?.slug ?? null,
+              niche_id: null,
+              niche_name: p.category ?? 'Général',
+              match_score: synthScore,
+              is_joined: joinedIds.includes(compId) || (p.id ? joinedProductIds.has(p.id) : false),
+            };
         });
 
       const combined = [...activeCampaignsList, ...syntheticCampaigns];

@@ -56,21 +56,24 @@ export function Discover() {
 
   // Categories list with counts
   const categories = useMemo(() => {
+    const safeCampaigns = campaigns ?? [];
     const map = new Map<string, number>();
-    campaigns.forEach((c) => {
-      if (c.product_category) {
+    safeCampaigns.forEach((c) => {
+      if (c && c.product_category) {
         map.set(c.product_category, (map.get(c.product_category) ?? 0) + 1);
       }
     });
     return [
-      { name: 'Tous', count: campaigns.length },
+      { name: 'Tous', count: safeCampaigns.length },
       ...Array.from(map.entries()).map(([name, count]) => ({ name, count })),
     ];
   }, [campaigns]);
 
   // Filtering + Sorting
   const filteredAndSorted = useMemo(() => {
-    let list = campaigns.filter((c) => {
+    const safeCampaigns = campaigns ?? [];
+    const list = safeCampaigns.filter((c) => {
+      if (!c) return false;
       const matchesCategory = categoryFilter === 'Tous' || c.product_category === categoryFilter;
       const matchesModel =
         modelFilter === 'tous' ||
@@ -85,18 +88,18 @@ export function Discover() {
       const matchesQuery =
         q === '' ||
         (c.product_name?.toLowerCase().includes(q) ?? false) ||
-        c.merchant_name.toLowerCase().includes(q) ||
+        (c.merchant_name?.toLowerCase().includes(q) ?? false) ||
         (c.product_category?.toLowerCase().includes(q) ?? false) ||
         (c.niche_name?.toLowerCase().includes(q) ?? false);
 
       return matchesCategory && matchesModel && matchesFormat && matchesQuery;
     });
 
-    return list.sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (sortBy === 'gain_desc') return getNetGain(b) - getNetGain(a);
       if (sortBy === 'price_asc') return (a.product_price ?? 0) - (b.product_price ?? 0);
       if (sortBy === 'price_desc') return (b.product_price ?? 0) - (a.product_price ?? 0);
-      return b.match_score - a.match_score;
+      return (b.match_score ?? 0) - (a.match_score ?? 0);
     });
   }, [campaigns, categoryFilter, modelFilter, formatFilter, query, sortBy]);
 

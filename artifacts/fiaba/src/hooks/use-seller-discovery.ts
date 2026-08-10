@@ -40,13 +40,13 @@ export function useSellerDiscovery() {
   const [error, setError] = useState<string | null>(null);
   const [sellerId, setSellerId] = useState<string | null>(null);
 
-  const fetchDiscovery = useCallback(async () => {
+  const fetchDiscovery = useCallback(async (isSilent = false) => {
     if (!profile) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!isSilent) setLoading(true);
     setError(null);
 
     try {
@@ -349,9 +349,9 @@ export function useSellerDiscovery() {
     } as never);
 
     haptic('success');
-    fetchDiscovery();
+    fetchDiscovery(true);
     return { error: null };
   }, [sellerId]);
 
-  return { campaigns, loading, error, sellerId, joinCampaign, refetch: fetchDiscovery };
+  return { campaigns, loading, error, sellerId, joinCampaign, refetch: (isSilent = true) => fetchDiscovery(isSilent) };
 }

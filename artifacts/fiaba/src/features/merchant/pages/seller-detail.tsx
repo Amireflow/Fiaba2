@@ -24,6 +24,17 @@ import {
   ProgressBar,
 } from '../components/merchant-ui';
 
+type JoinedCampaignItem = {
+  id: string;
+  name: string;
+  productName: string | null;
+  commission: number;
+  commissionType: string | null;
+  model: string;
+  status: string;
+  joinedAt: string | null;
+};
+
 type SellerDetail = {
   id: string;
   display_name: string;
@@ -39,6 +50,7 @@ type SellerDetail = {
   totalClicks: number;
   conversionRate: number;
   activeCampaignsCount: number;
+  joinedCampaigns: JoinedCampaignItem[];
 };
 
 const statusLabel: Record<string, 'Actif' | 'Invité' | 'En attente'> = {
@@ -108,7 +120,7 @@ export function SellerDetail() {
         return;
       }
 
-      // Execute parallel queries for real statistics
+      // Execute parallel queries for real statistics and joined campaigns
       const [profileRes, ordersRes, linksRes, campaignsRes] = await Promise.all([
         row.profile_id
           ? supabase.from('profiles').select('city, full_name, phone').eq('id', row.profile_id).maybeSingle()
@@ -124,20 +136,37 @@ export function SellerDetail() {
           .eq('seller_id', row.id),
         supabase
           .from('campaign_sellers')
-          .select('id', { count: 'exact', head: true })
+          .select(`
+            id, campaign_id, joined_at,
+            campaigns:campaign_id (id, name, commission, commission_type, model, status, products:product_id(name))
+          `)
           .eq('seller_id', row.id),
       ]);
 
       const prof = profileRes.data as { city: string | null; full_name: string | null; phone: string | null } | null;
       const orderRows = (ordersRes.data as { total_amount: number; commission_amount: number }[] | null) ?? [];
       const linkRows = (linksRes.data as { clicks: number }[] | null) ?? [];
+      const rawCampaignSellers = (campaignsRes.data as any[] | null) ?? [];
+
+      const joinedCampaigns: JoinedCampaignItem[] = rawCampaignSellers
+        .map((j) => ({
+          id: j.campaigns?.id,
+          name: j.campaigns?.name ?? 'Campagne',
+          productName: j.campaigns?.products?.name ?? null,
+          commission: j.campaigns?.commission ?? 0,
+          commissionType: j.campaigns?.commission_type ?? null,
+          model: j.campaigns?.model ?? 'commission',
+          status: j.campaigns?.status ?? 'active',
+          joinedAt: j.joined_at,
+        }))
+        .filter((c) => !!c.id);
 
       const salesCount = orderRows.length;
       const totalRevenue = orderRows.reduce((sum, o) => sum + (o.total_amount || 0), 0);
       const totalCommissions = orderRows.reduce((sum, o) => sum + (o.commission_amount || 0), 0);
       const totalClicks = linkRows.reduce((sum, l) => sum + (l.clicks || 0), 0);
       const conversionRate = totalClicks > 0 ? Math.round((salesCount / totalClicks) * 100) : 0;
-      const activeCampaignsCount = campaignsRes.count ?? 0;
+      const activeCampaignsCount = joinedCampaigns.filter((c) => c.status === 'active').length;
       const city = prof?.city ?? 'Dakar';
       const displayName = row.display_name || prof?.full_name || 'Vendeur';
 
@@ -156,6 +185,7 @@ export function SellerDetail() {
         totalClicks,
         conversionRate,
         activeCampaignsCount,
+        joinedCampaigns,
       });
       setLoading(false);
     }
@@ -272,7 +302,7 @@ export function SellerDetail() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Niveau de Performance</p>
               <p className="mt-0.5 font-[Space_Grotesk] text-base font-bold text-[#292541]">
-                {seller.salesCount} vente{seller.salesCount > 1 ? 's' : ''} · {seller.activeCampaignsCount} campagne{seller.activeCampaignsCount > 1 ? 's' : ''}
+                {seller.salesCount} vente{seller.salesCount > 1 ? 's' : ''} · {seller.activeCampaignsCount} campagne{seller.activeCampaignsCount > 1 ? 's' : ''} active{seller.activeCampaignsCount > 1 ? 's' : ''}
               </p>
             </div>
             <Badge tone={seller.salesCount >= 10 ? 'mint' : seller.salesCount >= 1 ? 'violet' : 'slate'}>
@@ -285,6 +315,40 @@ export function SellerDetail() {
           <p className="mt-2 text-xs text-[#77738a]">
             {seller.salesCount} ventes enregistrées · Taux de conversion {seller.conversionRate}% sur {seller.totalClicks} clics.
           </p>
+        </Card>
+
+        {/* Card for Joined Campaigns */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">
+              Campagnes rejointes ({seller.joinedCampaigns.length})
+            </p>
+            <Link href="/merchant/campaigns">
+              <Button variant="ghost" className="text-xs py-1 px-2.5">
+                Voir toutes les campagnes <Icon glyph={ArrowUpRightIcon} size={13} />
+              </Button>
+            </Link>
+          </div>
+
+          {seller.joinedCampaigns.length === 0 ? (
+            <p className="text-xs text-[#77738a] py-2">Ce vendeur n'a rejoint aucune campagne pour le moment.</p>
+          ) : (
+            <div className="space-y-2 divide-y divide-[#f1eef7]">
+              {seller.joinedCampaigns.map((c) => (
+                <div key={c.id} className="pt-2 flex items-center justify-between text-xs">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[#292541] truncate">{c.name}</p>
+                    {c.productName && <p className="text-[11px] text-[#9290a2] truncate">{c.productName}</p>}
+                  </div>
+                  <div className="shrink-0 ml-3">
+                    <Badge tone={c.status === 'active' ? 'mint' : 'slate'}>
+                      {c.status === 'active' ? 'Active' : 'En pause'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Detailed Information Card */}

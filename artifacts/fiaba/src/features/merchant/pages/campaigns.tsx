@@ -72,7 +72,8 @@ export function Campaigns() {
     setToDelete(null);
   }
 
-  const active = campaigns.filter((c) => c.status === 'active').length;
+  const safeCampaigns = campaigns ?? [];
+  const active = safeCampaigns.filter((c) => c?.status === 'active').length;
 
   return (
     <Page
@@ -97,17 +98,17 @@ export function Campaigns() {
         <Card className="p-3.5 sm:p-4">
           <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]"><Icon glyph={Store01Icon} size={18} /></span>
           <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Total</p>
-          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{campaigns.length}</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{safeCampaigns.length}</p>
         </Card>
         <Card className="p-3.5 sm:p-4">
           <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#fff4de] text-[#ac741e]"><Icon glyph={UserGroupIcon} size={18} /></span>
           <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">En pause</p>
-          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{campaigns.filter((c) => c.status === 'en_pause').length}</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{safeCampaigns.filter((c) => c?.status === 'en_pause').length}</p>
         </Card>
         <Card className="p-3.5 sm:p-4">
           <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#fff0f1] text-[#c45667]"><Icon glyph={Target01Icon} size={18} /></span>
           <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Terminées</p>
-          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{campaigns.filter((c) => c.status === 'terminee').length}</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{safeCampaigns.filter((c) => c?.status === 'terminee').length}</p>
         </Card>
       </div>
 
@@ -118,13 +119,13 @@ export function Campaigns() {
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
           </div>
         </Card>
-      ) : campaigns.length === 0 ? (
+      ) : safeCampaigns.length === 0 ? (
         <Card className="mt-5 p-0">
           <EmptyState glyph={Chart02Icon} title="Aucune campagne" description="Lancez votre première campagne pour mobiliser votre réseau." action={<Link href="/merchant/campaigns/new"><Button>Créer une campagne +</Button></Link>} />
         </Card>
       ) : (
         <div className="mt-4 sm:mt-5 grid gap-3 sm:gap-4 lg:grid-cols-2">
-          {campaigns.map((c) => {
+          {safeCampaigns.map((c) => {
             const st = statusMap[c.status] ?? statusMap.terminee;
             const imgUrl = getFirstImageUrl(c.products?.image_url);
             return (

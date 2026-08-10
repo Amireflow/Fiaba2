@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   ArrowDown01Icon,
@@ -41,17 +41,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Icon, type IconType } from "@/components/shared/icon";
 import { haptic } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
-import { AdminRouter } from "@/features/admin/admin-router";
-import { MerchantRouter } from "@/features/merchant/merchant-router";
-import { SellerRouter } from "@/features/seller/seller-router";
-import { CheckoutDispatcher } from "@/features/shop/pages/checkout-dispatcher";
-import { ProductLinkRedirect } from "@/features/shop/pages/product-link-redirect";
-import { Onboarding } from "@/features/merchant/pages/onboarding";
-import { SellerOnboarding } from "@/features/seller/pages/onboarding";
-import { SignInPage, SignUpPage } from "@/pages/auth";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+
+const AdminRouter = lazy(() => import("@/features/admin/admin-router").then((m) => ({ default: m.AdminRouter })));
+const MerchantRouter = lazy(() => import("@/features/merchant/merchant-router").then((m) => ({ default: m.MerchantRouter })));
+const SellerRouter = lazy(() => import("@/features/seller/seller-router").then((m) => ({ default: m.SellerRouter })));
+const CheckoutDispatcher = lazy(() => import("@/features/shop/pages/checkout-dispatcher").then((m) => ({ default: m.CheckoutDispatcher })));
+const ProductLinkRedirect = lazy(() => import("@/features/shop/pages/product-link-redirect").then((m) => ({ default: m.ProductLinkRedirect })));
+const Onboarding = lazy(() => import("@/features/merchant/pages/onboarding").then((m) => ({ default: m.Onboarding })));
+const SellerOnboarding = lazy(() => import("@/features/seller/pages/onboarding").then((m) => ({ default: m.SellerOnboarding })));
+const SignInPage = lazy(() => import("@/pages/auth").then((m) => ({ default: m.SignInPage })));
+const SignUpPage = lazy(() => import("@/pages/auth").then((m) => ({ default: m.SignUpPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -1299,23 +1301,33 @@ function Home() {
   );
 }
 
+function AppFallback() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-[#faf9fd]">
+      <span className="h-8 w-8 animate-spin rounded-full border-3 border-[#5b49e8] border-t-transparent" />
+    </div>
+  );
+}
+
 function Router() {
   useScrollToTop();
   return (
     <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/onboarding" component={Onboarding} />
-        <Route path="/seller/onboarding" component={SellerOnboarding} />
-        <Route path="/sign-in/*?" component={SignInPage} />
-        <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/checkout/:id" component={CheckoutDispatcher} />
-        <Route path="/p/:id" component={ProductLinkRedirect} />
-        <Route path="/merchant/*?" component={MerchantRouter} />
-        <Route path="/seller/*?" component={SellerRouter} />
-        <Route path="/admin/*?" component={AdminRouter} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense fallback={<AppFallback />}>
+        <Switch>
+          <Route path="/" component={Home} />
+          <Route path="/onboarding" component={Onboarding} />
+          <Route path="/seller/onboarding" component={SellerOnboarding} />
+          <Route path="/sign-in/*?" component={SignInPage} />
+          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/checkout/:id" component={CheckoutDispatcher} />
+          <Route path="/p/:id" component={ProductLinkRedirect} />
+          <Route path="/merchant/*?" component={MerchantRouter} />
+          <Route path="/seller/*?" component={SellerRouter} />
+          <Route path="/admin/*?" component={AdminRouter} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     </RoutedErrorBoundary>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CheckmarkCircle02Icon, Tag01Icon, Target01Icon, Calendar01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
@@ -23,7 +23,6 @@ type FormState = {
   description: string;
   commission: string;
   commissionType: 'percentage' | 'fixed';
-  model: 'commission' | 'marge';
   goal: string;
   productId: string;
   endDate: string;
@@ -34,7 +33,6 @@ const emptyForm: FormState = {
   description: '',
   commission: '10',
   commissionType: 'percentage',
-  model: 'commission',
   goal: '50',
   productId: '',
   endDate: '',
@@ -64,14 +62,14 @@ export function CampaignForm() {
     setLoading(true);
     supabase
       .from('campaigns')
-      .select('name, description, commission, commission_type, model, goal, product_id, ends_at')
+      .select('name, description, commission, commission_type, goal, product_id, ends_at')
       .eq('id', id)
       .single()
       .then(({ data }) => {
         if (data) {
           const c = data as {
             name: string; description: string | null; commission: number;
-            commission_type: string | null; model: string; goal: number | null;
+            commission_type: string | null; goal: number | null;
             product_id: string | null; ends_at: string | null;
           };
           setForm({
@@ -79,7 +77,6 @@ export function CampaignForm() {
             description: c.description ?? '',
             commission: String(c.commission),
             commissionType: (c.commission_type as 'percentage' | 'fixed') ?? 'percentage',
-            model: (c.model as 'commission' | 'marge') ?? 'commission',
             goal: String(c.goal ?? 50),
             productId: c.product_id ?? '',
             endDate: c.ends_at ? c.ends_at.slice(0, 10) : '',
@@ -173,7 +170,7 @@ export function CampaignForm() {
       description: form.description.trim() || null,
       commission,
       commission_type: form.commissionType,
-      model: form.model,
+      model: 'commission',
       goal: Number(form.goal) || null,
       product_id: form.productId || null,
       ends_at: form.endDate ? new Date(form.endDate).toISOString() : null,
@@ -219,115 +216,184 @@ export function CampaignForm() {
     <Page
       eyebrow={isEdit ? 'Modifier' : 'Nouvelle'}
       title={isEdit ? 'Modifier la campagne' : 'Nouvelle campagne'}
-      description="Définissez les paramètres de votre campagne et le type de rémunération."
+      description="Définissez les paramètres de votre campagne et la rémunération de vos vendeurs."
       action={
         <Link href="/merchant/campaigns">
           <Button variant="ghost"><Icon glyph={ArrowLeft01Icon} size={15} /> Retour</Button>
         </Link>
       }
     >
-      <Card className="mt-6">
-        <form onSubmit={save} className="space-y-5">
-          <Field label="Nom de la campagne">
-            <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="Ex. Rentrée douce — septembre" className={inputClass} data-testid="input-name" />
-          </Field>
-          <Field label="Description" hint="Visible par vos vendeurs dans l'espace campagne.">
-            <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Décrivez l'objectif et les produits mis en avant…" className={`${textareaClass} min-h-20`} data-testid="input-description" />
-          </Field>
-          <Field label="Produit mis en avant">
-            <select value={form.productId} onChange={(e) => setField('productId', e.target.value)} className={selectClass} data-testid="input-product">
-              <option value="">— Sélectionnez —</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {money(p.price)}</option>)}
-            </select>
-          </Field>
-
-          {/* Commission type selector */}
-          <Field label="Type de rémunération" hint="Choisissez comment vos vendeurs sont payés.">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => { haptic('light'); setField('commissionType', 'percentage'); }}
-                className={`rounded-2xl border-2 p-4 text-left transition ${form.commissionType === 'percentage' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#eeeaf6] bg-white hover:border-[#d4ceff]'}`}
-                data-testid="button-commission-percentage"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${form.commissionType === 'percentage' ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
-                    {form.commissionType === 'percentage' && <span className="h-2 w-2 rounded-full bg-white" />}
-                  </span>
-                  <span className="text-sm font-bold text-[#292541]">Pourcentage</span>
-                </div>
-                <p className="mt-2 text-xs leading-4 text-[#77738a]">Le vendeur touche un % du prix de vente. Ex: 12% sur un produit à 12 500 F = 1 500 F.</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => { haptic('light'); setField('commissionType', 'fixed'); }}
-                className={`rounded-2xl border-2 p-4 text-left transition ${form.commissionType === 'fixed' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#eeeaf6] bg-white hover:border-[#d4ceff]'}`}
-                data-testid="button-commission-fixed"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${form.commissionType === 'fixed' ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
-                    {form.commissionType === 'fixed' && <span className="h-2 w-2 rounded-full bg-white" />}
-                  </span>
-                  <span className="text-sm font-bold text-[#292541]">Montant fixe</span>
-                </div>
-                <p className="mt-2 text-xs leading-4 text-[#77738a]">Le vendeur touche un montant fixe par vente. Ex: 1 500 F par commande, quel que soit le prix.</p>
-              </button>
-            </div>
-          </Field>
-
-          {/* Commission value + model */}
-          <div className="grid grid-cols-2 gap-4">
-            <Field label={form.commissionType === 'percentage' ? 'Commission (%)' : 'Commission (FCFA)'} hint={form.commissionType === 'percentage' ? 'Part reversée au vendeur (0-50%)' : 'Montant fixe par vente'}>
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1.3fr_.7fr]">
+        {/* Left column: Main form */}
+        <Card>
+          <form onSubmit={save} className="space-y-4">
+            <Field label="Nom de la campagne">
               <input
-                type="number"
-                min="0"
-                max={form.commissionType === 'percentage' ? 50 : selectedProduct?.price ?? 999999}
-                value={form.commission}
-                onChange={(e) => setField('commission', e.target.value)}
+                value={form.name}
+                onChange={(e) => setField('name', e.target.value)}
+                placeholder="Ex. Offre Spéciale Rentrée"
                 className={inputClass}
-                data-testid="input-commission"
+                data-testid="input-name"
               />
             </Field>
-            <Field label="Modèle" hint="Commission = sur vente, Marge = sur marge brute">
-              <select value={form.model} onChange={(e) => setField('model', e.target.value as 'commission' | 'marge')} className={selectClass} data-testid="input-model">
-                <option value="commission">Commission (sur vente)</option>
-                <option value="marge">Marge (sur marge brute)</option>
+
+            <Field label="Produit mis en avant">
+              <select
+                value={form.productId}
+                onChange={(e) => setField('productId', e.target.value)}
+                className={selectClass}
+                data-testid="input-product"
+              >
+                <option value="">— Sélectionnez un produit —</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {money(p.price)}
+                  </option>
+                ))}
               </select>
             </Field>
-          </div>
 
-          {/* Commission preview */}
-          {selectedProduct && (
-            <div className="rounded-2xl bg-[#f8f7fc] p-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu de la commission vendeur</p>
-              <div className="mt-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#77738a]">Produit : {selectedProduct.name}</p>
-                  <p className="text-xs text-[#77738a]">Prix : {money(selectedProduct.price)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-[#9290a2]">Le vendeur reçoit</p>
-                  <strong className="font-[Space_Grotesk] text-xl font-bold text-[#278e69]">{money(commissionPreview)}</strong>
-                </div>
+            {/* Type de Rémunération épuré */}
+            <Field label="Type de commission">
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setField('commissionType', 'percentage'); }}
+                  className={`rounded-2xl border px-3.5 py-3 text-left transition flex items-center justify-between ${
+                    form.commissionType === 'percentage'
+                      ? 'border-[#5b49e8] bg-[#f7f6ff] text-[#292541]'
+                      : 'border-[#e7e5ef] bg-white text-[#757185] hover:border-[#d0cbdc] hover:bg-[#fafafc]'
+                  }`}
+                  data-testid="button-commission-percentage"
+                >
+                  <div>
+                    <strong className="block text-xs font-bold">Pourcentage (%)</strong>
+                    <span className="text-[10px] text-[#77738a] block mt-0.5">% par vente livrée</span>
+                  </div>
+                  {form.commissionType === 'percentage' && (
+                    <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-[#5b49e8] text-white">
+                      <Icon glyph={CheckmarkCircle02Icon} size={12} />
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setField('commissionType', 'fixed'); }}
+                  className={`rounded-2xl border px-3.5 py-3 text-left transition flex items-center justify-between ${
+                    form.commissionType === 'fixed'
+                      ? 'border-[#5b49e8] bg-[#f7f6ff] text-[#292541]'
+                      : 'border-[#e7e5ef] bg-white text-[#757185] hover:border-[#d0cbdc] hover:bg-[#fafafc]'
+                  }`}
+                  data-testid="button-commission-fixed"
+                >
+                  <div>
+                    <strong className="block text-xs font-bold">Montant fixe (FCFA)</strong>
+                    <span className="text-[10px] text-[#77738a] block mt-0.5">Montant fixe par vente</span>
+                  </div>
+                  {form.commissionType === 'fixed' && (
+                    <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-[#5b49e8] text-white">
+                      <Icon glyph={CheckmarkCircle02Icon} size={12} />
+                    </span>
+                  )}
+                </button>
+              </div>
+            </Field>
+
+            {/* Montant commission & Objectif */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <Field label={form.commissionType === 'percentage' ? 'Valeur (%)' : 'Montant (FCFA)'}>
+                <input
+                  type="number"
+                  min="0"
+                  max={form.commissionType === 'percentage' ? 50 : selectedProduct?.price ?? 999999}
+                  value={form.commission}
+                  onChange={(e) => setField('commission', e.target.value)}
+                  placeholder="0"
+                  className={inputClass}
+                  data-testid="input-commission"
+                />
+              </Field>
+
+              <Field label="Objectif (ventes)">
+                <input
+                  type="number"
+                  min="1"
+                  value={form.goal}
+                  onChange={(e) => setField('goal', e.target.value)}
+                  placeholder="50"
+                  className={inputClass}
+                  data-testid="input-goal"
+                />
+              </Field>
+            </div>
+
+            {/* Description & Date de fin */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <Field label="Date de fin (Optionnel)">
+                <input
+                  type="date"
+                  value={form.endDate}
+                  onChange={(e) => setField('endDate', e.target.value)}
+                  className={inputClass}
+                  data-testid="input-end-date"
+                />
+              </Field>
+
+              <Field label="Note vendeurs (Optionnel)">
+                <input
+                  value={form.description}
+                  onChange={(e) => setField('description', e.target.value)}
+                  placeholder="Ex. 15% pour les 20 premiers"
+                  className={inputClass}
+                  data-testid="input-description"
+                />
+              </Field>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-[#f1effa]">
+              <Link href="/merchant/campaigns">
+                <Button variant="ghost" type="button">Annuler</Button>
+              </Link>
+              <Button type="submit" disabled={saving} testId="button-save-campaign">
+                {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Lancer la campagne'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        {/* Right column: Live Calculator & Preview */}
+        <div className="space-y-4">
+          <Card>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Simulation Commission Vendeur</p>
+            <div className="mt-3.5 space-y-3 text-xs">
+              <div className="flex justify-between items-center py-1.5 border-b border-[#f1effa]">
+                <span className="text-[#8b88a0]">Produit sélectionné</span>
+                <strong className="text-[#292541] truncate max-w-[160px]">{selectedProduct?.name || 'Aucun'}</strong>
+              </div>
+
+              <div className="flex justify-between items-center py-1.5 border-b border-[#f1effa]">
+                <span className="text-[#8b88a0]">Prix de vente</span>
+                <strong className="text-[#292541]">{selectedProduct ? money(selectedProduct.price) : '—'}</strong>
+              </div>
+
+              <div className="flex justify-between items-center py-1.5 border-b border-[#f1effa]">
+                <span className="text-[#8b88a0]">Rémunération choisie</span>
+                <strong className="text-[#5b49e8]">
+                  {form.commissionType === 'percentage' ? `${form.commission || 0}% par vente` : `${money(Number(form.commission || 0))} / vente`}
+                </strong>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-[#e7faf2] p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#278e69]">Gain net vendeur par vente</p>
+                <strong className="mt-1 block font-[Space_Grotesk] text-2xl font-bold text-[#278e69]">
+                  {money(commissionPreview)}
+                </strong>
               </div>
             </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Objectif (ventes)">
-              <input type="number" min="1" value={form.goal} onChange={(e) => setField('goal', e.target.value)} className={inputClass} data-testid="input-goal" />
-            </Field>
-            <Field label="Date de fin" hint="Optionnel">
-              <input type="date" value={form.endDate} onChange={(e) => setField('endDate', e.target.value)} className={inputClass} data-testid="input-end-date" />
-            </Field>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Link href="/merchant/campaigns"><Button variant="ghost" type="button">Annuler</Button></Link>
-            <Button type="submit" disabled={saving} testId="button-save-campaign">{saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Lancer la campagne'}</Button>
-          </div>
-        </form>
-      </Card>
+          </Card>
+        </div>
+      </div>
     </Page>
   );
 }

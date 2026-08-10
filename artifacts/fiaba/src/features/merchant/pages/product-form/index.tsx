@@ -1,9 +1,8 @@
 import { Link } from 'wouter';
-import { ArrowLeft01Icon, CheckmarkCircle02Icon, PackageIcon, SparklesIcon, Tag01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CheckmarkCircle02Icon, PackageIcon, Tag01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { MerchantButton as Button, MerchantCard as Card, Page } from '../../components/merchant-ui';
 import { useProductForm } from './use-product-form';
-import { useAiGeneration } from './use-ai-generation';
 import { StepInfo } from './step-info';
 import { StepPricing } from './step-pricing';
 import { StepMedia } from './step-media';
@@ -18,7 +17,6 @@ const stepDefs = [
 
 export function ProductForm() {
   const ctx = useProductForm();
-  const ai = useAiGeneration(ctx.id);
 
   if (ctx.loading) {
     return (
@@ -63,9 +61,6 @@ export function ProductForm() {
               <StepInfo
                 form={ctx.form} errors={ctx.errors} isEdit={ctx.isEdit} productId={ctx.id}
                 setField={ctx.setField} onNext={() => ctx.goToStep(2)}
-                aiGenerating={ai.aiGenerating} aiPreview={ai.aiPreview}
-                aiGenerationsLeft={ai.aiGenerationsLeft}
-                onGenerate={ai.generate} onDismissPreview={ai.dismissPreview}
               />
             )}
             {ctx.activeStep === 2 && (

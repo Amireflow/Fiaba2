@@ -49,10 +49,3 @@ export const emptyForm: FormState = {
   digital_file_url: '',
   digital_access_instructions: '',
 };
-
-export type AiPreview = {
-  headline: string;
-  benefits: { icon: string; title: string; text: string }[];
-  faq: { question: string; answer: string }[];
-  cta_text: string;
-} | null;

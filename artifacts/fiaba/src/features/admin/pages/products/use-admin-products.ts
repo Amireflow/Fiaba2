@@ -19,9 +19,17 @@ export function useAdminProducts() {
   useEffect(() => {
     async function loadData() {
       const [prodRes, campRes] = await Promise.all([
-        supabase.from('products').select('id, name, merchant_id, niche_id, price, status, created_at, ai_headline, ai_generated_at, ai_generation_count').order('created_at', { ascending: false }).limit(100),
+        supabase.from('products').select('id, name, merchant_id, price, status, created_at, ai_headline, ai_generated_at, ai_generation_count').order('created_at', { ascending: false }).limit(100),
         supabase.from('campaigns').select('id, name, merchant_id, model, commission, commission_type, status, created_at').order('created_at', { ascending: false }).limit(100),
       ]);
+
+      if (prodRes.error) {
+        console.error('[admin products] query error:', prodRes.error);
+      }
+      if (campRes.error) {
+        console.error('[admin campaigns] query error:', campRes.error);
+      }
+
       const prodRows = (prodRes.data as ProductRow[] | null) ?? [];
       const campRows = (campRes.data as CampaignRow[] | null) ?? [];
       setProducts(prodRows);
@@ -33,10 +41,28 @@ export function useAdminProducts() {
         setMerchantNames(new Map<string, string>(((mNames as MerchantName[] | null) ?? []).map((m) => [m.id, m.name])));
       }
 
-      const nicheIds = [...new Set(prodRows.filter((p) => p.niche_id).map((p) => p.niche_id!))];
-      if (nicheIds.length > 0) {
-        const { data: nNames } = await supabase.from('niches').select('id, name').in('id', nicheIds);
-        setNicheNames(new Map<string, string>(((nNames as NicheName[] | null) ?? []).map((n) => [n.id, n.name])));
+      // Fetch niches via product_niches join table (products has no niche_id column)
+      if (prodRows.length > 0) {
+        const productIds = prodRows.map((p) => p.id);
+        const { data: pnData } = await supabase
+          .from('product_niches')
+          .select('product_id, niche_id')
+          .in('product_id', productIds);
+        const pnRows = (pnData as { product_id: string; niche_id: string }[] | null) ?? [];
+        const nicheIds = [...new Set(pnRows.map((pn) => pn.niche_id))];
+        if (nicheIds.length > 0) {
+          const { data: nNames } = await supabase.from('niches').select('id, name').in('id', nicheIds);
+          const nicheNameMap = new Map<string, string>(((nNames as NicheName[] | null) ?? []).map((n) => [n.id, n.name]));
+          // Map product_id → first niche name
+          const productNicheMap = new Map<string, string>();
+          pnRows.forEach((pn) => {
+            if (!productNicheMap.has(pn.product_id)) {
+              const name = nicheNameMap.get(pn.niche_id);
+              if (name) productNicheMap.set(pn.product_id, name);
+            }
+          });
+          setNicheNames(productNicheMap);
+        }
       }
 
       const campaignIds = campRows.map((c) => c.id);
@@ -74,29 +100,9 @@ export function useAdminProducts() {
     setToSuspend(null);
   }, [toSuspend, toast]);
 
-  const generateAi = useCallback(async (productId: string, productName: string) => {
-    if (aiGeneratingId) return;
-    setAiGeneratingId(productId);
-    haptic('light');
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-product-ai', { body: { product_id: productId } });
-      if (error) throw error;
-      setProducts((prev) => prev.map((pr) => pr.id === productId ? {
-        ...pr, ai_headline: data.headline, ai_generated_at: new Date().toISOString(),
-        ai_generation_count: (pr.ai_generation_count ?? 0) + 1,
-      } : pr));
-      haptic('success');
-      toast({ title: 'Contenu IA généré', description: `${productName} — page de vente mise à jour.` });
-    } catch (err: any) {
-      haptic('error');
-      toast({ title: 'Génération IA échouée', description: err?.message || 'Veuillez réessayer.' });
-    }
-    setAiGeneratingId(null);
-  }, [aiGeneratingId, toast]);
-
   return {
     products, campaigns, merchantNames, nicheNames, campaignSellerCounts,
-    loading, toSuspend, suspending, aiGeneratingId,
-    setToSuspend, suspend, generateAi,
+    loading, toSuspend, suspending,
+    setToSuspend, suspend,
   };
 }

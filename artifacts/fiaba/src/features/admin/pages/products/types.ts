@@ -2,7 +2,6 @@ export type ProductRow = {
   id: string;
   name: string;
   merchant_id: string;
-  niche_id: string | null;
   price: number;
   status: string;
   created_at: string;

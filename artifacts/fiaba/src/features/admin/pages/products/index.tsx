@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { PackageIcon, Search01Icon, SparklesIcon, Store01Icon } from '@hugeicons/core-free-icons';
+import { PackageIcon, Search01Icon, Store01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { haptic } from '@/lib/utils';
 import {
@@ -22,14 +22,11 @@ export function AdminProducts() {
   const ctx = useAdminProducts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [aiFilter, setAiFilter] = useState<'all' | 'generated' | 'none'>('all');
 
   // ── KPIs ──
   const activeCount = ctx.products.filter((p) => p.status === 'actif').length;
   const draftCount = ctx.products.filter((p) => p.status === 'brouillon').length;
   const suspendedCount = ctx.products.filter((p) => p.status === 'epuise').length;
-  const aiGeneratedCount = ctx.products.filter((p) => p.ai_headline).length;
-  const aiCoverage = ctx.products.length > 0 ? Math.round((aiGeneratedCount / ctx.products.length) * 100) : 0;
 
   // ── Filtered products ──
   const filtered = useMemo(() => {
@@ -38,14 +35,11 @@ export function AdminProducts() {
       const matchesSearch = q === '' ||
         p.name.toLowerCase().includes(q) ||
         (ctx.merchantNames.get(p.merchant_id) ?? '').toLowerCase().includes(q) ||
-        (p.niche_id ? (ctx.nicheNames.get(p.niche_id) ?? '') : '').toLowerCase().includes(q);
+        (ctx.nicheNames.get(p.id) ?? '').toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-      const matchesAi = aiFilter === 'all' ||
-        (aiFilter === 'generated' && p.ai_headline) ||
-        (aiFilter === 'none' && !p.ai_headline);
-      return matchesSearch && matchesStatus && matchesAi;
+      return matchesSearch && matchesStatus;
     });
-  }, [ctx.products, ctx.merchantNames, ctx.nicheNames, search, statusFilter, aiFilter]);
+  }, [ctx.products, ctx.merchantNames, ctx.nicheNames, search, statusFilter]);
 
   const statusFilters: { id: StatusFilter; label: string; count: number }[] = [
     { id: 'all', label: 'Tous', count: ctx.products.length },
@@ -58,18 +52,17 @@ export function AdminProducts() {
     <AdminPage
       eyebrow="Catalogue plateforme"
       title="Produits"
-      description="Surveillez le catalogue, générez du contenu IA et suspendez les offres non conformes."
+      description="Surveillez le catalogue et suspendez les offres non conformes."
     >
       {/* ── KPIs ── */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total produits" value={String(ctx.products.length)} glyph={PackageIcon} tone="violet" />
         <KpiCard label="Actifs" value={String(activeCount)} glyph={Store01Icon} tone="mint" sub={`${draftCount} brouillons`} />
         <KpiCard label="Suspendus" value={String(suspendedCount)} glyph={PackageIcon} tone="amber" />
-        <KpiCard label="Couverture IA" value={`${aiCoverage}%`} glyph={SparklesIcon} tone="violet" sub={`${aiGeneratedCount} / ${ctx.products.length}`} />
       </div>
 
       {/* ── Filters ── */}
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
+      <div className="mt-5">
         {/* Search */}
         <div className="relative">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#9290a2]">
@@ -84,18 +77,6 @@ export function AdminProducts() {
             data-testid="input-product-search"
           />
         </div>
-
-        {/* AI filter */}
-        <select
-          value={aiFilter}
-          onChange={(e) => { haptic('light'); setAiFilter(e.target.value as typeof aiFilter); }}
-          className={`${adminSelectClass} lg:w-48`}
-          data-testid="select-ai-filter"
-        >
-          <option value="all">Tous (IA)</option>
-          <option value="generated">Avec contenu IA</option>
-          <option value="none">Sans contenu IA</option>
-        </select>
       </div>
 
       {/* Status filter pills */}
@@ -126,8 +107,8 @@ export function AdminProducts() {
         <Card className="mt-5 p-0">
           <AdminEmptyState
             glyph={PackageIcon}
-            title={search || statusFilter !== 'all' || aiFilter !== 'all' ? 'Aucun résultat' : 'Aucun produit'}
-            description={search || statusFilter !== 'all' || aiFilter !== 'all' ? 'Ajustez vos filtres pour afficher des produits.' : 'Le catalogue est vide.'}
+            title={search || statusFilter !== 'all' ? 'Aucun résultat' : 'Aucun produit'}
+            description={search || statusFilter !== 'all' ? 'Ajustez vos filtres pour afficher des produits.' : 'Le catalogue est vide.'}
           />
         </Card>
       ) : (
@@ -146,9 +127,7 @@ export function AdminProducts() {
                   key={p.id}
                   p={p}
                   merchantName={ctx.merchantNames.get(p.merchant_id) ?? '—'}
-                  nicheName={p.niche_id ? (ctx.nicheNames.get(p.niche_id) ?? '—') : '—'}
-                  aiGeneratingId={ctx.aiGeneratingId}
-                  onGenerate={ctx.generateAi}
+                  nicheName={ctx.nicheNames.get(p.id) ?? '—'}
                   onSuspend={(id, name) => ctx.setToSuspend({ id, name, kind: 'product' })}
                 />
               ))}

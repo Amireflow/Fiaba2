@@ -1,8 +1,7 @@
-import { ArrowRight01Icon, CheckmarkCircle02Icon, PackageIcon, SparklesIcon } from '@hugeicons/core-free-icons';
+import { ArrowRight01Icon, PackageIcon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { Field, MerchantButton as Button, inputClass, selectClass, textareaClass } from '../../components/merchant-ui';
 import { physicalCategories, digitalCategories, type FormState } from './types';
-import { AiPreviewSection } from './ai-preview-section';
 
 type Props = {
   form: FormState;
@@ -11,14 +10,9 @@ type Props = {
   productId: string | undefined;
   setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
   onNext: () => void;
-  aiGenerating: boolean;
-  aiPreview: import('./types').AiPreview;
-  aiGenerationsLeft: number | null;
-  onGenerate: () => void;
-  onDismissPreview: () => void;
 };
 
-export function StepInfo({ form, errors, isEdit, productId, setField, onNext, aiGenerating, aiPreview, aiGenerationsLeft, onGenerate, onDismissPreview }: Props) {
+export function StepInfo({ form, errors, setField, onNext }: Props) {
   return (
     <div className="space-y-4 sm:space-y-5">
       <div><h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Produit & Format</h3></div>
@@ -66,13 +60,6 @@ export function StepInfo({ form, errors, isEdit, productId, setField, onNext, ai
         <textarea value={form.description} onChange={(e) => setField('description', e.target.value)}
           placeholder="Avantages et détails du produit…" className={`${textareaClass} min-h-24 sm:min-h-32`} data-testid="input-description" />
       </Field>
-
-      {isEdit && productId && (
-        <AiPreviewSection
-          aiGenerating={aiGenerating} aiPreview={aiPreview} aiGenerationsLeft={aiGenerationsLeft}
-          onGenerate={onGenerate} onDismiss={onDismissPreview}
-        />
-      )}
 
       <div className="flex justify-end pt-2 sm:pt-3">
         <Button type="button" onClick={onNext} testId="button-next-step-2">

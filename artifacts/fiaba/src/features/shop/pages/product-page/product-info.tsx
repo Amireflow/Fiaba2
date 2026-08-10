@@ -40,11 +40,13 @@ export function ProductInfo({ product, ctaText, checkoutTarget }: Props) {
             {money(product.price)}
           </strong>
         </div>
-        <Link href={checkoutTarget} onClick={() => haptic('medium')}
-          className="flex items-center gap-2 rounded-2xl bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4a3bc7]"
-          data-testid="cta-checkout">
-          {ctaText} <Icon glyph={ArrowRight01Icon} size={16} />
-        </Link>
+        {!isDigital && (
+          <Link href={checkoutTarget} onClick={() => haptic('medium')}
+            className="flex items-center gap-2 rounded-2xl bg-[#5b49e8] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#4a3bc7]"
+            data-testid="cta-checkout">
+            {ctaText} <Icon glyph={ArrowRight01Icon} size={16} />
+          </Link>
+        )}
       </div>
     </div>
   );

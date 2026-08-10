@@ -76,6 +76,28 @@ export function CampaignForm() {
               </Field>
             </div>
 
+            {ctx.isEdit && ctx.form.productId && (
+              <div className="rounded-2xl border-2 border-[#5b49e8]/20 bg-[#f6f5ff] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-[#5b49e8] flex items-center gap-1.5">
+                      <Icon glyph={SparklesIcon} size={14} /> Page de vente IA
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-[#807b98]">Régénérez le contenu marketing optimisé pour ce produit.</p>
+                  </div>
+                  <Button type="button" variant="soft" onClick={ctx.regenerateAi} disabled={ctx.aiGenerating} testId="button-regenerate-ai">
+                    {ctx.aiGenerating ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" /> Génération…
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5"><Icon glyph={SparklesIcon} size={14} /> Régénérer</span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-3 border-t border-[#f1effa]">
               <Link href="/merchant/campaigns"><Button variant="ghost" type="button">Annuler</Button></Link>
               <Button type="submit" disabled={ctx.saving || ctx.aiGenerating} testId="button-save-campaign">

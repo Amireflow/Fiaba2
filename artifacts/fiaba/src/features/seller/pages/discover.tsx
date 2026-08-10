@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'wouter';
 import { ArrowUpRight01Icon, Chart02Icon, Search01Icon, SparklesIcon, Store01Icon, Tick01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
@@ -68,17 +68,34 @@ export function Discover() {
   // Load seller stats
   const [stats, setStats] = useState({ available: 0, activeCampaigns: 0, reputation: 50 });
 
-  useMemo(() => {
+  useEffect(() => {
     async function loadStats() {
       if (!profile || !sellerId) return;
-      // Count commissions
+      // Fetch commissions
       const { data: commissions } = await supabase
         .from('commissions')
-        .select('amount, status')
+        .select('amount, status, order_id')
         .eq('seller_id', sellerId);
-      const available = ((commissions as { amount: number; status: string }[] | null) ?? [])
-        .filter((c) => c.status === 'available')
-        .reduce((sum, c) => sum + c.amount, 0);
+
+      const commRows = (commissions as { amount: number; status: string; order_id: string | null }[] | null) ?? [];
+      const commOrderIds = new Set(commRows.map((c) => c.order_id).filter(Boolean));
+
+      let available = commRows
+        .filter((c) => c.status === 'available' || c.status === 'paid')
+        .reduce((sum, c) => sum + (c.amount ?? 0), 0);
+
+      // Fetch delivered orders directly for fallbacks
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, commission_amount, status')
+        .eq('seller_id', sellerId)
+        .eq('status', 'livree');
+
+      ((orders as { id: string; commission_amount: number; status: string }[] | null) ?? []).forEach((o) => {
+        if (!commOrderIds.has(o.id) && o.commission_amount > 0) {
+          available += o.commission_amount;
+        }
+      });
 
       // Count active campaigns
       const { count } = await supabase
@@ -91,7 +108,7 @@ export function Discover() {
         .from('seller_profiles')
         .select('reputation')
         .eq('profile_id', profile.id)
-        .single();
+        .maybeSingle();
 
       setStats({
         available,

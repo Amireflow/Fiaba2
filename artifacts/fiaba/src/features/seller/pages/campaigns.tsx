@@ -94,8 +94,15 @@ export function SellerCampaigns() {
       // Fetch commissions for earnings + sales count
       const { data: commissions } = await supabase
         .from('commissions')
-        .select('campaign_id, amount, status')
+        .select('campaign_id, order_id, amount, status')
         .eq('seller_id', sId);
+
+      // Fetch orders for fallback sales + earnings count
+      const { data: orderList } = await supabase
+        .from('orders')
+        .select('id, campaign_id, commission_amount, status')
+        .eq('seller_id', sId)
+        .neq('status', 'annulee');
 
       const campaignMap = new Map<string, JoinedCampaign>();
       const linkMap = new Map<string, { token: string; seller_code: string; clicks: number }>(
@@ -104,11 +111,25 @@ export function SellerCampaigns() {
       );
 
       const commissionAgg = new Map<string, { earnings: number; sales: number }>();
-      ((commissions as { campaign_id: string; amount: number; status: string }[] | null) ?? []).forEach((c) => {
-        const agg = commissionAgg.get(c.campaign_id) ?? { earnings: 0, sales: 0 };
-        agg.earnings += c.amount;
-        agg.sales += 1;
-        commissionAgg.set(c.campaign_id, agg);
+      const orderIdsInComms = new Set<string>();
+
+      ((commissions as { campaign_id: string; order_id: string | null; amount: number; status: string }[] | null) ?? []).forEach((c) => {
+        if (c.campaign_id) {
+          const agg = commissionAgg.get(c.campaign_id) ?? { earnings: 0, sales: 0 };
+          agg.earnings += (c.amount ?? 0);
+          agg.sales += 1;
+          commissionAgg.set(c.campaign_id, agg);
+          if (c.order_id) orderIdsInComms.add(c.order_id);
+        }
+      });
+
+      ((orderList as { id: string; campaign_id: string | null; commission_amount: number; status: string }[] | null) ?? []).forEach((o) => {
+        if (o.campaign_id && !orderIdsInComms.has(o.id)) {
+          const agg = commissionAgg.get(o.campaign_id) ?? { earnings: 0, sales: 0 };
+          agg.earnings += (o.commission_amount ?? 0);
+          agg.sales += 1;
+          commissionAgg.set(o.campaign_id, agg);
+        }
       });
 
       for (const j of joinedRows) {

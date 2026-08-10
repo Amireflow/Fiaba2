@@ -35,7 +35,6 @@ security definer
 as $$
 declare
   v_campaign record;
-  v_product record;
   v_zone_fee integer := 0;
   v_commission integer := 0;
   v_platform_fee_rate numeric := 5.00;
@@ -45,8 +44,6 @@ declare
   v_subtotal integer := 0;
   v_effective_price integer;
   v_seller_attributed boolean := false;
-  v_sub record;
-  v_plan record;
 begin
   -- Fetch campaign + product
   select c.commission, c.commission_type, c.model, c.product_id, c.merchant_id,
@@ -60,7 +57,6 @@ begin
     raise exception 'Campaign not found or inactive';
   end if;
 
-  v_product.price := v_campaign.price;
   v_effective_price := coalesce(p_seller_price, v_campaign.price);
 
   -- Modèle marge: prix vendeur >= prix commerçant (CDC §11.2)
@@ -84,13 +80,11 @@ begin
   end if;
 
   -- Determine platform fee rate from merchant's subscription plan
-  select sp.platform_fee_rate into v_plan
+  select sp.platform_fee_rate into v_platform_fee_rate
   from public.merchant_subscriptions ms
   join public.subscription_plans sp on sp.id = ms.plan_id
   where ms.merchant_id = v_campaign.merchant_id and ms.status = 'active';
-  if found then
-    v_platform_fee_rate := v_plan.platform_fee_rate;
-  else
+  if not found then
     -- Default platform fee rule
     select pfr.rate_percent into v_platform_fee_rate
     from public.platform_fee_rules pfr
@@ -101,7 +95,7 @@ begin
     end if;
   end if;
 
-  v_platform_fee := round(v_subtotal * v_platform_fee_rate / 100);
+  v_platform_fee := round(v_subtotal * v_platform_fee_rate / 100)::integer;
 
   -- Calculate commission if seller attributed
   if p_seller_id is not null then
@@ -116,7 +110,7 @@ begin
       v_commission := v_campaign.commission * p_quantity;
     else
       -- Percentage
-      v_commission := round(v_subtotal * v_campaign.commission / 100);
+      v_commission := round(v_subtotal * v_campaign.commission / 100)::integer;
     end if;
   end if;
 
@@ -603,12 +597,5 @@ grant execute on function public.auto_release_commissions to authenticated;
 --     The triggers use SECURITY DEFINER so they bypass RLS.
 --     No additional policies needed — triggers run as the function owner.
 -- ============================================================================
-
--- ============================================================================
--- 14. RLS: Allow authenticated to insert analytics_events (CDC §25)
--- ============================================================================
-create policy "analytics_insert_auth" on public.analytics_events
-  for insert with check (auth.uid() is not null);
-
-create policy "analytics_select_admin" on public.analytics_events
-  for select using (public.is_admin());
+-- Note: analytics_events policies already defined in 0003_complete_schema.sql
+-- (events_insert, events_select) — no duplicate policies needed here.

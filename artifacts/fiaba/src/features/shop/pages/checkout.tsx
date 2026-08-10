@@ -480,8 +480,9 @@ export function Checkout() {
       const selectedZone = zones.find((z) => z.id === form.zoneId);
       const fee = selectedZone ? selectedZone.fee : 0;
       const sub = campaign.product_price * qty;
+      const isFixedComm = campaign.commission_type === 'fixed' || (!campaign.commission_type && campaign.commission >= 100);
       const comm = resolvedSellerId
-        ? (campaign.commission_type === 'fixed' ? campaign.commission * qty : Math.round((sub * campaign.commission) / 100))
+        ? (isFixedComm ? campaign.commission * qty : Math.round((sub * campaign.commission) / 100))
         : 0;
       const platformFee = Math.round(sub * 0.05);
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Fiaba — Migration 0018 : Fix calculate_order_total Permissions & Support Status
+-- Fiaba — Migration 0019 : Correct Commission Calculation for Multi-Unit Quantities
 -- ============================================================================
 
 create or replace function public.calculate_order_total(
@@ -37,7 +37,12 @@ declare
   v_subtotal integer := 0;
   v_effective_price integer;
   v_seller_attributed boolean := false;
+  v_qty integer := coalesce(p_quantity, 1);
 begin
+  if v_qty < 1 then
+    v_qty := 1;
+  end if;
+
   -- Fetch campaign + product
   select c.commission, c.commission_type, c.model, c.product_id, c.merchant_id,
          coalesce(p.price, 0) as price, coalesce(p.name, c.name) as name
@@ -70,7 +75,7 @@ begin
     v_effective_price := p_seller_price;
   end if;
 
-  v_subtotal := v_effective_price * coalesce(p_quantity, 1);
+  v_subtotal := v_effective_price * v_qty;
 
   -- Fetch delivery zone fee
   if p_zone_id is not null then
@@ -98,15 +103,16 @@ begin
   if p_seller_id is not null then
     v_seller_attributed := true;
     if v_campaign.model = 'marge' and p_seller_price is not null then
-      v_commission := (p_seller_price - v_campaign.price) * p_quantity;
+      v_commission := (p_seller_price - v_campaign.price) * v_qty;
       if v_commission < 0 then
         v_commission := 0;
       end if;
-    elsif v_campaign.commission_type = 'fixed' then
-      v_commission := v_campaign.commission * p_quantity;
+    elsif v_campaign.commission_type = 'fixed' or (v_campaign.commission_type is null and v_campaign.commission >= 100) then
+      -- Fixed commission per unit (e.g. 1000 FCFA per item * qty)
+      v_commission := v_campaign.commission * v_qty;
     else
-      -- Percentage
-      v_commission := round(v_subtotal * v_campaign.commission / 100)::integer;
+      -- Percentage commission (e.g. 10% or 20% of subtotal)
+      v_commission := round((v_subtotal * v_campaign.commission) / 100)::integer;
     end if;
   end if;
 
@@ -132,5 +138,4 @@ begin
 end;
 $$;
 
--- Grant execution to ALL roles (anon, authenticated, public) for guest checkout
 grant execute on function public.calculate_order_total to authenticated, anon, public;

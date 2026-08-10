@@ -4,6 +4,7 @@ import { ArrowLeft01Icon, CheckmarkCircle02Icon, Cancel01Icon, Clock01Icon, Deli
 import { Icon } from '@/components/shared/icon';
 import { money } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/use-auth';
 import {
   SellerBadge,
   SellerButton as Button,
@@ -43,17 +44,36 @@ export function SaleDetail() {
   const [order, setOrder] = useState<SaleDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { profile } = useAuth();
+
   useEffect(() => {
     async function loadSale() {
-      if (!id) return;
+      if (!id || !profile) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
 
-      // Fetch order
+      // Get current seller ID
+      const { data: seller } = await supabase
+        .from('sellers')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+
+      const sId = (seller as { id: string } | null)?.id;
+      if (!sId) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch order scoped to seller_id
       const { data: rawOrder } = await supabase
         .from('orders')
         .select('id, customer_name, total_amount, commission_amount, status, created_at')
         .eq('id', id)
-        .single();
+        .eq('seller_id', sId)
+        .maybeSingle();
 
       if (!rawOrder) {
         setLoading(false);

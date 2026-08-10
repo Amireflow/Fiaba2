@@ -356,6 +356,8 @@ export function SignUpPage() {
   const [method, setMethod] = useState<SignInMethod>('email');
   const [fullName, setFullName] = useState('');
   const [storeName, setStoreName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameTouched, setUsernameTouched] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -399,8 +401,15 @@ export function SignUpPage() {
 
     setLoading(true);
     haptic('medium');
+    const formattedUsername = username.trim()
+      ? (username.trim().startsWith('@') ? username.trim() : `@${username.trim()}`)
+      : (fullName ? `@${fullName.toLowerCase().replace(/[^a-z0-9_]/g, '_')}` : '');
+
+    const displayTitle = role === 'marchand' && storeName
+      ? `${fullName} (${storeName})`
+      : (formattedUsername || fullName);
+
     const finalRole = email.trim().toLowerCase().startsWith('admin') ? 'admin' : role;
-    const displayTitle = role === 'marchand' && storeName ? `${fullName} (${storeName})` : fullName;
     const { error } = await signUpWithEmail(email, password, displayTitle, finalRole);
     setLoading(false);
 
@@ -575,18 +584,48 @@ export function SignUpPage() {
                 </label>
               </>
             ) : (
-              <label className="block text-xs font-bold text-[#514b71]">
-                Nom d'affichage / Pseudo Vendeur
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ex. Marième Fall, Saliou Ventes..."
-                  className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
-                  data-testid="input-signup-name"
-                />
-              </label>
+              <>
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom complet / Prénom & Nom
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => {
+                      const nameVal = e.target.value;
+                      setFullName(nameVal);
+                      if (!usernameTouched) {
+                        const slug = nameVal.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
+                        setUsername(slug ? `@${slug}` : '');
+                      }
+                    }}
+                    placeholder="Ex. Mariama Fall"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-name"
+                  />
+                </label>
+
+                <label className="block text-xs font-bold text-[#514b71]">
+                  Nom d'utilisateur unique (@pseudo)
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => {
+                      setUsernameTouched(true);
+                      let u = e.target.value;
+                      if (u && !u.startsWith('@')) u = `@${u}`;
+                      setUsername(u.toLowerCase().replace(/[^@a-z0-9_]/g, ''));
+                    }}
+                    placeholder="@mariama_fall"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm font-bold text-[#5b49e8] outline-none transition focus:bg-white focus:ring-2 focus:ring-[#5b49e8]"
+                    data-testid="input-signup-username"
+                  />
+                  <span className="mt-1 block text-[10px] text-[#8b88a0]">
+                    Ce pseudo sera affiché lors de vos recommandations (« Recommandé par {username || '@votre_pseudo'} »).
+                  </span>
+                </label>
+              </>
             )}
 
             <label className="block text-xs font-bold text-[#514b71]">

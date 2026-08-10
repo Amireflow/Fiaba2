@@ -59,9 +59,13 @@ export function Settings() {
 
       // 2. Update Merchant
       if (authMerchant) {
+        let cleanName = (name || authMerchant.name || '').trim();
+        cleanName = cleanName.replace(/^(Boutique\s+)+/i, '').trim();
+        if (!cleanName) cleanName = 'Ma Boutique';
+
         await (supabase.from('merchants') as any)
           .update({
-            name: name || authMerchant.name,
+            name: cleanName,
             phone: phone || null,
             description: bio || null,
           })

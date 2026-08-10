@@ -96,12 +96,19 @@ export function Onboarding() {
 
         // 2. If Merchant, ensure merchant record exists
         if (role === 'marchand') {
-          const nameToUse = storeName || fullName || profile.full_name || 'Ma Boutique';
-          const slugName = nameToUse.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          let cleanStoreName = (storeName || fullName || profile.full_name || 'Ma Boutique').trim();
+          if (cleanStoreName.includes('(') && cleanStoreName.includes(')')) {
+            const match = cleanStoreName.match(/\(([^)]+)\)/);
+            if (match && match[1]) cleanStoreName = match[1].trim();
+          }
+          cleanStoreName = cleanStoreName.replace(/^(Boutique\s+)+/i, '').trim();
+          if (!cleanStoreName) cleanStoreName = 'Ma Boutique';
+
+          const slugName = cleanStoreName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
           await (supabase.from('merchants') as any)
             .upsert({
               owner_id: profile.id,
-              name: nameToUse,
+              name: cleanStoreName,
               slug: `${slugName}-${profile.id.slice(0, 6)}`,
               phone: phone || profile.phone || null,
               email: profile.email || null,

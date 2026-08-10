@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import {
   AdminBadge,
   AdminButton as Button,
@@ -29,38 +28,144 @@ type ProfileRow = {
   created_at: string;
 };
 
+type UserStats = {
+  salesCount: number;
+  volume: number;
+  disputes: number;
+};
+
 const roleTone = (role: string) => (role === 'marchand' ? 'violet' : role === 'vendeur' ? 'mint' : 'amber');
 const statusTone = (status: string) => (status === 'verified' ? 'mint' : status === 'pending' ? 'amber' : 'rose');
 const getInitials = (name: string) => (name || 'U').split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
 export function AdminUsers() {
   const { toast } = useToast();
-  const { data: rawProfiles, loading, refetch } = useSupabaseQuery<ProfileRow>('profiles', {
-    select: 'id, role, full_name, phone, email, city, verification_status, trust_score, created_at',
-    order: { column: 'created_at', ascending: false },
-  });
-
+  const [rawProfiles, setRawProfiles] = useState<ProfileRow[]>([]);
+  const [statsMap, setStatsMap] = useState<Record<string, UserStats>>({});
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('Tous');
   const [selected, setSelected] = useState<AdminUser | null>(null);
 
   const roles = ['Tous', 'marchand', 'vendeur', 'admin'] as const;
 
-  const users: AdminUser[] = rawProfiles.map((p) => ({
-    id: p.id,
-    name: p.full_name || 'Utilisateur sans nom',
-    role: p.role as any,
-    phone: p.phone || 'Non renseigné',
-    email: p.email || 'Non renseigné',
-    city: p.city || 'Dakar',
-    status: (p.verification_status === 'verified' ? 'Vérifié' : 'En attente') as VerificationStatus,
-    trustScore: p.trust_score || 50,
-    salesCount: 0,
-    volume: 0,
-    sales: 0,
-    disputes: 0,
-    joinedDate: new Date(p.created_at).toLocaleDateString('fr-FR'),
-  }));
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+
+      // 1. Fetch all profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, role, full_name, phone, email, city, verification_status, trust_score, created_at')
+        .order('created_at', { ascending: false });
+      const profileRows = (profiles as ProfileRow[] | null) ?? [];
+      setRawProfiles(profileRows);
+
+      // 2. Fetch sellers to map profile_id → seller_id
+      const { data: sellerRows } = await supabase
+        .from('sellers')
+        .select('id, profile_id');
+      const profileToSeller: Record<string, string> = {};
+      (sellerRows as { id: string; profile_id: string | null }[] | null)?.forEach((s) => {
+        if (s.profile_id) profileToSeller[s.profile_id] = s.id;
+      });
+
+      // 3. Fetch merchants to map owner_id → merchant_id
+      const { data: merchantRows } = await supabase
+        .from('merchants')
+        .select('id, owner_id');
+      const profileToMerchant: Record<string, string> = {};
+      (merchantRows as { id: string; owner_id: string | null }[] | null)?.forEach((m) => {
+        if (m.owner_id) profileToMerchant[m.owner_id] = m.id;
+      });
+
+      // 4. Fetch all orders (just IDs + amounts for stats)
+      const { data: orderRows } = await supabase
+        .from('orders')
+        .select('seller_id, merchant_id, total_amount');
+      const orders = (orderRows as { seller_id: string | null; merchant_id: string | null; total_amount: number }[] | null) ?? [];
+
+      // 5. Fetch all disputes (just opened_by for stats)
+      const { data: disputeRows } = await supabase
+        .from('disputes')
+        .select('opened_by');
+      const disputes = (disputeRows as { opened_by: string | null }[] | null) ?? [];
+
+      // 6. Build stats per profile
+      const newStatsMap: Record<string, UserStats> = {};
+
+      // Pre-aggregate order stats by seller_id and merchant_id
+      const sellerOrderStats: Record<string, { count: number; volume: number }> = {};
+      const merchantOrderStats: Record<string, { count: number; volume: number }> = {};
+      orders.forEach((o) => {
+        if (o.seller_id) {
+          if (!sellerOrderStats[o.seller_id]) sellerOrderStats[o.seller_id] = { count: 0, volume: 0 };
+          sellerOrderStats[o.seller_id].count++;
+          sellerOrderStats[o.seller_id].volume += o.total_amount;
+        }
+        if (o.merchant_id) {
+          if (!merchantOrderStats[o.merchant_id]) merchantOrderStats[o.merchant_id] = { count: 0, volume: 0 };
+          merchantOrderStats[o.merchant_id].count++;
+          merchantOrderStats[o.merchant_id].volume += o.total_amount;
+        }
+      });
+
+      // Pre-aggregate dispute counts by opened_by
+      const disputeCounts: Record<string, number> = {};
+      disputes.forEach((d) => {
+        if (d.opened_by) disputeCounts[d.opened_by] = (disputeCounts[d.opened_by] ?? 0) + 1;
+      });
+
+      // Compute stats for each profile
+      profileRows.forEach((p) => {
+        let salesCount = 0;
+        let volume = 0;
+
+        if (p.role === 'vendeur') {
+          const sellerId = profileToSeller[p.id];
+          if (sellerId && sellerOrderStats[sellerId]) {
+            salesCount = sellerOrderStats[sellerId].count;
+            volume = sellerOrderStats[sellerId].volume;
+          }
+        } else if (p.role === 'marchand') {
+          const merchantId = profileToMerchant[p.id];
+          if (merchantId && merchantOrderStats[merchantId]) {
+            salesCount = merchantOrderStats[merchantId].count;
+            volume = merchantOrderStats[merchantId].volume;
+          }
+        }
+
+        newStatsMap[p.id] = {
+          salesCount,
+          volume,
+          disputes: disputeCounts[p.id] ?? 0,
+        };
+      });
+
+      setStatsMap(newStatsMap);
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  const users: AdminUser[] = rawProfiles.map((p) => {
+    const stats = statsMap[p.id] ?? { salesCount: 0, volume: 0, disputes: 0 };
+    return {
+      id: p.id,
+      name: p.full_name || 'Utilisateur sans nom',
+      role: p.role as any,
+      phone: p.phone || 'Non renseigné',
+      email: p.email || 'Non renseigné',
+      city: p.city || 'Dakar',
+      status: (p.verification_status === 'verified' ? 'Vérifié' : 'En attente') as VerificationStatus,
+      trustScore: p.trust_score || 50,
+      salesCount: stats.salesCount,
+      volume: stats.volume,
+      sales: stats.salesCount,
+      disputes: stats.disputes,
+      joinedDate: new Date(p.created_at).toLocaleDateString('fr-FR'),
+    };
+  });
 
   const filtered = users.filter((u) => {
     const matchesRole = roleFilter === 'Tous' || u.role === roleFilter;
@@ -78,7 +183,13 @@ export function AdminUsers() {
       toast({ title: 'Erreur', description: error.message });
     } else {
       toast({ title: 'Statut mis à jour', description: `Vérification passée à ${newStatus}.` });
-      refetch();
+      // Update local state
+      setRawProfiles((prev) =>
+        prev.map((p) => (p.id === userId ? { ...p, verification_status: newStatus } : p))
+      );
+      if (selected && selected.id === userId) {
+        setSelected({ ...selected, status: newStatus === 'verified' ? 'Vérifié' : 'En attente' });
+      }
     }
     setSelected(null);
   }
@@ -158,6 +269,21 @@ export function AdminUsers() {
             <div>
               <p className="text-xs font-bold text-slate-500">Trust Score</p>
               <TrustScore score={selected.trustScore} />
+            </div>
+            {/* Real stats from Supabase */}
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              <div className="rounded-xl bg-[#f4f3f8] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes</p>
+                <p className="mt-1 font-bold text-[#292541]">{selected.salesCount}</p>
+              </div>
+              <div className="rounded-xl bg-[#f4f3f8] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Volume</p>
+                <p className="mt-1 font-bold text-[#292541]">{(selected.volume ?? 0).toLocaleString('fr-FR')}</p>
+              </div>
+              <div className="rounded-xl bg-[#f4f3f8] p-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Litiges</p>
+                <p className="mt-1 font-bold text-[#292541]">{selected.disputes}</p>
+              </div>
             </div>
             <div className="pt-4 border-t space-y-2">
               <Button variant="primary" className="w-full" onClick={() => updateVerification(selected.id, 'verified')}>

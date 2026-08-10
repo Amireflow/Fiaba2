@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Alert01Icon, Cancel01Icon, CheckmarkCircle02Icon, DashboardSquare01Icon, Logout01Icon, Menu02Icon, Notification01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AdminLogo } from './admin-ui';
 import { adminPrimaryNav, adminSecondaryNav, adminAllNav } from '@/config/admin-navigation';
 import { haptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 import { useAuth } from '@/hooks/use-auth';
 
@@ -23,6 +24,35 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
   const { signOut } = useAuth();
+  const [disputeCount, setDisputeCount] = useState(0);
+  const [fraudCount, setFraudCount] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    async function loadBadges() {
+      // Count open disputes
+      const { count: dCount } = await supabase
+        .from('disputes')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['open', 'pending', 'ouvert']);
+      setDisputeCount(dCount ?? 0);
+
+      // Count unresolved fraud signals
+      const { count: fCount } = await supabase
+        .from('fraud_signals')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'flagged', 'open']);
+      setFraudCount(fCount ?? 0);
+
+      // Count unread notifications
+      const { count: nCount } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_read', false);
+      setUnreadNotifs(nCount ?? 0);
+    }
+    loadBadges();
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -44,8 +74,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
       >
         <Icon glyph={item.glyph} size={isMobile ? 18 : 17} />
         {item.label}
-        {item.href === '/admin/disputes' && <span className="ml-auto rounded-full bg-[#fff0f1] px-1.5 py-0.5 text-[9px] text-[#c45667]">2</span>}
-        {item.href === '/admin/fraud' && <span className="ml-auto rounded-full bg-[#fff4de] px-1.5 py-0.5 text-[9px] text-[#ac741e]">5</span>}
+        {item.href === '/admin/disputes' && disputeCount > 0 && <span className="ml-auto rounded-full bg-[#fff0f1] px-1.5 py-0.5 text-[9px] text-[#c45667]">{disputeCount}</span>}
+        {item.href === '/admin/fraud' && fraudCount > 0 && <span className="ml-auto rounded-full bg-[#fff4de] px-1.5 py-0.5 text-[9px] text-[#ac741e]">{fraudCount}</span>}
       </Link>
     );
   };
@@ -91,7 +121,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               data-testid="button-admin-notifications"
             >
               <Icon glyph={Notification01Icon} size={17} />
-              <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />
+              {unreadNotifs > 0 && <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />}
             </button>
           </Link>
           <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-admin-initials">AD</span>

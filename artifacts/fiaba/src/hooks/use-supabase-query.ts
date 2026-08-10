@@ -145,14 +145,21 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
       .eq('id', userId)
       .maybeSingle();
 
-    const nameToUse = prof?.full_name ? `Boutique ${prof.full_name}` : 'Ma Boutique Fiaba';
-    const slugName = nameToUse.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    let cleanShopName = (prof?.full_name || 'Ma Boutique').trim();
+    if (cleanShopName.includes('(') && cleanShopName.includes(')')) {
+      const match = cleanShopName.match(/\(([^)]+)\)/);
+      if (match && match[1]) cleanShopName = match[1].trim();
+    }
+    cleanShopName = cleanShopName.replace(/^(Boutique\s+)+/i, '').trim();
+    if (!cleanShopName) cleanShopName = 'Ma Boutique';
+
+    const slugName = cleanShopName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     // 3. Créer automatiquement la boutique
     const { data: newMerch } = await (supabase.from('merchants') as any)
       .insert({
         owner_id: userId,
-        name: nameToUse,
+        name: cleanShopName,
         slug: `${slugName}-${userId.slice(0, 6)}`,
         phone: prof?.phone || null,
         email: prof?.email || null,

@@ -93,14 +93,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
 
         if (merch) {
+          // Clean up any legacy store names with repeated 'Boutique' prefixes
+          if (merch.name && /^Boutique\s+Boutique\s+/i.test(merch.name)) {
+            const cleanName = merch.name.replace(/^(Boutique\s+)+/i, 'Boutique ').trim();
+            await (supabase.from('merchants') as any).update({ name: cleanName }).eq('id', merch.id);
+            merch.name = cleanName;
+          }
           setMerchant(merch as Merchant);
         } else {
-          // Auto-create merchant if none exists yet
-          const slugName = (prof.full_name || 'Boutique').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          // Auto-create merchant with clean store name
+          let cleanShopName = (prof.full_name || 'Ma Boutique').trim();
+          if (cleanShopName.includes('(') && cleanShopName.includes(')')) {
+            const match = cleanShopName.match(/\(([^)]+)\)/);
+            if (match && match[1]) cleanShopName = match[1].trim();
+          }
+          cleanShopName = cleanShopName.replace(/^(Boutique\s+)+/i, '').trim();
+          if (!cleanShopName) cleanShopName = 'Ma Boutique';
+
+          const slugName = cleanShopName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
           const { data: newMerch } = await (supabase.from('merchants') as any)
             .insert({
               owner_id: userId,
-              name: prof.full_name ? `Boutique ${prof.full_name}` : 'Maison Ndar',
+              name: cleanShopName,
               slug: `${slugName}-${userId.slice(0, 6)}`,
               phone: prof.phone || null,
               email: prof.email || null,

@@ -558,7 +558,7 @@ export function Checkout() {
 
               {/* Product description */}
               {campaign.product_description && (
-                <div className="rounded-2xl bg-white p-5 space-y-1.5 border border-[#f1effa]" data-testid="product-description-card">
+                <div className="rounded-2xl bg-white p-5 space-y-1.5" data-testid="product-description-card">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Description du produit</p>
                   <p className="text-sm leading-relaxed text-[#514b71] whitespace-pre-line">{campaign.product_description}</p>
                 </div>
@@ -658,16 +658,16 @@ export function Checkout() {
                 {/* Name */}
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Nom complet *</label>
-                  <input value={form.customerName} onChange={(e) => setField('customerName', e.target.value)} placeholder="Ex. Aminata Ndiaye" className={`mt-1.5 w-full rounded-xl border bg-[#fbfaff] px-4 py-3 text-sm outline-none ${errors.customerName ? 'border-[#ef6d78]' : 'border-[#e9e6f1] focus:border-[#5b49e8]'}`} data-testid="input-customer-name" />
+                  <input value={form.customerName} onChange={(e) => setField('customerName', e.target.value)} placeholder="Ex. Aminata Ndiaye" className={`mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${errors.customerName ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'} placeholder:text-[#b8b4c8]`} data-testid="input-customer-name" />
                   {errors.customerName && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.customerName}</p>}
                 </div>
 
                 {/* Phone */}
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Téléphone *</label>
-                  <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-4">
+                  <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${errors.phone ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'}`}>
                     <Icon glyph={SmartPhone01Icon} size={16} />
-                    <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm outline-none" data-testid="input-phone" />
+                    <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]" data-testid="input-phone" />
                   </div>
                   {errors.phone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.phone}</p>}
                 </div>
@@ -697,14 +697,14 @@ export function Checkout() {
                 {/* Address */}
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Adresse précise *</label>
-                  <textarea value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Quartier, rue, repère, point de rencontre…" className={`mt-1.5 w-full rounded-xl border bg-[#fbfaff] px-4 py-3 text-sm outline-none ${errors.address ? 'border-[#ef6d78]' : 'border-[#e9e6f1] focus:border-[#5b49e8]'}`} data-testid="input-address" />
+                  <textarea value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Quartier, rue, repère, point de rencontre…" className={`mt-1.5 w-full min-h-24 resize-none rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${errors.address ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'} placeholder:text-[#b8b4c8]`} data-testid="input-address" />
                   {errors.address && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.address}</p>}
                 </div>
 
                 {/* Note */}
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Note (optionnel)</label>
-                  <input value={form.note} onChange={(e) => setField('note', e.target.value)} placeholder="Ex. Appeler avant livraison" className="mt-1.5 w-full rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-4 py-3 text-sm outline-none focus:border-[#5b49e8]" data-testid="input-note" />
+                  <input value={form.note} onChange={(e) => setField('note', e.target.value)} placeholder="Ex. Appeler avant livraison" className="mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8] placeholder:text-[#b8b4c8]" data-testid="input-note" />
                 </div>
               </div>
 

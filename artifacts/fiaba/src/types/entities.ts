@@ -151,6 +151,8 @@ export type AdminUser = {
   joinedDate: string;
   trustScore: number; // 0-100
   sales: number;
+  salesCount?: number;
+  volume?: number;
   disputes: number;
 };
 

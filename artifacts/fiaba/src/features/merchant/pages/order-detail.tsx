@@ -5,7 +5,7 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { supabaseUpdate } from '@/hooks/use-supabase-query';
+import { useMerchantId, supabaseUpdate, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
 import {
   Badge,
   ConfirmDialog,
@@ -45,6 +45,7 @@ export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { merchantId } = useMerchantId();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [toCancel, setToCancel] = useState(false);
@@ -52,15 +53,19 @@ export function OrderDetail() {
 
   useEffect(() => {
     async function loadOrder() {
-      if (!id) return;
-      setLoading(true);
+      const activeMerchantId = await getOrCreateMerchantId(merchantId);
+      if (!activeMerchantId) {
+        setLoading(false);
+        return;
+      }
 
-      // Fetch order
+      // Fetch order filtered strictly by merchant_id
       const { data: rawOrder } = await supabase
         .from('orders')
         .select('id, customer_name, customer_phone, customer_address, total_amount, commission_amount, status, zone_name, delivery_fee, payment_method, created_at, seller_id')
         .eq('id', id)
-        .single();
+        .eq('merchant_id', activeMerchantId)
+        .maybeSingle();
 
       if (!rawOrder) {
         setLoading(false);

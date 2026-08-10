@@ -23,6 +23,7 @@ export function SellerProfile() {
   const { profile: authProfile, seller: authSeller, refetchProfile } = useAuth();
 
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('Dakar');
   const [bio, setBio] = useState('');
@@ -41,7 +42,12 @@ export function SellerProfile() {
       setCity(authProfile.city || 'Dakar');
     }
     if (authSeller) {
-      setFullName(authSeller.display_name || authProfile?.full_name || '');
+      const disp = authSeller.display_name || authProfile?.full_name || '';
+      if (disp.startsWith('@')) {
+        setUsername(disp);
+      } else {
+        setUsername(disp ? `@${disp.toLowerCase().replace(/[^a-z0-9_]/g, '_')}` : '');
+      }
     }
   }, [authProfile, authSeller]);
 
@@ -69,9 +75,13 @@ export function SellerProfile() {
 
       // 2. Update Seller in Supabase if exists
       if (authSeller) {
+        const formattedUser = username.trim()
+          ? (username.trim().startsWith('@') ? username.trim() : `@${username.trim()}`)
+          : `@${fullName.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
+
         await (supabase.from('sellers') as any)
           .update({
-            display_name: fullName,
+            display_name: formattedUser,
             phone: phone || null,
           })
           .eq('id', authSeller.id);
@@ -167,10 +177,23 @@ export function SellerProfile() {
 
         {/* Personal info */}
         <Card>
-          <SellerSectionTitle title="Informations personnelles" />
+          <SellerSectionTitle title="Informations personnelles" subtitle="Votre pseudo unique permet de vous identifier sur vos liens de recommandation." />
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <SellerField label="Nom complet">
               <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={sellerInputClass} data-testid="input-profile-name" />
+            </SellerField>
+            <SellerField label="Nom d'utilisateur unique (@pseudo)">
+              <input
+                value={username}
+                onChange={(e) => {
+                  let u = e.target.value;
+                  if (u && !u.startsWith('@')) u = `@${u}`;
+                  setUsername(u.toLowerCase().replace(/[^@a-z0-9_]/g, ''));
+                }}
+                placeholder="@mariama_fall"
+                className={`${sellerInputClass} font-bold text-[#5b49e8]`}
+                data-testid="input-profile-username"
+              />
             </SellerField>
             <SellerField label="Téléphone">
               <input value={phone} onChange={(e) => setPhone(e.target.value)} className={sellerInputClass} data-testid="input-profile-phone" />

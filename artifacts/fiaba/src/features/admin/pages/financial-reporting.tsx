@@ -1,20 +1,37 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  DollarSign,
-  TrendingUp,
-  Download,
-  Filter,
-  ShieldCheck,
-  CreditCard,
-  Zap,
-  CheckCircle,
-  Layers,
-  ArrowUpRight,
-  AlertTriangle,
-  Award
-} from 'lucide-react';
+  Alert01Icon,
+  ArrowUpRight01Icon,
+  Award01Icon,
+  Chart02Icon,
+  ChartUpIcon,
+  CheckmarkCircle02Icon,
+  Coins01Icon,
+  CreditCardIcon,
+  Download01Icon,
+  FilterIcon,
+  FlashIcon,
+  Layers01Icon,
+  Shield01Icon,
+  SparklesIcon,
+  ZapIcon,
+} from '@hugeicons/core-free-icons';
+import { Icon } from '@/components/shared/icon';
+import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AdminBadge,
+  AdminButton as Button,
+  AdminCard as Card,
+  AdminEmptyState,
+  AdminField,
+  AdminPage,
+  AdminScrollTable,
+  AdminSectionTitle,
+  adminInputClass,
+  adminSelectClass,
+} from '../components/admin-ui';
 
 type LedgerRow = {
   id: string;
@@ -56,9 +73,29 @@ type PlatformFeeRuleRow = {
   is_active: boolean;
 };
 
+const entryTypeConfig: Record<string, { label: string; tone: 'violet' | 'mint' | 'amber' | 'rose' | 'slate' }> = {
+  PLATFORM_FEE: { label: 'Commission vente', tone: 'violet' },
+  PLATFORM_FEE_REVERSAL: { label: 'Annulation commission', tone: 'rose' },
+  COMMISSION: { label: 'Commission vendeur', tone: 'slate' },
+  MARGIN: { label: 'Marge vendeur', tone: 'slate' },
+  SUBSCRIPTION_FEE: { label: 'Abonnement', tone: 'violet' },
+  SPONSORED_CAMPAIGN_FEE: { label: 'Sponsoring', tone: 'amber' },
+  PAYOUT_FEE: { label: 'Frais de retrait', tone: 'mint' },
+  PAYOUT: { label: 'Retrait vendeur', tone: 'mint' },
+};
+
+const tabs = [
+  { id: 'ledger', label: 'Grand Livre' },
+  { id: 'plans', label: 'Paliers Abonnements' },
+  { id: 'rules', label: 'Commission Plateforme' },
+  { id: 'payouts', label: 'Frais de Retrait' },
+] as const;
+
+type TabId = (typeof tabs)[number]['id'];
+
 export const FinancialReportingPage: React.FC = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'ledger' | 'rules' | 'plans' | 'payouts'>('ledger');
+  const [activeTab, setActiveTab] = useState<TabId>('ledger');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -165,6 +202,7 @@ export const FinancialReportingPage: React.FC = () => {
 
   // Export CSV
   const handleExportCSV = () => {
+    haptic('light');
     const headers = ['ID', 'Date', 'Type Écriture', 'Montant (FCFA)', 'Description', 'Marchand', 'Vendeur'];
     const rows = filteredEntries.map(e => [
       e.id,
@@ -184,16 +222,19 @@ export const FinancialReportingPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    toast({ title: 'Export généré', description: `${filteredEntries.length} écritures exportées.` });
   };
 
   async function savePlatformFeeRate() {
     if (!platformFeeRule) return;
+    haptic('medium');
     setSavingRule(true);
     const { error } = await (supabase.from('platform_fee_rules') as any)
       .update({ rate_percent: platformFeeRule.rate_percent })
       .eq('id', platformFeeRule.id);
     setSavingRule(false);
     if (error) {
+      haptic('error');
       toast({ title: 'Erreur', description: error.message });
     } else {
       toast({ title: 'Taux mis à jour', description: `Taux par défaut : ${platformFeeRule.rate_percent}%` });
@@ -202,12 +243,14 @@ export const FinancialReportingPage: React.FC = () => {
 
   async function savePayoutRule() {
     if (!payoutRule) return;
+    haptic('medium');
     setSavingRule(true);
     const { error } = await (supabase.from('payout_fee_rules') as any)
       .update({ fixed_fee: payoutRule.fixed_fee, free_threshold: payoutRule.free_threshold })
       .eq('id', payoutRule.id);
     setSavingRule(false);
     if (error) {
+      haptic('error');
       toast({ title: 'Erreur', description: error.message });
     } else {
       toast({ title: 'Règle mise à jour', description: 'Frais de retrait mis à jour avec succès.' });
@@ -216,296 +259,282 @@ export const FinancialReportingPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-center p-12">
-          <span className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+      <AdminPage eyebrow="Modèle économique" title="Finances">
+        <div className="mt-10 flex items-center justify-center py-16">
+          <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
         </div>
-      </div>
+      </AdminPage>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <TrendingUp className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
-            Finances & Modèle Économique
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Supervision transversale des 4 sources de revenus & audit immuable du Grand Livre
-          </p>
-        </div>
-
-        <button
-          onClick={handleExportCSV}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          Exporter le Grand Livre (CSV)
-        </button>
-      </div>
-
-      {/* KPI Cards — Synthese des 4 sources de revenus */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Revenu Total</span>
-            <DollarSign className="w-5 h-5 text-emerald-500" />
+    <AdminPage
+      eyebrow="Modèle économique"
+      title="Finances"
+      description="Supervision transversale des 4 sources de revenus et audit immuable du Grand Livre comptable."
+      action={
+        <Button variant="soft" onClick={handleExportCSV} testId="button-export-ledger">
+          <Icon glyph={Download01Icon} size={15} /> Exporter le Grand Livre
+        </Button>
+      }
+    >
+      {/* ── Hero : revenu total + 4 sources ── */}
+      <div className="mt-6 grid gap-4 xl:grid-cols-[1.3fr_.85fr]">
+        {/* Revenu total — carte violette profonde */}
+        <div className="rounded-[22px] bg-[#5745df] p-5 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#d0caff]">Revenu total plateforme</p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/15">
+                  <Icon glyph={ChartUpIcon} size={18} />
+                </span>
+                <strong className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.08em] sm:text-4xl">
+                  {money(grandTotalRevenue).replace(' F', '')}
+                </strong>
+                <span className="mb-1 text-sm text-[#d0caff]">FCFA</span>
+              </div>
+            </div>
+            <AdminBadge tone="mint" className="bg-white/15 text-white">
+              <Icon glyph={ArrowUpRight01Icon} size={12} /> Transverse
+            </AdminBadge>
           </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">
-            {grandTotalRevenue.toLocaleString('fr-FR')} FCFA
-          </p>
-          <span className="text-xs text-emerald-600 flex items-center gap-1 mt-1 font-medium">
-            <ArrowUpRight className="w-3.5 h-3.5" /> Transverse tous modules
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">1. Commissions Ventes</span>
-            <Layers className="w-5 h-5 text-blue-500" />
+          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-4 text-sm">
+            <div>
+              <p className="text-[#d0caff]">Écritures analysées</p>
+              <p className="mt-1 font-[Space_Grotesk] font-bold">{ledgerEntries.length}</p>
+            </div>
+            <div>
+              <p className="text-[#d0caff]">Sources actives</p>
+              <p className="mt-1 font-[Space_Grotesk] font-bold">
+                {[totalPlatformFees, totalSubscriptions, totalSponsored, totalPayoutFees].filter(v => v > 0).length} / 4
+              </p>
+            </div>
           </div>
-          <p className="text-xl font-bold text-slate-900 dark:text-white">
-            {totalPlatformFees.toLocaleString('fr-FR')} FCFA
-          </p>
-          <span className="text-xs text-slate-500 mt-1 block">Taux standard ~ {platformFeeRule ? `${platformFeeRule.rate_percent}%` : '5%'}</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">2. Abonnements</span>
-            <CreditCard className="w-5 h-5 text-purple-500" />
-          </div>
-          <p className="text-xl font-bold text-slate-900 dark:text-white">
-            {totalSubscriptions.toLocaleString('fr-FR')} FCFA
-          </p>
-          <span className="text-xs text-purple-600 mt-1 block font-medium">Plan Premium (25k)</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">3. Sponsoring</span>
-            <Zap className="w-5 h-5 text-amber-500" />
-          </div>
-          <p className="text-xl font-bold text-slate-900 dark:text-white">
-            {totalSponsored.toLocaleString('fr-FR')} FCFA
-          </p>
-          <span className="text-xs text-amber-600 mt-1 block font-medium">Boost Découvrir</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">4. Frais Retrait</span>
-            <ShieldCheck className="w-5 h-5 text-teal-500" />
-          </div>
-          <p className="text-xl font-bold text-slate-900 dark:text-white">
-            {totalPayoutFees.toLocaleString('fr-FR')} FCFA
-          </p>
-          <span className="text-xs text-slate-500 mt-1 block">Retraits &lt; 25k FCFA</span>
-        </div>
-      </div>
-
-      {/* Tabs Menu */}
-      <div className="border-b border-slate-200 dark:border-slate-700 flex gap-4 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('ledger')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'ledger'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Grand Livre Comptable (Ledger)
-        </button>
-
-        <button
-          onClick={() => setActiveTab('plans')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'plans'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Paliers Abonnements Freemium
-        </button>
-
-        <button
-          onClick={() => setActiveTab('rules')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'rules'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Règles Commission Plateforme
-        </button>
-
-        <button
-          onClick={() => setActiveTab('payouts')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'payouts'
-              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
-        >
-          Frais de Retrait Vendeurs
-        </button>
-      </div>
-
-      {/* Tab 1 : Grand Livre Comptable */}
-      {activeTab === 'ledger' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-            <input
-              type="text"
-              placeholder="Rechercher par description, marchand, vendeur..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="px-4 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white w-full sm:w-80"
+        {/* Détail des 4 sources — carte claire */}
+        <Card>
+          <p className="text-sm font-bold text-[#292541]">Les 4 sources de revenus</p>
+          <div className="mt-4 space-y-3">
+            <RevenueLine
+              glyph={Layers01Icon}
+              tone="violet"
+              label="Commissions ventes"
+              value={totalPlatformFees}
+              hint={platformFeeRule ? `Taux ~ ${platformFeeRule.rate_percent}%` : 'Taux ~ 5%'}
             />
-
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <select
-                value={selectedTypeFilter}
-                onChange={e => setSelectedTypeFilter(e.target.value)}
-                className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-              >
-                <option value="ALL">Tous les types d'écritures</option>
-                <option value="PLATFORM_FEE">Commission Plateforme (Vente)</option>
-                <option value="PLATFORM_FEE_REVERSAL">Annulation Commission Plateforme</option>
-                <option value="COMMISSION">Commission Vendeur</option>
-                <option value="MARGIN">Marge Vendeur</option>
-                <option value="SUBSCRIPTION_FEE">Frais d'Abonnement</option>
-                <option value="SPONSORED_CAMPAIGN_FEE">Sponsoring Campagne</option>
-                <option value="PAYOUT_FEE">Frais de Retrait</option>
-                <option value="PAYOUT">Retrait Vendeur</option>
-              </select>
-            </div>
+            <RevenueLine
+              glyph={CreditCardIcon}
+              tone="violet"
+              label="Abonnements"
+              value={totalSubscriptions}
+              hint="Plan Premium · 25k FCFA"
+            />
+            <RevenueLine
+              glyph={ZapIcon}
+              tone="amber"
+              label="Sponsoring"
+              value={totalSponsored}
+              hint="Boost Découvrir"
+            />
+            <RevenueLine
+              glyph={Shield01Icon}
+              tone="mint"
+              label="Frais de retrait"
+              value={totalPayoutFees}
+              hint="Retraits < 25k FCFA"
+            />
           </div>
+        </Card>
+      </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-xs">
-                  <tr>
-                    <th className="py-3.5 px-4 font-semibold">ID / Date</th>
-                    <th className="py-3.5 px-4 font-semibold">Type Écriture</th>
-                    <th className="py-3.5 px-4 font-semibold">Acteurs</th>
-                    <th className="py-3.5 px-4 font-semibold">Description</th>
-                    <th className="py-3.5 px-4 font-semibold text-right">Montant (FCFA)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {filteredEntries.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
-                        Aucune écriture comptable trouvée.
-                      </td>
-                    </tr>
-                  ) : filteredEntries.map(entry => (
-                    <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono text-xs text-slate-500 block">{entry.id.slice(0, 8)}</span>
-                        <span className="text-xs text-slate-400">{new Date(entry.created_at).toLocaleDateString('fr-FR')}</span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          entry.entry_type === 'PLATFORM_FEE' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
-                          entry.entry_type === 'SUBSCRIPTION_FEE' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' :
-                          entry.entry_type === 'SPONSORED_CAMPAIGN_FEE' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' :
-                          entry.entry_type === 'PAYOUT_FEE' || entry.entry_type === 'PAYOUT' ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' :
-                          entry.entry_type === 'PLATFORM_FEE_REVERSAL' ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300' :
-                          'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300'
+      {/* ── Tabs ── */}
+      <div className="mt-6 flex gap-1 overflow-x-auto border-b border-[#f1eef7]">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => { haptic('light'); setActiveTab(t.id); }}
+            className={`whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold transition ${
+              activeTab === t.id
+                ? 'border-[#5b49e8] text-[#5b49e8]'
+                : 'border-transparent text-[#77738a] hover:text-[#292541]'
+            }`}
+            data-testid={`tab-${t.id}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab 1 : Grand Livre Comptable ── */}
+      {activeTab === 'ledger' && (
+        <div className="mt-5 space-y-4">
+          {/* Filtres */}
+          <Card>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <input
+                type="text"
+                placeholder="Rechercher par description, marchand, vendeur…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className={adminInputClass}
+                data-testid="input-ledger-search"
+              />
+              <div className="flex items-center gap-2">
+                <Icon glyph={FilterIcon} size={16} className="shrink-0 text-[#9290a2]" />
+                <select
+                  value={selectedTypeFilter}
+                  onChange={e => setSelectedTypeFilter(e.target.value)}
+                  className={adminSelectClass}
+                  data-testid="select-ledger-type"
+                >
+                  <option value="ALL">Tous les types d'écritures</option>
+                  <option value="PLATFORM_FEE">Commission Plateforme (Vente)</option>
+                  <option value="PLATFORM_FEE_REVERSAL">Annulation Commission Plateforme</option>
+                  <option value="COMMISSION">Commission Vendeur</option>
+                  <option value="MARGIN">Marge Vendeur</option>
+                  <option value="SUBSCRIPTION_FEE">Frais d'Abonnement</option>
+                  <option value="SPONSORED_CAMPAIGN_FEE">Sponsoring Campagne</option>
+                  <option value="PAYOUT_FEE">Frais de Retrait</option>
+                  <option value="PAYOUT">Retrait Vendeur</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Table Grand Livre */}
+          <Card className="p-0">
+            <div className="px-5 py-4">
+              <AdminSectionTitle
+                title="Écritures comptables"
+                subtitle={`${filteredEntries.length} écriture(s) — triées par date décroissante`}
+              />
+            </div>
+            {filteredEntries.length === 0 ? (
+              <AdminEmptyState
+                glyph={Chart02Icon}
+                title="Aucune écriture trouvée"
+                description="Ajustez votre recherche ou votre filtre pour afficher des écritures comptables."
+              />
+            ) : (
+              <AdminScrollTable minWidth={720} testId="scroll-ledger">
+                <div className="divide-y divide-[#f1eef7]">
+                  {filteredEntries.map(entry => {
+                    const cfg = entryTypeConfig[entry.entry_type] ?? { label: entry.entry_type, tone: 'slate' as const };
+                    const isNegative = entry.amount < 0;
+                    return (
+                      <div key={entry.id} className="flex items-center gap-3 px-5 py-4">
+                        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+                          cfg.tone === 'mint' ? 'bg-[#e7faf2] text-[#278e69]' :
+                          cfg.tone === 'amber' ? 'bg-[#fff4de] text-[#ac741e]' :
+                          cfg.tone === 'rose' ? 'bg-[#fff0f1] text-[#c45667]' :
+                          cfg.tone === 'violet' ? 'bg-[#efedff] text-[#5b49e8]' :
+                          'bg-[#f0eff5] text-[#716d82]'
                         }`}>
-                          {entry.entry_type}
+                          <Icon glyph={Coins01Icon} size={17} />
                         </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {entry.merchant_name && <div className="text-xs font-medium text-slate-900 dark:text-white">Marchand: {entry.merchant_name}</div>}
-                        {entry.seller_name && <div className="text-xs text-slate-500">Vendeur: {entry.seller_name}</div>}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        {entry.description ?? '—'}
-                      </td>
-                      <td className={`py-3.5 px-4 text-right font-bold ${entry.amount < 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
-                        {entry.amount > 0 ? `+${entry.amount.toLocaleString('fr-FR')}` : entry.amount.toLocaleString('fr-FR')} FCFA
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-[#292541]">{cfg.label}</p>
+                            <span className="font-mono text-[10px] text-[#b8b4c8]">#{entry.id.slice(0, 8)}</span>
+                          </div>
+                          <p className="mt-0.5 truncate text-[11px] text-[#9290a2]">
+                            {new Date(entry.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {entry.merchant_name && ` · ${entry.merchant_name}`}
+                            {entry.seller_name && ` · ${entry.seller_name}`}
+                          </p>
+                        </div>
+                        <div className="hidden text-right text-[11px] text-[#9290a2] sm:block sm:max-w-[220px] sm:truncate">
+                          {entry.description ?? '—'}
+                        </div>
+                        <strong className={`shrink-0 font-[Space_Grotesk] text-sm font-bold ${isNegative ? 'text-[#c45667]' : 'text-[#292541]'}`}>
+                          {isNegative ? '' : '+'}{money(entry.amount).replace(' F', '')}
+                          <span className="ml-1 text-[10px] font-sans font-normal text-[#9290a2]">F</span>
+                        </strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </AdminScrollTable>
+            )}
+          </Card>
         </div>
       )}
 
-      {/* Tab 2 : Paliers Freemium */}
+      {/* ── Tab 2 : Paliers Freemium ── */}
       {activeTab === 'plans' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
           {plans.map(plan => {
             const features = plan.features ?? [];
+            const isPremium = plan.name === 'Premium';
             return (
-              <div key={plan.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      {plan.name === 'Premium' && <Award className="w-5 h-5 text-purple-500" />}
-                      Plan {plan.name}
-                    </h3>
-                    <span className="text-xs font-semibold px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-700 dark:text-slate-300">
-                      Commission Plateforme : {Number(plan.platform_fee_rate)}%
+              <Card key={plan.id}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${isPremium ? 'bg-[#efedff] text-[#5b49e8]' : 'bg-[#f0eff5] text-[#716d82]'}`}>
+                      <Icon glyph={isPremium ? SparklesIcon : CreditCardIcon} size={18} />
                     </span>
+                    <div>
+                      <p className="text-sm font-bold text-[#292541]">Plan {plan.name}</p>
+                      <p className="text-[10px] text-[#9290a2]">{isPremium ? 'Croissance' : 'Démarrage'}</p>
+                    </div>
                   </div>
-
-                  <div className="text-3xl font-extrabold text-slate-900 dark:text-white mb-4">
-                    {plan.price_monthly === 0 ? 'Gratuit' : `${plan.price_monthly.toLocaleString('fr-FR')} FCFA / mois`}
-                  </div>
-
-                  <ul className="space-y-3 mb-6 text-sm text-slate-600 dark:text-slate-300">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      <span>Max produits actifs : <strong>{plan.max_active_products}</strong></span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      <span>Max campagnes actives : <strong>{plan.max_active_campaigns}</strong></span>
-                    </li>
-                    {features.map((feat, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <AdminBadge tone={plan.is_active ? 'mint' : 'slate'}>
+                    {plan.is_active ? 'Actif' : 'Inactif'}
+                  </AdminBadge>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs text-slate-500">
-                  <span>Statut : {plan.is_active ? 'Active' : 'Inactive'}</span>
+                <div className="mt-5 flex items-end gap-1">
+                  <strong className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] text-[#292541]">
+                    {plan.price_monthly === 0 ? 'Gratuit' : money(plan.price_monthly).replace(' F', '')}
+                  </strong>
+                  {plan.price_monthly > 0 && <span className="mb-1 text-xs text-[#9290a2]">FCFA / mois</span>}
                 </div>
-              </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-[#f4f3f8] p-3 text-center">
+                  <div>
+                    <p className="text-[10px] text-[#9290a2]">Produits</p>
+                    <p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{plan.max_active_products}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-[#9290a2]">Campagnes</p>
+                    <p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">{plan.max_active_campaigns}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-[#9290a2]">Commission</p>
+                    <p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#5b49e8]">{Number(plan.platform_fee_rate)}%</p>
+                  </div>
+                </div>
+
+                <ul className="mt-5 space-y-2.5">
+                  {features.map((feat, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-[13px] text-[#292541]">
+                      <Icon glyph={CheckmarkCircle02Icon} size={16} className="mt-0.5 shrink-0 text-[#278e69]" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {/* Tab 3 : Règles Commission Plateforme */}
+      {/* ── Tab 3 : Règle Commission Plateforme ── */}
       {activeTab === 'rules' && platformFeeRule && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
-              Règle Générale par Défaut
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Ce taux est appliqué à toute commande sauf si le marchand bénéficie d'un plan Premium à taux préférentiel.
-            </p>
-
-            <div className="flex items-center gap-4 max-w-sm">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Taux de commission par défaut (%) :
-              </label>
+        <Card className="mt-5">
+          <AdminSectionTitle
+            title="Règle générale par défaut"
+            subtitle="Taux appliqué à toute commande sauf si le marchand bénéficie d'un plan Premium à taux préférentiel."
+            action={
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+                <Icon glyph={Chart02Icon} size={18} />
+              </span>
+            }
+          />
+          <div className="mt-5 max-w-md rounded-xl bg-[#f4f3f8] p-5">
+            <AdminField label="Taux de commission par défaut (%)">
               <input
                 type="number"
                 step="0.5"
@@ -513,71 +542,97 @@ export const FinancialReportingPage: React.FC = () => {
                 max="30"
                 value={platformFeeRule.rate_percent}
                 onChange={e => setPlatformFeeRule({ ...platformFeeRule, rate_percent: parseFloat(e.target.value) || 0 })}
-                className="px-3 py-2 border rounded-lg w-24 text-center font-bold text-slate-900 dark:bg-slate-900 dark:text-white dark:border-slate-700"
+                className={`${adminInputClass} text-center font-[Space_Grotesk] text-lg font-bold`}
+                data-testid="input-platform-fee-rate"
               />
-              <button
-                onClick={savePlatformFeeRate}
-                disabled={savingRule}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow disabled:opacity-50"
-              >
-                {savingRule ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
+            </AdminField>
+            <div className="mt-4">
+              <Button onClick={savePlatformFeeRate} disabled={savingRule} testId="button-save-platform-fee">
+                {savingRule ? 'Enregistrement…' : 'Enregistrer le taux'}
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Tab 4 : Frais de Retrait Vendeurs */}
+      {/* ── Tab 4 : Frais de Retrait Vendeurs ── */}
       {activeTab === 'payouts' && payoutRule && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
-              Configuration des Frais de Retrait Mobile Money
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Couvre les coûts de transaction de nos partenaires Mobile Money (Wave, Orange Money).
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Frais Fixe (&lt; Seuil)</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={payoutRule.fixed_fee}
-                    onChange={e => setPayoutRule({ ...payoutRule, fixed_fee: parseInt(e.target.value) || 0 })}
-                    className="px-3 py-2 border rounded-lg w-full text-slate-900 dark:bg-slate-900 dark:text-white dark:border-slate-700"
-                  />
-                  <span className="text-xs text-slate-500 font-bold">FCFA</span>
-                </div>
+        <Card className="mt-5">
+          <AdminSectionTitle
+            title="Configuration des frais de retrait Mobile Money"
+            subtitle="Couvre les coûts de transaction de nos partenaires Mobile Money (Wave, Orange Money)."
+            action={
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]">
+                <Icon glyph={Shield01Icon} size={18} />
+              </span>
+            }
+          />
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <AdminField label="Frais fixe (< seuil)" hint="Montant prélevé sur les retraits sous le seuil de gratuité.">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={payoutRule.fixed_fee}
+                  onChange={e => setPayoutRule({ ...payoutRule, fixed_fee: parseInt(e.target.value) || 0 })}
+                  className={adminInputClass}
+                  data-testid="input-payout-fixed-fee"
+                />
+                <span className="shrink-0 text-xs font-bold text-[#9290a2]">FCFA</span>
               </div>
+            </AdminField>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Seuil de Gratuité</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={payoutRule.free_threshold}
-                    onChange={e => setPayoutRule({ ...payoutRule, free_threshold: parseInt(e.target.value) || 0 })}
-                    className="px-3 py-2 border rounded-lg w-full text-slate-900 dark:bg-slate-900 dark:text-white dark:border-slate-700"
-                  />
-                  <span className="text-xs text-slate-500 font-bold">FCFA</span>
-                </div>
+            <AdminField label="Seuil de gratuité" hint="Au-delà de ce montant, le retrait est gratuit pour le vendeur.">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={payoutRule.free_threshold}
+                  onChange={e => setPayoutRule({ ...payoutRule, free_threshold: parseInt(e.target.value) || 0 })}
+                  className={adminInputClass}
+                  data-testid="input-payout-threshold"
+                />
+                <span className="shrink-0 text-xs font-bold text-[#9290a2]">FCFA</span>
               </div>
+            </AdminField>
 
-              <div className="flex items-end">
-                <button
-                  onClick={savePayoutRule}
-                  disabled={savingRule}
-                  className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg shadow disabled:opacity-50"
-                >
-                  {savingRule ? 'Enregistrement…' : 'Mettre à jour Règle'}
-                </button>
-              </div>
+            <div className="flex items-end">
+              <Button onClick={savePayoutRule} disabled={savingRule} className="w-full" testId="button-save-payout-rule">
+                {savingRule ? 'Enregistrement…' : 'Mettre à jour la règle'}
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
       )}
-    </div>
+    </AdminPage>
   );
 };
+
+/* ── Ligne de revenu compacte (hero secondaire) ── */
+function RevenueLine({
+  glyph,
+  tone,
+  label,
+  value,
+  hint,
+}: {
+  glyph: typeof Chart02Icon;
+  tone: 'violet' | 'mint' | 'amber';
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  const toneClass = tone === 'mint' ? 'bg-[#e7faf2] text-[#278e69]' : tone === 'amber' ? 'bg-[#fff4de] text-[#ac741e]' : 'bg-[#efedff] text-[#5b49e8]';
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${toneClass}`}>
+        <Icon glyph={glyph} size={15} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-[#292541]">{label}</p>
+        <p className="text-[10px] text-[#9290a2]">{hint}</p>
+      </div>
+      <strong className="shrink-0 font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+        {money(value).replace(' F', '')} <span className="text-[10px] font-sans font-normal text-[#9290a2]">F</span>
+      </strong>
+    </div>
+  );
+}

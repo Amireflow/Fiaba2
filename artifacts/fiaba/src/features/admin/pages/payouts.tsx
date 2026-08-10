@@ -100,9 +100,16 @@ export function AdminPayouts() {
       haptic('error');
       toast({ title: 'Erreur', description: error.message });
     } else {
+      if (action === 'paid') {
+        await (supabase.from('commissions') as any)
+          .update({ status: 'paid', paid_at: new Date().toISOString() })
+          .eq('seller_id', payout.seller_id)
+          .eq('status', 'available');
+      }
+
       setPayouts((prev) => prev.map((p) => (p.id === payout.id ? { ...p, status: action } : p)));
       setSelected({ ...payout, status: action });
-      toast({ title: `Retrait ${statusLabelMap[action].toLowerCase()}`, description: `${sellerNames.get(payout.seller_id) ?? 'Vendeur'} · ${money(payout.amount)}. Journal d'audit mis à jour.` });
+      toast({ title: `Retrait ${statusLabelMap[action].toLowerCase()}`, description: `${sellerNames.get(payout.seller_id) ?? 'Vendeur'} · ${money(payout.amount)}.` });
     }
     setToProcess(null);
   }

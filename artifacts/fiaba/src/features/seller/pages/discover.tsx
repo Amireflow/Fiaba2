@@ -136,7 +136,7 @@ export function Discover() {
     >
       {/* Barre de filtres simplifiée */}
       <div className="mt-5 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9290a2]">
               <Icon glyph={Search01Icon} size={17} />
@@ -150,34 +150,36 @@ export function Discover() {
               data-testid="input-seller-search"
             />
           </div>
-          {/* Toggle vue grille/liste */}
-          <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#f4f3f8] p-1">
+          <div className="flex items-center justify-between gap-2 lg:justify-start">
+            {/* Toggle vue grille/liste */}
+            <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#f4f3f8] p-1">
+              <button
+                onClick={() => { haptic('light'); setViewMode('grid'); }}
+                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'grid' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+                data-testid="button-view-grid"
+                aria-label="Vue grille"
+              >
+                <Icon glyph={GridViewIcon} size={16} />
+              </button>
+              <button
+                onClick={() => { haptic('light'); setViewMode('list'); }}
+                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'list' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+                data-testid="button-view-list"
+                aria-label="Vue liste"
+              >
+                <Icon glyph={ListViewIcon} size={16} />
+              </button>
+            </div>
+            {/* Bouton filtres avancés */}
             <button
-              onClick={() => { haptic('light'); setViewMode('grid'); }}
-              className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'grid' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
-              data-testid="button-view-grid"
-              aria-label="Vue grille"
+              onClick={() => { haptic('light'); setShowAdvanced(!showAdvanced); }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${showAdvanced ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#67627b] hover:bg-[#e4e1ff] hover:text-[#5b49e8]'}`}
+              data-testid="button-advanced-filters"
             >
-              <Icon glyph={GridViewIcon} size={16} />
-            </button>
-            <button
-              onClick={() => { haptic('light'); setViewMode('list'); }}
-              className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'list' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
-              data-testid="button-view-list"
-              aria-label="Vue liste"
-            >
-              <Icon glyph={ListViewIcon} size={16} />
+              <Icon glyph={FilterIcon} size={15} />
+              Avancés
             </button>
           </div>
-          {/* Bouton filtres avancés */}
-          <button
-            onClick={() => { haptic('light'); setShowAdvanced(!showAdvanced); }}
-            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${showAdvanced ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#67627b] hover:bg-[#e4e1ff] hover:text-[#5b49e8]'}`}
-            data-testid="button-advanced-filters"
-          >
-            <Icon glyph={FilterIcon} size={15} />
-            Avancés
-          </button>
         </div>
 
         {/* Panneau filtres avancés (dépliable) */}
@@ -503,19 +505,19 @@ function CampaignListRow({
   const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
 
   return (
-    <Card className="flex flex-col gap-4 p-4 transition hover:shadow-md sm:flex-row sm:items-center">
+    <Card className="flex flex-col gap-3 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-4">
       <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
         <SafeImage
           src={imgUrl}
           alt={c.product_name ?? c.campaign_name}
-          className="h-32 w-full rounded-xl object-cover sm:h-20 sm:w-24"
+          className="h-16 w-16 rounded-xl object-cover sm:h-20 sm:w-20"
           iconSize={22}
         />
       </Link>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
             {c.product_name ?? c.campaign_name}
           </p>
           {isTopMatch && (
@@ -529,32 +531,32 @@ function CampaignListRow({
             </span>
           )}
         </div>
-        <p className="mt-1 truncate text-xs text-[#9290a2]">
+        <p className="mt-0.5 truncate text-xs text-[#9290a2]">
           {c.merchant_name} · {c.product_category ?? 'Divers'}
         </p>
         <div className="mt-2 flex items-center gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-[#9290a2]">Prix</p>
-            <p className="text-sm font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</p>
+            <p className="text-[9px] uppercase tracking-wider text-[#9290a2]">Prix</p>
+            <p className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</p>
           </div>
           <div className="h-8 w-px bg-[#f0eff5]" />
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-[#278e69]">Gain / vente</p>
-            <p className="text-sm font-bold text-[#278e69]">+{money(netGain)}</p>
+            <p className="text-[9px] uppercase tracking-wider text-[#278e69]">Gain / vente</p>
+            <p className="text-xs font-bold text-[#278e69]">+{money(netGain)}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:flex-col">
+      <div className="flex items-center gap-2 sm:shrink-0">
         {c.is_joined ? (
-          <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 sm:w-full">
-            <Button variant="success" className="w-full" testId={`share-list-${c.campaign_id}`}>
+          <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 sm:flex-none">
+            <Button variant="success" className="w-full sm:w-auto" testId={`share-list-${c.campaign_id}`}>
               Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
             </Button>
           </Link>
         ) : (
           <Button
-            className="flex-1 sm:w-full"
+            className="flex-1 sm:w-auto"
             onClick={() => onJoin(c)}
             disabled={joining === c.campaign_id}
             testId={`join-list-${c.campaign_id}`}
@@ -562,8 +564,8 @@ function CampaignListRow({
             {joining === c.campaign_id ? '…' : 'Rejoindre'}
           </Button>
         )}
-        <Link href={`/seller/product/${c.campaign_id}`} className="flex-1 sm:w-full">
-          <Button variant="soft" className="w-full" testId={`view-list-${c.campaign_id}`}>Détails</Button>
+        <Link href={`/seller/product/${c.campaign_id}`} className="flex-1 sm:flex-none">
+          <Button variant="soft" className="w-full sm:w-auto" testId={`view-list-${c.campaign_id}`}>Détails</Button>
         </Link>
       </div>
     </Card>

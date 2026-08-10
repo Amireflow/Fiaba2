@@ -8,12 +8,15 @@ import { compressImageFile } from '@/lib/utils';
  */
 export async function uploadImageToSupabase(
   file: File,
-  bucketName = 'products'
+  bucketName = 'products',
+  onProgress?: (percent: number) => void
 ): Promise<{ url: string | null; error: string | null }> {
   try {
     const ext = file.name.split('.').pop() || 'png';
     const fileName = `item-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
     const filePath = `public/${fileName}`;
+
+    if (onProgress) onProgress(15);
 
     // Attempt Supabase Storage Upload
     const { error: uploadErr } = await supabase.storage
@@ -23,8 +26,12 @@ export async function uploadImageToSupabase(
         upsert: true,
       });
 
+    if (onProgress) onProgress(75);
+
     if (uploadErr) {
-      return uploadAsCompressedBase64(file);
+      const fallback = await uploadAsCompressedBase64(file);
+      if (onProgress) onProgress(100);
+      return fallback;
     }
 
     // Get Public URL
@@ -32,26 +39,40 @@ export async function uploadImageToSupabase(
       .from(bucketName)
       .getPublicUrl(filePath);
 
+    if (onProgress) onProgress(100);
+
     if (publicUrlData?.publicUrl) {
       return { url: publicUrlData.publicUrl, error: null };
     }
 
     return uploadAsCompressedBase64(file);
   } catch (err: any) {
+    if (onProgress) onProgress(100);
     return uploadAsCompressedBase64(file);
   }
 }
 
 /**
- * Upload multiple image files concurrently to Supabase Storage with client-side compression.
+ * Upload multiple image files concurrently to Supabase Storage with client-side compression and progress callback.
  */
 export async function uploadMultipleImagesToSupabase(
   files: FileList | File[],
-  bucketName = 'products'
+  bucketName = 'products',
+  onProgress?: (percent: number) => void
 ): Promise<{ urls: string[]; errors: string[] }> {
   const fileArray = Array.from(files);
+  let completedCount = 0;
+  if (onProgress) onProgress(10);
+
   const results = await Promise.all(
-    fileArray.map((file) => uploadImageToSupabase(file, bucketName))
+    fileArray.map(async (file) => {
+      const res = await uploadImageToSupabase(file, bucketName);
+      completedCount++;
+      if (onProgress) {
+        onProgress(Math.round((completedCount / fileArray.length) * 100));
+      }
+      return res;
+    })
   );
 
   const urls: string[] = [];

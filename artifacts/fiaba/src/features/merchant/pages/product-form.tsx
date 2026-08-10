@@ -201,11 +201,28 @@ export function ProductForm() {
   }
 
   // Handle Digital File Upload with Progress %
+  const [digitalFileName, setDigitalFileName] = useState<string>('');
+
+  function getCleanFileName(url: string): string {
+    if (digitalFileName) return digitalFileName;
+    if (!url) return 'Fichier.pdf';
+    try {
+      const raw = url.split('?')[0].split('#')[0];
+      const parts = raw.split('/');
+      let filename = parts[parts.length - 1] || 'Fichier.pdf';
+      filename = filename.replace(/^item-\d+-[a-z0-9]+-?/i, '');
+      return decodeURIComponent(filename);
+    } catch (e) {
+      return 'Fichier_numérique.pdf';
+    }
+  }
+
   async function handleDigitalFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const file = files[0];
+    setDigitalFileName(file.name);
     setDigitalUploadProgress(10);
     haptic('medium');
 
@@ -462,8 +479,8 @@ export function ProductForm() {
       }
     >
       {/* Step Wizard Navigation Header */}
-      <div className="mt-6 rounded-2xl bg-white p-2.5 shadow-xs border border-[#f0edf7]">
-        <div className="grid grid-cols-3 gap-2">
+      <div className="mt-4 sm:mt-6 rounded-2xl bg-white p-1.5 sm:p-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {[
             { step: 1 as WizardStep, label: '1. Informations & Format', icon: PackageIcon },
             { step: 2 as WizardStep, label: '2. Prix & Affiliation', icon: Tag01Icon },
@@ -476,73 +493,73 @@ export function ProductForm() {
                 key={s.step}
                 type="button"
                 onClick={() => goToStep(s.step)}
-                className={`flex items-center justify-center gap-2 rounded-xl py-3 px-2 text-xs font-bold transition ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2.5 sm:py-3 px-2 text-xs font-bold transition ${
                   isActive
-                    ? 'bg-[#5b49e8] text-white shadow-xs'
+                    ? 'bg-[#5b49e8] text-white'
                     : isDone
                     ? 'bg-[#efedff] text-[#5b49e8]'
                     : 'bg-transparent text-[#807b98] hover:bg-[#f8f7fc]'
                 }`}
                 data-testid={`step-tab-${s.step}`}
               >
-                <Icon glyph={isDone ? CheckmarkCircle02Icon : s.icon} size={16} />
-                <span className="hidden sm:inline">{s.label}</span>
-                <span className="sm:hidden">Étape {s.step}</span>
+                <Icon glyph={isDone ? CheckmarkCircle02Icon : s.icon} size={15} />
+                <span className="hidden md:inline">{s.label}</span>
+                <span className="md:hidden">Étape {s.step}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
+      <div className="mt-4 sm:mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[1.3fr_.7fr]">
         {/* Step Content */}
-        <Card className="p-6">
-          <form onSubmit={save} className="space-y-6">
+        <Card className="p-4 sm:p-6">
+          <form onSubmit={save} className="space-y-4 sm:space-y-6">
             {/* ── STEP 1: INFORMATIONS GENERALES & FORMAT ── */}
             {activeStep === 1 && (
-              <div className="space-y-5">
-                <div className="border-b border-[#f0edf7] pb-4">
-                  <h3 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Type & Format de Produit</h3>
-                  <p className="text-xs text-[#807b98] mt-0.5">Choisissez la nature du produit pour adapter la livraison.</p>
+              <div className="space-y-4 sm:space-y-5">
+                <div>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Type & Format de Produit</h3>
+                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Choisissez la nature du produit pour adapter la livraison.</p>
                 </div>
 
                 <Field label="Format de vente">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => setField('type', 'physique')}
-                      className={`flex items-center gap-3 rounded-2xl p-4 text-left transition border-2 ${
+                      className={`flex items-center gap-2.5 sm:gap-3 rounded-2xl p-3 sm:p-4 text-left transition ${
                         form.type === 'physique'
-                          ? 'border-[#5b49e8] bg-[#f6f5ff]'
-                          : 'border-[#ede9f5] bg-white hover:border-[#d4ceff]'
+                          ? 'bg-[#f6f5ff] text-[#5b49e8]'
+                          : 'bg-[#f4f3f8] text-[#807b98] hover:bg-[#eae8f5]'
                       }`}
                       data-testid="type-physique"
                     >
-                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${form.type === 'physique' ? 'bg-[#5b49e8] text-white' : 'bg-[#efedff] text-[#5b49e8]'}`}>
-                        <Icon glyph={PackageIcon} size={20} />
+                      <span className={`grid h-9 w-9 sm:h-10 sm:w-10 shrink-0 place-items-center rounded-xl ${form.type === 'physique' ? 'bg-[#5b49e8] text-white' : 'bg-[#efedff] text-[#5b49e8]'}`}>
+                        <Icon glyph={PackageIcon} size={18} />
                       </span>
                       <div>
                         <p className="text-xs font-bold text-[#292541]">Produit Physique</p>
-                        <p className="text-[10px] text-[#807b98]">Livraison physique, colis & zones</p>
+                        <p className="text-[10px] text-[#807b98] hidden sm:block">Livraison physique, colis & zones</p>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setField('type', 'digital')}
-                      className={`flex items-center gap-3 rounded-2xl p-4 text-left transition border-2 ${
+                      className={`flex items-center gap-2.5 sm:gap-3 rounded-2xl p-3 sm:p-4 text-left transition ${
                         form.type === 'digital'
-                          ? 'border-[#5b49e8] bg-[#f6f5ff]'
-                          : 'border-[#ede9f5] bg-white hover:border-[#d4ceff]'
+                          ? 'bg-[#f6f5ff] text-[#5b49e8]'
+                          : 'bg-[#f4f3f8] text-[#807b98] hover:bg-[#eae8f5]'
                       }`}
                       data-testid="type-digital"
                     >
-                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${form.type === 'digital' ? 'bg-[#5b49e8] text-white' : 'bg-[#efedff] text-[#5b49e8]'}`}>
-                        <Icon glyph={SparklesIcon} size={20} />
+                      <span className={`grid h-9 w-9 sm:h-10 sm:w-10 shrink-0 place-items-center rounded-xl ${form.type === 'digital' ? 'bg-[#5b49e8] text-white' : 'bg-[#efedff] text-[#5b49e8]'}`}>
+                        <Icon glyph={SparklesIcon} size={18} />
                       </span>
                       <div>
                         <p className="text-xs font-bold text-[#292541]">Produit Digital</p>
-                        <p className="text-[10px] text-[#807b98]">Ebook, Formation, PDF (Accès instantané)</p>
+                        <p className="text-[10px] text-[#807b98] hidden sm:block">Ebook, Formation (Téléchargement)</p>
                       </div>
                     </button>
                   </div>
@@ -552,14 +569,14 @@ export function ProductForm() {
                   <input
                     value={form.name}
                     onChange={(e) => setField('name', e.target.value)}
-                    placeholder={form.type === 'digital' ? 'Ex. Guide Complet E-Commerce Sénégal (PDF)' : 'Ex. Coffret Soin Karité & Miel'}
+                    placeholder={form.type === 'digital' ? 'Ex. Guide E-Commerce Sénégal (PDF)' : 'Ex. Coffret Soin Karité & Miel'}
                     className={`${inputClass} ${errors.name ? 'ring-1 ring-[#ef6d78]' : ''}`}
                     data-testid="input-name"
                   />
                   {errors.name && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.name}</p>}
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Field label="Catégorie *">
                     <select value={form.category} onChange={(e) => setField('category', e.target.value)} className={selectClass} data-testid="input-category">
                       {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -581,14 +598,14 @@ export function ProductForm() {
                     value={form.description}
                     onChange={(e) => setField('description', e.target.value)}
                     placeholder="Présentez clairement votre produit pour convaincre vos vendeurs et vos clients…"
-                    className={`${textareaClass} min-h-32`}
+                    className={`${textareaClass} min-h-24 sm:min-h-32`}
                     data-testid="input-description"
                   />
                 </Field>
 
-                <div className="flex justify-end pt-3">
+                <div className="flex justify-end pt-2 sm:pt-3">
                   <Button type="button" onClick={() => goToStep(2)} testId="button-next-step-2">
-                    Étape suivante : Prix & Affiliation <Icon glyph={ArrowRight01Icon} size={15} />
+                    Suivant : Prix & Affiliation <Icon glyph={ArrowRight01Icon} size={15} />
                   </Button>
                 </div>
               </div>
@@ -596,13 +613,13 @@ export function ProductForm() {
 
             {/* ── STEP 2: PRIX, STOCK & AFFILIATION ── */}
             {activeStep === 2 && (
-              <div className="space-y-5">
-                <div className="border-b border-[#f0edf7] pb-4">
-                  <h3 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Tarification & Stocks</h3>
-                  <p className="text-xs text-[#807b98] mt-0.5">Définissez le prix public et réglez les commissions créateurs.</p>
+              <div className="space-y-4 sm:space-y-5">
+                <div>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Tarification & Stocks</h3>
+                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Définissez le prix public et réglez les commissions créateurs.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Field label="Prix public de vente (FCFA) *">
                     <input
                       type="number"
@@ -644,15 +661,15 @@ export function ProductForm() {
                 )}
 
                 {/* Seller Affiliation Module & Live Calculator */}
-                <div className="rounded-2xl bg-[#f6f5ff] p-5 border border-[#e4ddff] space-y-4">
+                <div className="rounded-2xl bg-[#f6f5ff] p-4 sm:p-5 space-y-3 sm:space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#5b49e8] text-white">
-                        <Icon glyph={SparklesIcon} size={18} />
+                      <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#5b49e8] text-white">
+                        <Icon glyph={SparklesIcon} size={16} />
                       </span>
                       <div>
-                        <h4 className="text-xs font-bold text-[#292541]">Programme d'Affiliation Vendeurs</h4>
-                        <p className="text-[10px] text-[#77738a]">Permettre aux affiliés de promouvoir ce produit immédiatement.</p>
+                        <h4 className="text-xs font-bold text-[#292541]">Programme Affiliation</h4>
+                        <p className="text-[10px] text-[#77738a] hidden sm:block">Permettre aux affiliés de promouvoir ce produit immédiatement.</p>
                       </div>
                     </div>
 
@@ -669,9 +686,9 @@ export function ProductForm() {
                   </div>
 
                   {form.enableAffiliation && (
-                    <div className="space-y-4 pt-2 border-t border-[#e4ddff]">
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="Type de rémunération">
+                    <div className="space-y-3 sm:space-y-4 pt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Field label="Rémunération">
                           <select
                             value={form.commissionType}
                             onChange={(e) => setField('commissionType', e.target.value as 'percentage' | 'fixed')}
@@ -698,35 +715,35 @@ export function ProductForm() {
                       </div>
 
                       {/* Live Revenue Breakdown Card */}
-                      <div className="rounded-xl bg-white p-4 space-y-2 text-xs border border-[#e4ddff]">
+                      <div className="rounded-xl bg-white p-3.5 sm:p-4 space-y-2 text-xs">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Simulateur de revenus par vente</p>
                         <div className="flex justify-between text-[#77738a]">
                           <span>Prix de vente public</span>
                           <span className="font-bold text-[#292541]">{money(revenueCalculations.price)}</span>
                         </div>
                         <div className="flex justify-between text-[#c45667]">
-                          <span>Commission accordée au vendeur</span>
+                          <span>Commission vendeur</span>
                           <span className="font-bold">− {money(revenueCalculations.sellerGain)}</span>
                         </div>
                         <div className="flex justify-between text-[#77738a]">
                           <span>Frais plateforme Fiaba (5%)</span>
                           <span className="font-bold">− {money(revenueCalculations.platformFee)}</span>
                         </div>
-                        <div className="flex justify-between border-t border-[#f0edf7] pt-2 text-sm font-bold text-[#278e69]">
+                        <div className="flex justify-between pt-1.5 text-xs sm:text-sm font-bold text-[#278e69]">
                           <span>Votre revenu net garanti</span>
-                          <span className="font-[Space_Grotesk] text-base">{money(revenueCalculations.netMerchantRevenue)}</span>
+                          <span className="font-[Space_Grotesk] text-sm sm:text-base">{money(revenueCalculations.netMerchantRevenue)}</span>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-between pt-3">
+                <div className="flex justify-between pt-2 sm:pt-3">
                   <Button type="button" variant="ghost" onClick={() => goToStep(1)}>
                     <Icon glyph={ArrowLeft01Icon} size={15} /> Précédent
                   </Button>
                   <Button type="button" onClick={() => goToStep(3)} testId="button-next-step-3">
-                    Étape suivante : Médias & Fichiers <Icon glyph={ArrowRight01Icon} size={15} />
+                    Suivant : Médias <Icon glyph={ArrowRight01Icon} size={15} />
                   </Button>
                 </div>
               </div>
@@ -734,10 +751,10 @@ export function ProductForm() {
 
             {/* ── STEP 3: MEDIAS & RESSOURCES DIGITALES ── */}
             {activeStep === 3 && (
-              <div className="space-y-5">
-                <div className="border-b border-[#f0edf7] pb-4">
-                  <h3 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Galerie Photos & Fichiers</h3>
-                  <p className="text-xs text-[#807b98] mt-0.5">Importez vos visuels et joignez vos documents digitaux téléchargeables.</p>
+              <div className="space-y-4 sm:space-y-5">
+                <div>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Galerie Photos & Fichiers</h3>
+                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Importez vos visuels et joignez vos documents digitaux téléchargeables.</p>
                 </div>
 
                 {/* Multi-photo uploader with percentage % bar */}
@@ -754,7 +771,7 @@ export function ProductForm() {
 
                   {/* Percentage Progress Bar */}
                   {imageUploadProgress !== null && (
-                    <div className="rounded-2xl bg-[#efedff] p-4 space-y-2">
+                    <div className="rounded-2xl bg-[#efedff] p-3.5 sm:p-4 space-y-2">
                       <div className="flex items-center justify-between text-xs font-bold text-[#5b49e8]">
                         <span className="flex items-center gap-2">
                           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
@@ -774,9 +791,9 @@ export function ProductForm() {
                   {form.images.length > 0 ? (
                     <div className="space-y-3">
                       {/* Main Cover Image */}
-                      <div className="relative overflow-hidden rounded-2xl border-2 border-[#5b49e8] bg-white">
-                        <img src={form.images[0]} alt={form.name} className="h-48 w-full object-cover" />
-                        <span className="absolute left-3 top-3 rounded-xl bg-[#5b49e8] px-2.5 py-1 text-[10px] font-bold text-white shadow-xs flex items-center gap-1">
+                      <div className="relative overflow-hidden rounded-2xl bg-[#f4f3f8]">
+                        <img src={form.images[0]} alt={form.name} className="h-40 sm:h-48 w-full object-cover" />
+                        <span className="absolute left-3 top-3 rounded-xl bg-[#5b49e8] px-2.5 py-1 text-[10px] font-bold text-white flex items-center gap-1">
                           <Icon glyph={StarIcon} size={12} /> Photo principale
                         </span>
                         <button
@@ -791,28 +808,28 @@ export function ProductForm() {
 
                       {/* Grid Secondary Photos */}
                       {form.images.length > 1 && (
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                           {form.images.slice(1).map((imgUrl, idx) => {
                             const actualIdx = idx + 1;
                             return (
-                              <div key={imgUrl + actualIdx} className="group relative overflow-hidden rounded-xl border border-[#ede9f5] bg-white">
-                                <img src={imgUrl} alt={`Photo ${actualIdx}`} className="h-20 w-full object-cover" />
+                              <div key={imgUrl + actualIdx} className="group relative overflow-hidden rounded-xl bg-[#f4f3f8]">
+                                <img src={imgUrl} alt={`Photo ${actualIdx}`} className="h-16 sm:h-20 w-full object-cover" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => setPrimaryImage(actualIdx)}
-                                    className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#5b49e8]"
+                                    className="grid h-6 w-6 sm:h-7 sm:w-7 place-items-center rounded-lg bg-white text-[#5b49e8]"
                                     title="Mettre en principale"
                                   >
-                                    <Icon glyph={StarIcon} size={13} />
+                                    <Icon glyph={StarIcon} size={12} />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => removeImage(actualIdx)}
-                                    className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#c45667]"
+                                    className="grid h-6 w-6 sm:h-7 sm:w-7 place-items-center rounded-lg bg-white text-[#c45667]"
                                     title="Supprimer"
                                   >
-                                    <Icon glyph={Delete01Icon} size={13} />
+                                    <Icon glyph={Delete01Icon} size={12} />
                                   </button>
                                 </div>
                               </div>
@@ -822,13 +839,13 @@ export function ProductForm() {
                       )}
                     </div>
                   ) : (
-                    <label className="flex h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8d5e8] bg-[#f8f7fc] p-4 text-center transition hover:border-[#5b49e8] hover:bg-[#f5f3ff]">
+                    <label className="flex h-36 sm:h-44 cursor-pointer flex-col items-center justify-center rounded-2xl bg-[#f8f7fc] p-4 text-center transition hover:bg-[#f5f3ff]">
                       <div className="flex flex-col items-center gap-2 text-[#77738a]">
-                        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
-                          <Icon glyph={ImageUploadIcon} size={24} />
+                        <span className="grid h-10 w-10 sm:h-12 sm:w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                          <Icon glyph={ImageUploadIcon} size={22} />
                         </span>
                         <div>
-                          <p className="text-xs font-bold text-[#292541]">Déposez ou sélectionnez vos photos</p>
+                          <p className="text-xs font-bold text-[#292541]">Sélectionner vos photos</p>
                           <p className="text-[10px] text-[#9290a2] mt-0.5">Formats PNG, JPG, WebP jusqu'à 5 MB</p>
                         </div>
                       </div>
@@ -839,19 +856,31 @@ export function ProductForm() {
 
                 {/* Digital Product Resource Uploader with % progress bar */}
                 {form.type === 'digital' && (
-                  <div className="space-y-4 rounded-2xl bg-[#f5f3ff] p-5 border border-[#e4ddff]">
-                    <div className="flex items-center gap-2 text-[#5b49e8]">
-                      <Icon glyph={SparklesIcon} size={20} />
-                      <h4 className="text-xs font-bold uppercase tracking-wider">Fichier & Ressource Numérique</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-[#292541]">Fichier & Ressource Digital (PDF, ZIP, MP4)</p>
+                      {form.digital_file_url && (
+                        <button
+                          type="button"
+                          onClick={() => setField('digital_file_url', '')}
+                          className="text-xs font-bold text-[#c45667] hover:underline"
+                        >
+                          Retirer
+                        </button>
+                      )}
                     </div>
 
+                    {/* Percentage Progress Bar */}
                     {digitalUploadProgress !== null && (
-                      <div className="rounded-xl bg-white p-3.5 space-y-2 border border-[#d8cdff]">
+                      <div className="rounded-2xl bg-[#efedff] p-3.5 sm:p-4 space-y-2">
                         <div className="flex items-center justify-between text-xs font-bold text-[#5b49e8]">
-                          <span>Téléversement du fichier numérique…</span>
+                          <span className="flex items-center gap-2">
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+                            Téléversement du fichier…
+                          </span>
                           <span>{digitalUploadProgress}%</span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#efedff]">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#d8cdff]">
                           <div
                             className="h-full bg-[#5b49e8] transition-all duration-300 rounded-full"
                             style={{ width: `${digitalUploadProgress}%` }}
@@ -860,60 +889,74 @@ export function ProductForm() {
                       </div>
                     )}
 
-                    <Field label="Document téléchargeable (PDF, ZIP, EPUB, MP3, MP4)" hint="Fichier automatiquement délivré au client dès paiement.">
-                      <div className="space-y-2.5">
-                        {form.digital_file_url ? (
-                          <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-[#d8cdff]">
-                            <span className="truncate text-xs font-bold text-[#292541] max-w-[280px]">{form.digital_file_url}</span>
-                            <button
-                              type="button"
-                              onClick={() => setField('digital_file_url', '')}
-                              className="text-xs font-bold text-[#c45667] hover:underline"
-                            >
-                              Retirer
-                            </button>
+                    {form.digital_file_url ? (
+                      <div className="flex items-center justify-between rounded-2xl bg-[#f8f7fc] p-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white">
+                            <Icon glyph={File01Icon} size={20} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[#292541] truncate max-w-[200px] sm:max-w-[280px]" title={getCleanFileName(form.digital_file_url)}>
+                              {getCleanFileName(form.digital_file_url)}
+                            </p>
+                            <p className="text-[10px] text-[#278e69] font-bold">Fichier numériquement prêt pour livraison</p>
                           </div>
-                        ) : (
-                          <label className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#c5b8ff] bg-white p-3 text-center transition hover:border-[#5b49e8]">
-                            <span className="flex items-center gap-2 text-xs font-bold text-[#5b49e8]">
-                              <Icon glyph={File01Icon} size={18} /> Déposer un fichier (PDF, ZIP, Formation)
-                            </span>
-                            <input
-                              type="file"
-                              accept=".pdf,.epub,.zip,.rar,.mp3,.mp4,.doc,.docx"
-                              className="hidden"
-                              onChange={handleDigitalFileSelect}
-                              disabled={digitalUploadProgress !== null}
-                            />
-                          </label>
-                        )}
-                        <input
-                          type="text"
-                          value={form.digital_file_url}
-                          onChange={(e) => setField('digital_file_url', e.target.value)}
-                          placeholder="Ou entrez une URL directe (Drive, Notion, Telegram, Dropbox)…"
-                          className={inputClass}
-                        />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setField('digital_file_url', ''); setDigitalFileName(''); }}
+                          className="grid h-8 w-8 place-items-center rounded-xl bg-white text-[#c45667] hover:bg-[#fff0f1] transition"
+                          title="Supprimer"
+                        >
+                          <Icon glyph={Delete01Icon} size={15} />
+                        </button>
                       </div>
-                    </Field>
+                    ) : (
+                      <label className="flex h-36 sm:h-44 cursor-pointer flex-col items-center justify-center rounded-2xl bg-[#f8f7fc] p-4 text-center transition hover:bg-[#f5f3ff]">
+                        <div className="flex flex-col items-center gap-2 text-[#77738a]">
+                          <span className="grid h-10 w-10 sm:h-12 sm:w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                            <Icon glyph={File01Icon} size={22} />
+                          </span>
+                          <div>
+                            <p className="text-xs font-bold text-[#292541]">Sélectionner un fichier digital</p>
+                            <p className="text-[10px] text-[#9290a2] mt-0.5">PDF, EPUB, ZIP, MP3, MP4 ou lien direct</p>
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".pdf,.epub,.zip,.rar,.mp3,.mp4,.doc,.docx"
+                          className="hidden"
+                          onChange={handleDigitalFileSelect}
+                          disabled={digitalUploadProgress !== null}
+                        />
+                      </label>
+                    )}
 
-                    <Field label="Instructions d'accès optionnelles" hint="Ex: Code d'accès VIP, lien vers le groupe Telegram ou Notion.">
+                    <input
+                      type="text"
+                      value={form.digital_file_url}
+                      onChange={(e) => setField('digital_file_url', e.target.value)}
+                      placeholder="Ou entrez un lien direct (Drive, Telegram, Notion)…"
+                      className={inputClass}
+                    />
+
+                    <Field label="Instructions d'accès optionnelles" hint="Renseignez ici tout code VIP ou lien vers un groupe privé.">
                       <textarea
                         value={form.digital_access_instructions}
                         onChange={(e) => setField('digital_access_instructions', e.target.value)}
-                        placeholder="Ces instructions seront présentées à l'acheteur après validation de son paiement…"
+                        placeholder="Informations transmises au client après paiement…"
                         className={`${textareaClass} min-h-20`}
                       />
                     </Field>
                   </div>
                 )}
 
-                <div className="flex justify-between pt-4 border-t border-[#f0edf7]">
+                <div className="flex justify-between pt-3">
                   <Button type="button" variant="ghost" onClick={() => goToStep(2)}>
                     <Icon glyph={ArrowLeft01Icon} size={15} /> Précédent
                   </Button>
                   <Button type="submit" disabled={saving} testId="button-save-product">
-                    {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer les modifications' : 'Publier le produit'}
+                    {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Publier le produit'}
                   </Button>
                 </div>
               </div>
@@ -922,32 +965,32 @@ export function ProductForm() {
         </Card>
 
         {/* Interactive Double Preview Card Panel */}
-        <div className="space-y-5">
-          <Card className="p-5">
-            <div className="flex items-center justify-between border-b border-[#f0edf7] pb-3">
+        <div className="space-y-4 sm:space-y-5">
+          <Card className="p-4 sm:p-5">
+            <div className="flex items-center justify-between pb-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu en direct</p>
               <div className="flex rounded-xl bg-[#f4f3f8] p-1">
                 <button
                   type="button"
                   onClick={() => setPreviewMode('seller')}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'seller' ? 'bg-white text-[#5b49e8] shadow-xs' : 'text-[#807b98]'}`}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'seller' ? 'bg-white text-[#5b49e8]' : 'text-[#807b98]'}`}
                 >
                   Vue Vendeur
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewMode('customer')}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'customer' ? 'bg-white text-[#5b49e8] shadow-xs' : 'text-[#807b98]'}`}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'customer' ? 'bg-white text-[#5b49e8]' : 'text-[#807b98]'}`}
                 >
                   Vue Client
                 </button>
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-3">
               {previewMode === 'seller' ? (
                 /* Seller Discovery View Preview */
-                <div className="rounded-2xl bg-[#faf9fe] p-4 space-y-3 border border-[#f0edf7]">
+                <div className="rounded-2xl bg-[#faf9fe] p-3.5 sm:p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-[Space_Grotesk] font-bold text-[#292541]">
@@ -956,10 +999,10 @@ export function ProductForm() {
                       <p className="text-[11px] text-[#9290a2]">{form.category} · {form.type === 'digital' ? 'Digital' : 'Physique'}</p>
                     </div>
                     {form.images.length > 0 ? (
-                      <img src={form.images[0]} alt="Aperçu" className="h-12 w-12 rounded-xl object-cover" />
+                      <img src={form.images[0]} alt="Aperçu" className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl object-cover" />
                     ) : (
-                      <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                        <Icon glyph={Store01Icon} size={20} />
+                      <span className="grid h-11 w-11 sm:h-12 sm:w-12 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+                        <Icon glyph={Store01Icon} size={18} />
                       </span>
                     )}
                   </div>
@@ -979,13 +1022,13 @@ export function ProductForm() {
                 </div>
               ) : (
                 /* Customer Checkout View Preview */
-                <div className="rounded-2xl bg-white p-4 space-y-3 border border-[#f0edf7]">
+                <div className="rounded-2xl bg-white p-3.5 sm:p-4 space-y-3">
                   {form.images.length > 0 && (
-                    <img src={form.images[0]} alt="Aperçu" className="h-32 w-full rounded-xl object-cover" />
+                    <img src={form.images[0]} alt="Aperçu" className="h-28 sm:h-32 w-full rounded-xl object-cover" />
                   )}
                   <h4 className="font-[Space_Grotesk] font-bold text-[#292541] text-sm">{form.name || 'Nom du produit'}</h4>
                   <p className="text-xs text-[#77738a] line-clamp-2">{form.description || 'Description du produit…'}</p>
-                  <div className="flex items-center justify-between border-t border-[#f0edf7] pt-2">
+                  <div className="flex items-center justify-between pt-2">
                     <strong className="font-[Space_Grotesk] text-base font-bold text-[#5b49e8]">
                       {form.price ? money(Number(form.price)) : '—'}
                     </strong>
@@ -999,8 +1042,8 @@ export function ProductForm() {
           {/* Quick Help Card */}
           <Card className="p-4 bg-[#efedff]/40">
             <div className="flex items-start gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white">
-                <Icon glyph={HelpCircleIcon} size={16} />
+              <span className="grid h-7 w-7 sm:h-8 sm:w-8 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white">
+                <Icon glyph={HelpCircleIcon} size={15} />
               </span>
               <div className="text-xs space-y-1">
                 <p className="font-bold text-[#292541]">Conseil de publication Fiaba</p>

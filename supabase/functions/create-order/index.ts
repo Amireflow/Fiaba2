@@ -39,6 +39,39 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Valider la campagne : doit exister, être active et appartenir au marchand déclaré
+    let campaign: { commission: number; commission_type: string | null; model: string } | null = null;
+    if (campaign_id) {
+      const { data: camp } = await supabase
+        .from("campaigns")
+        .select("commission, commission_type, model, merchant_id, status")
+        .eq("id", campaign_id)
+        .single();
+
+      if (!camp || camp.status !== "active" || camp.merchant_id !== merchant_id) {
+        return new Response(
+          JSON.stringify({ error: "Campagne invalide, inactive ou ne appartenant pas à ce marchand" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      campaign = camp;
+    }
+
+    // Valider le vendeur : doit exister et être actif (anti auto-attribution frauduleuse)
+    if (seller_id) {
+      const { data: seller } = await supabase
+        .from("sellers")
+        .select("id, status")
+        .eq("id", seller_id)
+        .single();
+      if (!seller || seller.status !== "actif") {
+        return new Response(
+          JSON.stringify({ error: "Vendeur invalide ou inactif" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Récupérer les prix des produits
     const productIds = items.map((i: { product_id: string }) => i.product_id);
     const { data: products, error: prodError } = await supabase
@@ -66,15 +99,13 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    // Calculer la commission si une campagne est liée
+    // Calculer la commission si une campagne est liée (fixe ou pourcentage)
     let commissionAmount = 0;
-    if (campaign_id) {
-      const { data: campaign } = await supabase
-        .from("campaigns")
-        .select("commission")
-        .eq("id", campaign_id)
-        .single();
-      if (campaign) {
+    if (campaign && seller_id) {
+      if (campaign.commission_type === "fixed") {
+        const totalQty = items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0);
+        commissionAmount = campaign.commission * totalQty;
+      } else {
         commissionAmount = Math.round(totalAmount * (campaign.commission / 100));
       }
     }
@@ -114,16 +145,8 @@ Deno.serve(async (req: Request) => {
         .eq("id", item.product_id);
     }
 
-    // Créer la commission vendeur si applicable
-    if (seller_id && commissionAmount > 0) {
-      await supabase.from("commissions").insert({
-        seller_id,
-        order_id: order.id,
-        campaign_id: campaign_id ?? null,
-        amount: commissionAmount,
-        is_paid: false,
-      });
-    }
+    // La commission vendeur est créée par le trigger DB auto_create_commission
+    // (idempotent, SECURITY DEFINER) — pas d'insertion manuelle ici.
 
     // Notifier le marchand
     const { data: merchant } = await supabase

@@ -80,7 +80,12 @@ export function EarningWithdraw() {
       return;
     }
 
-    if (amt > availableBalance && availableBalance > 0) {
+    if (availableBalance <= 0) {
+      toast({ title: 'Solde insuffisant', description: 'Vous n\'avez aucun solde disponible pour le moment.' });
+      return;
+    }
+
+    if (amt > availableBalance) {
       toast({ title: 'Solde insuffisant', description: `Votre solde disponible est de ${money(availableBalance)}.` });
       return;
     }

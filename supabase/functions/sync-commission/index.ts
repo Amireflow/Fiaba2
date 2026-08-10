@@ -17,6 +17,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Authentification obligatoire : réservée à l'admin ou au marchand de la commande
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authentification requise" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { order_id } = await req.json();
 
     if (!order_id) {
@@ -31,14 +40,47 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Vérifier le JWT de l'appelant
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Session invalide ou expirée" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Récupérer la commande
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, seller_id, commission_amount, status, campaign_id")
+      .select("id, merchant_id, seller_id, commission_amount, status, campaign_id")
       .eq("id", order_id)
       .single();
 
     if (orderError) throw orderError;
+
+    // Contrôle d'accès : admin ou marchand propriétaire de la commande
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    const { data: merchant } = await supabase
+      .from("merchants")
+      .select("owner_id")
+      .eq("id", order.merchant_id)
+      .single();
+
+    if (profile?.role !== "admin" && merchant?.owner_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "Accès refusé" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (order.status !== "livree") {
       return new Response(

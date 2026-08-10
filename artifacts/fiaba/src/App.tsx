@@ -1271,19 +1271,19 @@ function Home() {
               <p className="text-xs font-bold uppercase tracking-wider text-[#9290a2]">Entreprise</p>
               <ul className="mt-4 space-y-3 text-sm text-[#77738a]">
                 <li><a href="#temoignages" className="hover:text-[#5b49e8]">Nos créateurs</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">À propos</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">Blog</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">Carrières</a></li>
+                <li><a href="#temoignages" className="hover:text-[#5b49e8]">À propos</a></li>
+                <li><a href="#temoignages" className="hover:text-[#5b49e8]">Blog</a></li>
+                <li><a href="#temoignages" className="hover:text-[#5b49e8]">Carrières</a></li>
               </ul>
             </div>
             {/* Support links */}
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-[#9290a2]">Support</p>
               <ul className="mt-4 space-y-3 text-sm text-[#77738a]">
-                <li><a href="#" className="hover:text-[#5b49e8]">Centre d'aide</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">Nous contacter</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">Conditions d'utilisation</a></li>
-                <li><a href="#" className="hover:text-[#5b49e8]">Confidentialité</a></li>
+                <li><a href="#espace" className="hover:text-[#5b49e8]">Centre d'aide</a></li>
+                <li><a href="#espace" className="hover:text-[#5b49e8]">Nous contacter</a></li>
+                <li><a href="#tarifs" className="hover:text-[#5b49e8]">Conditions d'utilisation</a></li>
+                <li><a href="#tarifs" className="hover:text-[#5b49e8]">Confidentialité</a></li>
               </ul>
             </div>
           </div>

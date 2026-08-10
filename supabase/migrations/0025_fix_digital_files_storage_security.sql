@@ -20,7 +20,7 @@ FOR INSERT WITH CHECK (
     public.is_admin()
     OR EXISTS (
       SELECT 1 FROM public.merchants m
-      WHERE m.profile_id = auth.uid()
+      WHERE m.owner_id = auth.uid()
     )
   )
 );

@@ -140,7 +140,16 @@ export function OrderDetail() {
   async function updateStatus(target: OrderDetail, newStatus: string) {
     setUpdating(true);
     haptic('medium');
-    const { error } = await supabaseUpdate('orders', target.id, { status: newStatus });
+    const statusV2Map: Record<string, string> = {
+      a_preparer: 'created',
+      en_livraison: 'shipped',
+      livree: 'delivered',
+      annulee: 'cancelled',
+    };
+    const { error } = await supabaseUpdate('orders', target.id, {
+      status: newStatus,
+      status_v2: statusV2Map[newStatus] ?? newStatus,
+    });
     setUpdating(false);
     if (error) {
       haptic('error');

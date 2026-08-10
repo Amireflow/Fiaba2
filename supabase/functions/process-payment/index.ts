@@ -17,6 +17,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Authentification obligatoire : l'appelant doit être le propriétaire du marchand
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authentification requise" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { merchant_id, amount, method } = await req.json();
 
     if (!merchant_id || !amount || amount <= 0) {
@@ -30,6 +39,39 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Vérifier le JWT de l'appelant
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Session invalide ou expirée" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Contrôle d'accès : propriétaire du marchand ou admin uniquement
+    const { data: merchantOwner } = await supabase
+      .from("merchants")
+      .select("owner_id")
+      .eq("id", merchant_id)
+      .single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (merchantOwner?.owner_id !== user.id && profile?.role !== "admin") {
+      return new Response(
+        JSON.stringify({ error: "Accès refusé : vous ne gérez pas ce marchand" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Vérifier le solde disponible du marchand
     // (somme des commandes livrées - somme des versements déjà versés)

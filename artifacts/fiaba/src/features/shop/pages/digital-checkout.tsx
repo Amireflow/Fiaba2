@@ -263,12 +263,39 @@ export function DigitalCheckout() {
     if (!campaign) return;
     setSubmitting(true);
 
-    const price = campaign.product_price;
-    const isFixedComm = campaign.commission_type === 'fixed' || (!campaign.commission_type && campaign.commission >= 100);
-    const comm = resolvedSellerId
-      ? (isFixedComm ? campaign.commission : Math.round((price * campaign.commission) / 100))
-      : 0;
-    const platformFee = Math.round(price * 0.05);
+    // ── Calcul server-side obligatoire (CDC §23) : aucun montant calculé côté client ──
+    const { data: calc, error: calcErr } = await (supabase.rpc as any)('calculate_order_total', {
+      p_campaign_id: campaign.campaign_id,
+      p_quantity: 1,
+      p_zone_id: null,
+      p_seller_id: resolvedSellerId ?? null,
+    });
+
+    if (calcErr || !calc || !Array.isArray(calc) || calc.length === 0) {
+      setSubmitting(false);
+      haptic('error');
+      toast({
+        title: 'Erreur de calcul',
+        description: "Impossible de valider le montant de la commande côté serveur. Veuillez réessayer.",
+      });
+      return;
+    }
+
+    const serverCalc = calc[0] as {
+      product_price: number;
+      subtotal: number;
+      commission_amount: number;
+      platform_fee_amount: number;
+      platform_fee_rate: number;
+      merchant_amount: number;
+      model: string;
+      commission_type: string;
+      commission_rate: number;
+    };
+
+    const price = serverCalc.subtotal;
+    const comm = serverCalc.commission_amount;
+    const platformFee = serverCalc.platform_fee_amount;
 
     const digitalDownloadToken = crypto.randomUUID().replace(/-/g, '');
     const digitalDownloadExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -286,18 +313,19 @@ export function DigitalCheckout() {
       commission_amount: comm,
       status: 'livree',
       status_v2: 'delivered',
+      quantity: 1,
       zone_name: 'Digital (Instant)',
       delivery_fee: 0,
       payment_method: paymentMethodMap[form.paymentMethod],
-      commission_model: campaign.model || 'commission',
-      commission_type: campaign.commission_type || 'percentage',
-      commission_rate: campaign.commission || 0,
-      snapshot_product_price: price,
+      commission_model: serverCalc.model || 'commission',
+      commission_type: serverCalc.commission_type || 'percentage',
+      commission_rate: serverCalc.commission_rate || 0,
+      snapshot_product_price: serverCalc.product_price,
       snapshot_commission_amount: comm,
-      merchant_amount: Math.max(0, price - comm - platformFee),
+      merchant_amount: serverCalc.merchant_amount,
       platform_fee: platformFee,
       platform_fee_amount: platformFee,
-      platform_fee_rate: 5.00,
+      platform_fee_rate: serverCalc.platform_fee_rate,
       digital_download_token: digitalDownloadToken,
       digital_download_expires_at: digitalDownloadExpiresAt,
     });
@@ -325,19 +353,8 @@ export function DigitalCheckout() {
       } as never);
     }
 
-    if (resolvedSellerId && comm > 0) {
-      await (supabase.from('commissions') as any)
-        .insert({
-          seller_id: resolvedSellerId,
-          order_id: orderId,
-          campaign_id: campaign.campaign_id,
-          amount: comm,
-          status: 'available',
-          model: campaign.model || 'commission',
-          available_at: new Date().toISOString(),
-        })
-        .catch(() => {});
-    }
+    // La commission vendeur est créée côté serveur par le trigger auto_create_commission
+    // (idempotent, SECURITY DEFINER, disponible immédiatement pour le digital) — aucune insertion client.
 
     setSubmitting(false);
     const orderShortId = `CMD-${orderId.slice(-6).toUpperCase()}`;

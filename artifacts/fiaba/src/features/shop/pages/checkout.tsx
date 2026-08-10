@@ -348,9 +348,8 @@ export function Checkout() {
           metadata: { campaign_id: tl.campaign_id, seller_id: tl.seller_id },
         });
 
-        await (supabase.from('tracking_links') as any)
-          .update({ clicks: tl.clicks + 1 })
-          .eq('id', tl.id);
+        // Compteur de clics via RPC sécurisé (SECURITY DEFINER)
+        await (supabase.rpc as any)('increment_tracking_click', { p_link_id: tl.id });
       } else if (sellerParam) {
         // Look up seller directly by ID or display_name
         const { data: sRow } = await (supabase.from('sellers') as any)
@@ -495,16 +494,26 @@ export function Checkout() {
       }
     }
 
-    // ── Server-side calculation via RPC with local fallback ──
+    // ── Calcul server-side obligatoire (CDC §23) : aucun fallback client ──
     const qty = Math.max(1, Number(form.quantity) || 1);
-    const { data: calc } = await (supabase.rpc as any)('calculate_order_total', {
+    const { data: calc, error: calcErr } = await (supabase.rpc as any)('calculate_order_total', {
       p_campaign_id: campaign.campaign_id,
       p_quantity: qty,
       p_zone_id: form.zoneId || null,
       p_seller_id: resolvedSellerId ?? null,
     });
 
-    let serverCalc: {
+    if (calcErr || !calc || !Array.isArray(calc) || calc.length === 0) {
+      setSubmitting(false);
+      haptic('error');
+      toast({
+        title: 'Erreur de calcul',
+        description: "Impossible de valider le montant de la commande côté serveur. Veuillez réessayer.",
+      });
+      return;
+    }
+
+    const serverCalc = calc[0] as {
       product_price: number;
       subtotal: number;
       delivery_fee: number;
@@ -518,35 +527,6 @@ export function Checkout() {
       commission_rate: number;
       seller_attributed: boolean;
     };
-
-    if (calc && Array.isArray(calc) && calc.length > 0) {
-      serverCalc = calc[0];
-    } else {
-      // Robust Client Fallback if RPC fails or is unmigrated
-      const selectedZone = zones.find((z) => z.id === form.zoneId);
-      const fee = selectedZone ? selectedZone.fee : 0;
-      const sub = campaign.product_price * qty;
-      const isFixedComm = campaign.commission_type === 'fixed' || (!campaign.commission_type && campaign.commission >= 100);
-      const comm = resolvedSellerId
-        ? (isFixedComm ? campaign.commission * qty : Math.round((sub * campaign.commission) / 100))
-        : 0;
-      const platformFee = Math.round(sub * 0.05);
-
-      serverCalc = {
-        product_price: campaign.product_price,
-        subtotal: sub,
-        delivery_fee: fee,
-        commission_amount: comm,
-        platform_fee_amount: platformFee,
-        platform_fee_rate: 5.00,
-        merchant_amount: Math.max(0, sub - comm - platformFee),
-        total_amount: sub + fee,
-        model: campaign.model || 'commission',
-        commission_type: campaign.commission_type || 'percentage',
-        commission_rate: campaign.commission || 0,
-        seller_attributed: !!resolvedSellerId,
-      };
-    }
 
     const isDigital = campaign.product_type === 'digital';
     const digitalDownloadToken = isDigital ? crypto.randomUUID().replace(/-/g, '') : null;
@@ -576,6 +556,8 @@ export function Checkout() {
         commission_amount: serverCommission,
         status: isDigital ? 'livree' : 'a_preparer',
         status_v2: isDigital ? 'delivered' : 'created',
+        quantity: qty,
+        zone_id: isDigital ? null : (form.zoneId || null),
         zone_name: isDigital ? 'Digital (Instant)' : (form.zoneName || selectedZone?.name || null),
         delivery_fee: serverDeliveryFee,
         payment_method: paymentMethodMap[form.paymentMethod],
@@ -617,20 +599,8 @@ export function Checkout() {
       } as never);
     }
 
-    // Explicit commission entry insertion (idempotent fallback if trigger is delayed)
-    if (resolvedSellerId && serverCommission > 0) {
-      await (supabase.from('commissions') as any)
-        .insert({
-          seller_id: resolvedSellerId,
-          order_id: orderId,
-          campaign_id: campaign.campaign_id,
-          amount: serverCommission,
-          status: isDigital ? 'available' : 'pending',
-          model: serverCalc.model || 'commission',
-          available_at: new Date().toISOString(),
-        })
-        .catch(() => {});
-    }
+    // La commission vendeur est créée côté serveur par le trigger auto_create_commission
+    // (idempotent, SECURITY DEFINER) — aucune insertion client.
 
     setSubmitting(false);
 

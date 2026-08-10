@@ -70,10 +70,6 @@ type FormState = {
   type: 'physique' | 'digital';
   digital_file_url: string;
   digital_access_instructions: string;
-  // Affiliation Module
-  enableAffiliation: boolean;
-  commission: string;
-  commissionType: 'percentage' | 'fixed';
 };
 
 const emptyForm: FormState = {
@@ -88,9 +84,6 @@ const emptyForm: FormState = {
   type: 'physique',
   digital_file_url: '',
   digital_access_instructions: '',
-  enableAffiliation: true,
-  commission: '15',
-  commissionType: 'percentage',
 };
 
 export function ProductForm() {
@@ -113,7 +106,17 @@ export function ProductForm() {
   // Field error validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Load existing product & linked campaign from Supabase
+  // AI generation state
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreview, setAiPreview] = useState<{
+    headline: string;
+    benefits: { icon: string; title: string; text: string }[];
+    faq: { question: string; answer: string }[];
+    cta_text: string;
+  } | null>(null);
+  const [aiGenerationsLeft, setAiGenerationsLeft] = useState<number | null>(null);
+
+  // Load existing product from Supabase
   useEffect(() => {
     if (!isEdit || !id) return;
     setLoading(true);
@@ -140,15 +143,6 @@ export function ProductForm() {
           digital_access_instructions: string | null;
         };
 
-        // Check if there is a linked active campaign
-        const { data: cData } = await supabase
-          .from('campaigns')
-          .select('id, commission, commission_type')
-          .eq('product_id', productId)
-          .maybeSingle();
-
-        const c = cData as { commission: number; commission_type: string | null } | null;
-
         setForm({
           name: p.name,
           category: p.category,
@@ -161,9 +155,6 @@ export function ProductForm() {
           type: p.type ?? 'physique',
           digital_file_url: p.digital_file_url ?? '',
           digital_access_instructions: p.digital_access_instructions ?? '',
-          enableAffiliation: !!c,
-          commission: c ? String(c.commission) : '15',
-          commissionType: (c?.commission_type as 'percentage' | 'fixed') ?? 'percentage',
         });
       }
       setLoading(false);
@@ -300,12 +291,6 @@ export function ProductForm() {
       if (isNaN(price) || price <= 0) errs.price = 'Entrez un prix valide supérieur à 0 F';
       if (form.type === 'physique' && (isNaN(stock) || stock < 0)) errs.stock = 'Entrez une quantité en stock valide';
 
-      if (form.enableAffiliation) {
-        const comm = Number(form.commission);
-        if (isNaN(comm) || comm <= 0) errs.commission = 'Entrez une commission valide';
-        if (form.commissionType === 'percentage' && comm > 90) errs.commission = 'La commission ne peut pas dépasser 90%';
-        if (form.commissionType === 'fixed' && comm >= price) errs.commission = 'La commission fixe doit être inférieure au prix';
-      }
     }
 
     if (Object.keys(errs).length > 0) {
@@ -322,28 +307,16 @@ export function ProductForm() {
     setActiveStep(target);
   }
 
-  // Live Revenue Calculation
+  // Live Revenue Preview (price only, no commission)
   const revenueCalculations = useMemo(() => {
     const price = Math.max(0, Number(form.price) || 0);
-    const commVal = Math.max(0, Number(form.commission) || 0);
-
-    let sellerGain = 0;
-    if (form.commissionType === 'fixed') {
-      sellerGain = commVal;
-    } else {
-      sellerGain = Math.round((price * commVal) / 100);
-    }
-
-    const platformFee = Math.round(price * 0.05); // 5%
-    const netMerchantRevenue = Math.max(0, price - sellerGain - platformFee);
-
     return {
       price,
-      sellerGain,
-      platformFee,
-      netMerchantRevenue,
+      sellerGain: 0,
+      platformFee: 0,
+      netMerchantRevenue: price,
     };
-  }, [form.price, form.commission, form.commissionType]);
+  }, [form.price]);
 
   // Atomic Save to Supabase (products + campaigns)
   async function save(e: React.FormEvent) {
@@ -441,47 +414,11 @@ export function ProductForm() {
       productId = newProd.id;
     }
 
-    // Atomic Sync for Affiliation Campaign in `campaigns` table
-    if (productId && form.enableAffiliation) {
-      const commVal = Number(form.commission) || 15;
-      const campaignPayload = {
-        merchant_id: activeMerchantId,
-        product_id: productId,
-        name: `Campagne ${form.name.trim()}`,
-        description: form.description.trim() || `Recommandez ${form.name.trim()} et gagnez vos commissions en direct.`,
-        commission: commVal,
-        commission_type: form.commissionType,
-        model: form.commissionType === 'fixed' ? 'marge' : 'commission',
-        status: 'active',
-        goal: 100,
-      };
-
-      const { data: existingCamp } = await supabase
-        .from('campaigns')
-        .select('id')
-        .eq('product_id', productId)
-        .maybeSingle();
-
-      const campId = (existingCamp as { id: string } | null)?.id;
-      if (campId) {
-        await supabaseUpdate('campaigns', campId, campaignPayload);
-      } else {
-        await (supabase.from('campaigns') as any).insert(campaignPayload);
-      }
-    } else if (productId && !form.enableAffiliation) {
-      // Deactivate linked campaign if merchant toggled off affiliation
-      await (supabase.from('campaigns') as any)
-        .update({ status: 'ended' })
-        .eq('product_id', productId);
-    }
-
     setSaving(false);
     haptic('success');
     toast({
       title: isEdit ? 'Produit mis à jour !' : 'Produit enregistré avec succès !',
-      description: form.enableAffiliation
-        ? `${form.name} est disponible et la campagne d'affiliation est active.`
-        : `${form.name} a été enregistré dans votre catalogue.`,
+      description: `${form.name} a été enregistré dans votre catalogue.`,
     });
     navigate('/merchant/products');
   }
@@ -500,7 +437,7 @@ export function ProductForm() {
     <Page
       eyebrow="Produits"
       title={isEdit ? 'Modifier le produit' : 'Nouveau produit'}
-      description="Définissez les caractéristiques et commissions."
+      description="Définissez les caractéristiques de votre produit."
       action={
         <Link href="/merchant/products">
           <Button variant="ghost"><Icon glyph={ArrowLeft01Icon} size={15} /> Retour</Button>
@@ -632,6 +569,130 @@ export function ProductForm() {
                   />
                 </Field>
 
+                {/* AI Content Generator */}
+                {isEdit && id && (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (aiGenerating) return;
+                        setAiGenerating(true);
+                        haptic('light');
+                        try {
+                          const { data, error } = await supabase.functions.invoke('generate-product-ai', {
+                            body: { product_id: id },
+                          });
+                          if (error) throw error;
+                          setAiPreview(data);
+                          setAiGenerationsLeft(data.generations_remaining ?? null);
+                          haptic('success');
+                          toast({
+                            title: 'Contenu IA généré !',
+                            description: 'Vérifiez et acceptez le contenu pour votre page de vente.',
+                          });
+                        } catch (err: any) {
+                          haptic('error');
+                          toast({
+                            title: 'Génération IA échouée',
+                            description: err?.message || 'Veuillez réessayer dans un instant.',
+                          });
+                        }
+                        setAiGenerating(false);
+                      }}
+                      disabled={aiGenerating || aiGenerationsLeft === 0}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#5b49e8]/20 bg-[#f6f5ff] py-3 text-sm font-bold text-[#5b49e8] transition hover:bg-[#efedff] disabled:opacity-50"
+                      data-testid="button-generate-ai"
+                    >
+                      {aiGenerating ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+                          Génération en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Icon glyph={SparklesIcon} size={16} />
+                          {aiPreview ? 'Régénérer le contenu IA' : "Générer ma page de vente avec l'IA"}
+                        </>
+                      )}
+                    </button>
+
+                    {aiGenerationsLeft !== null && aiGenerationsLeft < 3 && (
+                      <p className="text-center text-[10px] text-[#9290a2]">
+                        {aiGenerationsLeft > 0
+                          ? `${aiGenerationsLeft} génération${aiGenerationsLeft > 1 ? 's' : ''} restante${aiGenerationsLeft > 1 ? 's' : ''}`
+                          : 'Limite de générations atteinte'}
+                      </p>
+                    )}
+
+                    {aiPreview && (
+                      <div className="space-y-3 rounded-2xl border border-[#e4e1ff] bg-[#f8f7fc] p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#5b49e8]">Aperçu du contenu IA</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAiPreview(null);
+                              haptic('light');
+                            }}
+                            className="text-[10px] font-bold text-[#9290a2] hover:text-[#ef6d78]"
+                          >
+                            Masquer
+                          </button>
+                        </div>
+
+                        {aiPreview.headline && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Accroche</p>
+                            <p className="mt-0.5 text-sm font-bold text-[#292541]">{aiPreview.headline}</p>
+                          </div>
+                        )}
+
+                        {aiPreview.benefits?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Bénéfices</p>
+                            <ul className="mt-1 space-y-1.5">
+                              {aiPreview.benefits.map((b, i) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-[#292541]">
+                                  <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#e7faf2] text-[#278e69]">
+                                    <Icon glyph={CheckmarkCircle02Icon} size={10} />
+                                  </span>
+                                  <span><strong>{b.title}</strong> — {b.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {aiPreview.faq?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">FAQ</p>
+                            <ul className="mt-1 space-y-1.5">
+                              {aiPreview.faq.map((f, i) => (
+                                <li key={i} className="text-xs text-[#292541]">
+                                  <strong>Q: {f.question}</strong>
+                                  <br />
+                                  <span className="text-[#686380]">R: {f.answer}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {aiPreview.cta_text && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Bouton d'action</p>
+                            <p className="mt-0.5 text-sm font-bold text-[#292541]">{aiPreview.cta_text}</p>
+                          </div>
+                        )}
+
+                        <p className="rounded-xl bg-white p-2.5 text-[10px] text-[#9290a2]">
+                          ✅ Ce contenu est enregistré automatiquement sur votre produit et apparaîtra sur votre page de vente publique.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-end pt-2 sm:pt-3">
                   <Button type="button" onClick={() => goToStep(2)} testId="button-next-step-2">
                     Suivant <Icon glyph={ArrowRight01Icon} size={15} />
@@ -687,84 +748,6 @@ export function ProductForm() {
                     />
                   </Field>
                 )}
-
-                {/* Seller Affiliation Module & Live Calculator */}
-                <div className="rounded-2xl bg-[#f6f5ff] p-4 sm:p-5 space-y-3 sm:space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#5b49e8] text-white">
-                        <Icon glyph={SparklesIcon} size={16} />
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-bold text-[#292541]">Affiliation créateurs</h4>
-                        <p className="text-[10px] text-[#77738a]">Activer la recommandation vendeur.</p>
-                      </div>
-                    </div>
-
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={form.enableAffiliation}
-                        onChange={(e) => setField('enableAffiliation', e.target.checked)}
-                        className="peer sr-only"
-                        data-testid="toggle-enable-affiliation"
-                      />
-                      <div className="peer h-6 w-11 rounded-full bg-[#d8d5e8] transition after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-[#5b49e8] peer-checked:after:translate-x-full" />
-                    </label>
-                  </div>
-
-                  {form.enableAffiliation && (
-                    <div className="space-y-3 sm:space-y-4 pt-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Field label="Rémunération">
-                          <select
-                            value={form.commissionType}
-                            onChange={(e) => setField('commissionType', e.target.value as 'percentage' | 'fixed')}
-                            className={selectClass}
-                            data-testid="select-commission-type"
-                          >
-                            <option value="percentage">Pourcentage (%)</option>
-                            <option value="fixed">Marge fixe (FCFA)</option>
-                          </select>
-                        </Field>
-
-                        <Field label={form.commissionType === 'percentage' ? 'Taux (%)' : 'Marge (FCFA)'}>
-                          <input
-                            type="number"
-                            min="1"
-                            value={form.commission}
-                            onChange={(e) => setField('commission', e.target.value)}
-                            placeholder={form.commissionType === 'percentage' ? '15' : '2000'}
-                            className={`${inputClass} ${errors.commission ? 'ring-1 ring-[#ef6d78]' : ''}`}
-                            data-testid="input-commission"
-                          />
-                          {errors.commission && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.commission}</p>}
-                        </Field>
-                      </div>
-
-                      {/* Live Revenue Breakdown Card */}
-                      <div className="rounded-xl bg-white p-3.5 sm:p-4 space-y-2 text-xs">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Revenus par vente</p>
-                        <div className="flex justify-between text-[#77738a]">
-                          <span>Prix public</span>
-                          <span className="font-bold text-[#292541]">{money(revenueCalculations.price)}</span>
-                        </div>
-                        <div className="flex justify-between text-[#c45667]">
-                          <span>Commission créateur</span>
-                          <span className="font-bold">− {money(revenueCalculations.sellerGain)}</span>
-                        </div>
-                        <div className="flex justify-between text-[#77738a]">
-                          <span>Frais Fiaba (5%)</span>
-                          <span className="font-bold">− {money(revenueCalculations.platformFee)}</span>
-                        </div>
-                        <div className="flex justify-between pt-1.5 text-xs sm:text-sm font-bold text-[#278e69]">
-                          <span>Revenu net marchand</span>
-                          <span className="font-[Space_Grotesk] text-sm sm:text-base">{money(revenueCalculations.netMerchantRevenue)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 <div className="flex justify-between pt-2 sm:pt-3">
                   <Button type="button" variant="ghost" onClick={() => goToStep(1)}>
@@ -1036,18 +1019,12 @@ export function ProductForm() {
                     )}
                   </div>
 
-                  {form.enableAffiliation && (
-                    <div className="rounded-xl bg-white p-3 space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[#9290a2]">Prix public</span>
-                        <span className="font-bold text-[#292541]">{form.price ? money(Number(form.price)) : '0 F'}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-[#278e69]">
-                        <span>Gain créateur</span>
-                        <span className="font-bold">{money(revenueCalculations.sellerGain)}</span>
-                      </div>
+                  <div className="rounded-xl bg-white p-3 space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[#9290a2]">Prix public</span>
+                      <span className="font-bold text-[#292541]">{form.price ? money(Number(form.price)) : '0 F'}</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               ) : (
                 /* Customer Checkout View Preview */
@@ -1077,7 +1054,7 @@ export function ProductForm() {
               <div className="text-xs space-y-1">
                 <p className="font-bold text-[#292541]">Conseil</p>
                 <p className="text-[#686380] leading-relaxed">
-                  Offrez 10% à 15% de commission pour motiver les vendeurs.
+                  Ajoutez des photos de qualité et une description claire pour attirer plus de clients.
                 </p>
               </div>
             </div>

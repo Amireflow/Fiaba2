@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
-import { Delete02Icon, Edit02Icon, Store01Icon, SparklesIcon, Add01Icon } from '@hugeicons/core-free-icons';
+import { Delete02Icon, Edit02Icon, Store01Icon, SparklesIcon, Add01Icon, ViewIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
@@ -167,6 +167,11 @@ export function Products() {
                       </Link>
 
                       <div className="flex items-center gap-1">
+                        <a href={`/product/${p.id}`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" className="p-2" testId={`view-${p.id}`}>
+                            <Icon glyph={ViewIcon} size={16} />
+                          </Button>
+                        </a>
                         <Link href={`/merchant/products/${p.id}/edit`}>
                           <Button variant="ghost" className="p-2" testId={`edit-${p.id}`}>
                             <Icon glyph={Edit02Icon} size={16} />
@@ -224,6 +229,9 @@ export function Products() {
                           <td className="px-4 py-4 font-medium text-[#292541]">{p.type === 'digital' ? 'Illimité' : p.stock}</td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <a href={`/product/${p.id}`} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" testId={`view-${p.id}`}><Icon glyph={ViewIcon} size={15} /></Button>
+                              </a>
                               <Link href="/merchant/campaigns/new">
                                 <Button variant="soft" testId={`campaign-${p.id}`}>Campagne +</Button>
                               </Link>

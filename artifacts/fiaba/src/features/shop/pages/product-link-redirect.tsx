@@ -39,15 +39,15 @@ export function ProductLinkRedirect() {
           setError(true);
           return;
         }
-        // Redirect to checkout with campaign_id + token
-        navigate(`/checkout/${tl.campaign_id}?t=${id}`, { replace: true });
+        // Redirect to product page with campaign_id + token
+        navigate(`/product/${tl.campaign_id}?t=${id}`, { replace: true });
         return;
       }
 
       // Fallback: if not a tracking token, treat as campaign_id directly
       // (preserves backward compat for direct campaign links)
       const query = window.location.search;
-      navigate(`/checkout/${id}${query}`, { replace: true });
+      navigate(`/product/${id}${query}`, { replace: true });
     }
 
     resolveAndRedirect().catch(() => setError(true));

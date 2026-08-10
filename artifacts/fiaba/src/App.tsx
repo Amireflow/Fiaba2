@@ -50,6 +50,7 @@ const MerchantRouter = lazy(() => import("@/features/merchant/merchant-router").
 const SellerRouter = lazy(() => import("@/features/seller/seller-router").then((m) => ({ default: m.SellerRouter })));
 const CheckoutDispatcher = lazy(() => import("@/features/shop/pages/checkout-dispatcher").then((m) => ({ default: m.CheckoutDispatcher })));
 const ProductLinkRedirect = lazy(() => import("@/features/shop/pages/product-link-redirect").then((m) => ({ default: m.ProductLinkRedirect })));
+const ProductPage = lazy(() => import("@/features/shop/pages/product-page").then((m) => ({ default: m.ProductPage })));
 const Onboarding = lazy(() => import("@/features/merchant/pages/onboarding").then((m) => ({ default: m.Onboarding })));
 const SellerOnboarding = lazy(() => import("@/features/seller/pages/onboarding").then((m) => ({ default: m.SellerOnboarding })));
 const SignInPage = lazy(() => import("@/pages/auth").then((m) => ({ default: m.SignInPage })));
@@ -1320,6 +1321,7 @@ function Router() {
           <Route path="/seller/onboarding" component={SellerOnboarding} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/product/:id" component={ProductPage} />
           <Route path="/checkout/:id" component={CheckoutDispatcher} />
           <Route path="/p/:id" component={ProductLinkRedirect} />
           <Route path="/merchant/*?" component={MerchantRouter} />

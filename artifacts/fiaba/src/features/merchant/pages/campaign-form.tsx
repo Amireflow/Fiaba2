@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { ArrowLeft01Icon, CheckmarkCircle02Icon, Tag01Icon, Target01Icon, Calendar01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CheckmarkCircle02Icon, Tag01Icon, Target01Icon, Calendar01Icon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
@@ -55,6 +55,7 @@ export function CampaignForm() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   // Load existing campaign
   useEffect(() => {
@@ -195,15 +196,40 @@ export function CampaignForm() {
       }
     } else {
       const { error } = await supabaseInsert('campaigns', payload);
-      setSaving(false);
       if (error) {
+        setSaving(false);
         haptic('error');
         toast({ title: 'Erreur', description: error });
+        return;
+      }
+
+      // Générer la page produit IA automatiquement
+      if (form.productId) {
+        setAiGenerating(true);
+        try {
+          const { error: aiError } = await supabase.functions.invoke('generate-product-ai', {
+            body: { product_id: form.productId },
+          });
+          if (aiError) throw aiError;
+          haptic('success');
+          toast({
+            title: 'Campagne lancée + Page IA générée !',
+            description: `${payload.name} est active. La page de vente IA a été générée automatiquement.`,
+          });
+        } catch {
+          haptic('success');
+          toast({
+            title: 'Campagne lancée',
+            description: `${payload.name} est active. Vous pouvez générer la page IA depuis le formulaire produit.`,
+          });
+        }
+        setAiGenerating(false);
       } else {
         haptic('success');
         toast({ title: 'Campagne lancée', description: `${payload.name} est active dans votre réseau.` });
-        navigate('/merchant/campaigns');
       }
+      setSaving(false);
+      navigate('/merchant/campaigns');
     }
   }
 
@@ -360,8 +386,18 @@ export function CampaignForm() {
               <Link href="/merchant/campaigns">
                 <Button variant="ghost" type="button">Annuler</Button>
               </Link>
-              <Button type="submit" disabled={saving} testId="button-save-campaign">
-                {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Lancer la campagne'}
+              <Button type="submit" disabled={saving || aiGenerating} testId="button-save-campaign">
+                {saving ? 'Enregistrement…' : aiGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Génération page IA…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {!isEdit && <Icon glyph={SparklesIcon} size={15} />}
+                    {isEdit ? 'Enregistrer' : 'Lancer la campagne'}
+                  </span>
+                )}
               </Button>
             </div>
           </form>

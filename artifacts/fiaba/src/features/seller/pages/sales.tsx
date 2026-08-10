@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { CheckmarkCircle02Icon, Cancel01Icon, Clock01Icon, DeliveryTruck01Icon, Search01Icon, Store01Icon } from '@hugeicons/core-free-icons';
+import {
+  CheckmarkCircle02Icon,
+  Cancel01Icon,
+  Clock01Icon,
+  DeliveryTruck01Icon,
+  Search01Icon,
+  Store01Icon,
+  Package01Icon,
+  Wallet01Icon,
+  Chart02Icon,
+  ShoppingBag01Icon,
+} from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -30,9 +41,9 @@ type SellerOrderRow = {
 type StatusFilter = 'Tous' | 'a_preparer' | 'en_livraison' | 'livree' | 'annulee';
 
 const statusMap: Record<string, { label: string; tone: 'amber' | 'violet' | 'mint' | 'rose'; glyph: typeof Store01Icon }> = {
-  a_preparer: { label: 'En cours', tone: 'amber', glyph: Clock01Icon },
-  en_livraison: { label: 'En cours', tone: 'amber', glyph: Clock01Icon },
-  livree: { label: 'Livré', tone: 'violet', glyph: DeliveryTruck01Icon },
+  a_preparer: { label: 'À préparer', tone: 'amber', glyph: Clock01Icon },
+  en_livraison: { label: 'En livraison', tone: 'violet', glyph: DeliveryTruck01Icon },
+  livree: { label: 'Livré', tone: 'mint', glyph: CheckmarkCircle02Icon },
   annulee: { label: 'Annulé', tone: 'rose', glyph: Cancel01Icon },
 };
 
@@ -172,37 +183,61 @@ export function Sales() {
     .filter((o) => o.status !== 'annulee' && commissionStatuses[o.id] !== 'reversed')
     .reduce((s, o) => s + (o.commission_amount ?? 0), 0);
 
+  const totalOrders = orders.length;
+  const deliveredCount = orders.filter((o) => o.status === 'livree' || commissionStatuses[o.id] === 'paid').length;
+
   return (
     <Page
       eyebrow="Vos résultats"
       title="Mes ventes"
       description="Chaque commande liée à vos liens. Suivez les statuts et vos commissions."
+      action={
+        <Link href="/seller/earnings">
+          <Button variant="soft" testId="button-earnings-link"><Icon glyph={Wallet01Icon} size={14} /> Revenus</Button>
+        </Link>
+      }
     >
-      {/* Status summary */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Hero card — total commissions */}
+      <div className="mt-6 overflow-hidden rounded-[22px] bg-gradient-to-br from-[#5745df] via-[#6b58f0] to-[#7d6cf5] p-5 text-white shadow-lg sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#d0caff]">Commissions validées</p>
+            <strong className="mt-3 block font-[Space_Grotesk] text-3xl font-bold tracking-[-.08em] sm:text-4xl">
+              {money(totalCommission).replace(' F', '')} <small className="font-sans text-sm tracking-normal text-[#d0caff]">FCFA</small>
+            </strong>
+            <p className="mt-2 text-xs text-[#d0caff]">Disponibles pour retrait dans votre espace Revenus.</p>
+          </div>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm">
+            <Icon glyph={Chart02Icon} size={24} />
+          </span>
+        </div>
+        <div className="mt-5 flex items-center gap-4 border-t border-white/15 pt-4">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/15"><Icon glyph={ShoppingBag01Icon} size={14} /></span>
+            <span className="text-xs font-bold">{totalOrders} commande{totalOrders > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/15"><Icon glyph={CheckmarkCircle02Icon} size={14} /></span>
+            <span className="text-xs font-bold">{deliveredCount} livrée{deliveredCount > 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Status summary cards */}
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {filters.slice(1).map((s) => {
           const cfg = statusMap[s];
-          const label = s === 'livree' ? 'Livré' : s === 'annulee' ? 'Annulé' : 'En cours';
           return (
-            <Card key={s} className="p-4">
-              <div className="flex items-center gap-2">
-                <span className={`grid h-8 w-8 place-items-center rounded-lg ${cfg.tone === 'mint' ? 'bg-[#e7faf2] text-[#278e69]' : cfg.tone === 'amber' ? 'bg-[#fff4de] text-[#ac741e]' : cfg.tone === 'rose' ? 'bg-[#fff0f1] text-[#c45667]' : 'bg-[#efedff] text-[#5b49e8]'}`}>
-                  <Icon glyph={cfg.glyph} size={16} />
-                </span>
-                <span className="font-[Space_Grotesk] text-xl font-bold text-[#292541]">{statusCounts[s] ?? 0}</span>
-              </div>
-              <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">{label}</p>
+            <Card key={s} className="p-4 transition hover:shadow-md">
+              <span className={`grid h-9 w-9 place-items-center rounded-xl ${cfg.tone === 'mint' ? 'bg-[#e7faf2] text-[#278e69]' : cfg.tone === 'amber' ? 'bg-[#fff4de] text-[#ac741e]' : cfg.tone === 'rose' ? 'bg-[#fff0f1] text-[#c45667]' : 'bg-[#efedff] text-[#5b49e8]'}`}>
+                <Icon glyph={cfg.glyph} size={18} />
+              </span>
+              <span className="mt-3 block font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{statusCounts[s] ?? 0}</span>
+              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">{cfg.label}</p>
             </Card>
           );
         })}
       </div>
-
-      {/* Commission summary */}
-      <Card className="mt-4 bg-[#5745df] text-white">
-        <p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#d0caff]">Commissions validées</p>
-        <strong className="mt-3 block font-[Space_Grotesk] text-3xl font-bold tracking-[-.08em]">{money(totalCommission).replace(' F', '')} <small className="font-sans text-sm tracking-normal text-[#d0caff]">FCFA</small></strong>
-        <p className="mt-2 text-xs text-[#d0caff]">Disponibles pour retrait dans votre espace Revenus.</p>
-      </Card>
 
       {/* Search + filter */}
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -211,7 +246,7 @@ export function Sales() {
           <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une commande ou un client…" className={`${sellerInputClass} pl-10`} data-testid="input-seller-orders-search" />
         </div>
         <select value={filter} onChange={(e) => { haptic('light'); setFilter(e.target.value as StatusFilter); }} className={`${sellerSelectClass} sm:w-auto`} data-testid="select-seller-orders-filter">
-          {filters.map((f) => <option key={f} value={f}>{f === 'Tous' ? 'Tous' : f === 'livree' ? 'Livré' : f === 'annulee' ? 'Annulé' : 'En cours'}</option>)}
+          {filters.map((f) => <option key={f} value={f}>{f === 'Tous' ? 'Tous les statuts' : statusMap[f]?.label ?? f}</option>)}
         </select>
       </div>
 
@@ -222,7 +257,12 @@ export function Sales() {
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
           </div>
         ) : filtered.length === 0 ? (
-          <SellerEmptyState glyph={Search01Icon} title="Aucune vente trouvée" description="Modifiez votre recherche ou votre filtre pour voir d'autres commandes." />
+          <SellerEmptyState
+            glyph={Package01Icon}
+            title="Aucune vente pour l'instant"
+            description="Partagez vos liens de produits pour générer des ventes. Vos commandes apparaîtront ici."
+            action={<Link href="/seller/campaigns"><Button variant="soft">Voir mes campagnes</Button></Link>}
+          />
         ) : (
           <SellerScrollTable minWidth={720} testId="scroll-seller-orders">
             <div className="grid grid-cols-[1.5fr_1.5fr_1fr_1fr_.8fr] gap-4 border-b border-[#e9e6f1] px-5 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">
@@ -231,13 +271,23 @@ export function Sales() {
             {filtered.map((o) => {
               const shortId = `CMD-${o.id.slice(-6).toUpperCase()}`;
               const ds = displayStatus(o);
+              const tone = displayTone(o);
+              const glyph = displayGlyph(o);
               return (
                 <Link key={o.id} href={`/seller/sales/${o.id}`} className="grid w-full grid-cols-[1.5fr_1.5fr_1fr_1fr_.8fr] items-center gap-4 border-b border-[#f1eef7] px-5 py-4 text-left last:border-b-0 transition hover:bg-[#faf9fd]" data-testid={`view-seller-order-${o.id}`}>
-                  <div className="min-w-0"><p className="truncate font-bold text-[#292541]">{shortId}</p><p className="text-xs text-[#9290a2]">{new Date(o.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p></div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tone === 'mint' ? 'bg-[#e7faf2] text-[#278e69]' : tone === 'amber' ? 'bg-[#fff4de] text-[#ac741e]' : tone === 'rose' ? 'bg-[#fff0f1] text-[#c45667]' : 'bg-[#efedff] text-[#5b49e8]'}`}>
+                      <Icon glyph={glyph} size={16} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-[#292541]">{shortId}</p>
+                      <p className="text-xs text-[#9290a2]">{new Date(o.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
+                    </div>
+                  </div>
                   <span className="truncate text-sm font-medium text-[#292541]">{o.customer_name}</span>
-                  <span className="truncate text-sm text-[#77738a]">{o.product_name ?? '—'}</span>
+                  <span className="truncate text-sm text-[#77738a]">{o.product_name ?? '—'}{o.quantity ? ` ×${o.quantity}` : ''}</span>
                   <span className="font-[Space_Grotesk] font-bold text-[#278e69]">{money(o.commission_amount)}</span>
-                  <div className="text-right"><SellerBadge tone={displayTone(o)}>{ds}</SellerBadge></div>
+                  <div className="text-right"><SellerBadge tone={tone}>{ds}</SellerBadge></div>
                 </Link>
               );
             })}

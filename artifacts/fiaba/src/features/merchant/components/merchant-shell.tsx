@@ -5,6 +5,8 @@ import { Cancel01Icon, Chart02Icon, CheckmarkCircle02Icon, Home01Icon, Logout01I
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
+import { useMerchantSidebarBadges } from '@/hooks/use-sidebar-badges';
 import { MerchantLogo } from './merchant-ui';
 import { primaryNav, secondaryNav, allNav } from '@/config/navigation';
 import { haptic } from '@/lib/utils';
@@ -22,12 +24,15 @@ export function MerchantShell({ children }: { children: ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
   const { profile, signOut } = useAuth();
+  const { unreadCount } = useUnreadNotifications();
+  const { orderCount } = useMerchantSidebarBadges();
   const initials = (profile?.full_name ?? 'AN')
+    .replace(/@/g, '')
     .split(' ')
-    .map((w) => w[0])
-    .join('')
+    .filter(Boolean)
     .slice(0, 2)
-    .toUpperCase();
+    .map((w) => w[0].toUpperCase())
+    .join('') || 'A';
 
   const handleSignOut = async () => {
     await signOut();
@@ -49,7 +54,7 @@ export function MerchantShell({ children }: { children: ReactNode }) {
       >
         <Icon glyph={item.glyph} size={isMobile ? 18 : 17} />
         {item.label}
-        {item.href === '/merchant/orders' && <span className="ml-auto rounded-full bg-[#e7faf2] px-1.5 py-0.5 text-[9px] text-[#278e69]">4</span>}
+        {item.href === '/merchant/orders' && orderCount > 0 && <span className="ml-auto rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white">{orderCount}</span>}
       </Link>
     );
   };
@@ -102,10 +107,12 @@ export function MerchantShell({ children }: { children: ReactNode }) {
               data-testid="button-notifications"
             >
               <Icon glyph={Notification01Icon} size={17} />
-              <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-[#ef6d78] px-1 text-[9px] font-bold text-white ring-2 ring-[#f8f8fc]" data-testid="badge-notifications">{unreadCount > 99 ? '99+' : unreadCount}</span>
+              )}
             </button>
           </Link>
-          <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-user-initials">{initials}</span>
+          <Link href="/merchant/settings" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4] transition hover:bg-[#cec8f5]" data-testid="text-user-initials">{initials}</Link>
         </div>
       </header>
 

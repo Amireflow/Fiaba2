@@ -3,6 +3,8 @@ import { Link } from 'wouter';
 import {
   Add01Icon,
   ArrowUpRight01Icon,
+  GridViewIcon,
+  ListViewIcon,
   Search01Icon,
   SparklesIcon,
   Tick01Icon,
@@ -48,6 +50,7 @@ export function Discover() {
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('tous');
   const [sortBy, setSortBy] = useState<SortOption>('matching');
   const [joining, setJoining] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Categories list with counts
   const categories = useMemo(() => {
@@ -129,26 +132,6 @@ export function Discover() {
       title="Découvrir les produits"
       description="Trouvez les meilleures offres des boutiques au Sénégal. Partagez ce que vous aimez et recevez vos commissions directement."
     >
-      {/* Hero compact */}
-      <div className="mt-5 flex flex-col gap-4 overflow-hidden rounded-[22px] bg-gradient-to-r from-[#5b49e8] to-[#7c66f2] p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-            <Icon glyph={SparklesIcon} size={13} /> {campaigns.length} opportunités vérifiées
-          </span>
-          <h2 className="mt-2.5 font-[Space_Grotesk] text-lg font-bold tracking-[-.03em] sm:text-xl">
-            Des produits adaptés à votre audience
-          </h2>
-          <p className="mt-1 max-w-lg text-xs leading-5 text-[#e0dbff]">
-            Rejoignez une campagne en un clic, partagez votre lien et recevez vos commissions dès la livraison.
-          </p>
-        </div>
-        <Link href="/seller/campaigns" className="shrink-0">
-          <Button variant="white" className="w-full sm:w-auto" testId="button-banner-my-campaigns">
-            Mes campagnes <Icon glyph={ArrowUpRight01Icon} size={14} />
-          </Button>
-        </Link>
-      </div>
-
       {/* Barre de filtres unifiée */}
       <div className="mt-5 space-y-3">
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
@@ -165,38 +148,59 @@ export function Discover() {
               data-testid="input-seller-search"
             />
           </div>
-          <div className="grid grid-cols-3 gap-2 lg:flex lg:items-center">
-            <select
-              value={formatFilter}
-              onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
-              className={`${sellerSelectClass} lg:w-auto`}
-              data-testid="select-format-filter"
-            >
-              <option value="tous">Format</option>
-              <option value="physique">Physique</option>
-              <option value="digital">Digital</option>
-            </select>
-            <select
-              value={modelFilter}
-              onChange={(e) => setModelFilter(e.target.value as ModelFilter)}
-              className={`${sellerSelectClass} lg:w-auto`}
-              data-testid="select-model-filter"
-            >
-              <option value="tous">Modèle</option>
-              <option value="commission">Commission %</option>
-              <option value="marge">Marge</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className={`${sellerSelectClass} lg:w-auto`}
-              data-testid="select-sort-by"
-            >
-              <option value="matching">Match idéal</option>
-              <option value="gain_desc">Gain le plus élevé</option>
-              <option value="price_asc">Prix croissant</option>
-              <option value="price_desc">Prix décroissant</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <div className="grid grid-cols-3 gap-2 lg:flex lg:items-center">
+              <select
+                value={formatFilter}
+                onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
+                className={`${sellerSelectClass} lg:w-auto`}
+                data-testid="select-format-filter"
+              >
+                <option value="tous">Format</option>
+                <option value="physique">Physique</option>
+                <option value="digital">Digital</option>
+              </select>
+              <select
+                value={modelFilter}
+                onChange={(e) => setModelFilter(e.target.value as ModelFilter)}
+                className={`${sellerSelectClass} lg:w-auto`}
+                data-testid="select-model-filter"
+              >
+                <option value="tous">Modèle</option>
+                <option value="commission">Commission %</option>
+                <option value="marge">Marge</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className={`${sellerSelectClass} lg:w-auto`}
+                data-testid="select-sort-by"
+              >
+                <option value="matching">Match idéal</option>
+                <option value="gain_desc">Gain le plus élevé</option>
+                <option value="price_asc">Prix croissant</option>
+                <option value="price_desc">Prix décroissant</option>
+              </select>
+            </div>
+            {/* Toggle vue grille/liste */}
+            <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#f4f3f8] p-1">
+              <button
+                onClick={() => { haptic('light'); setViewMode('grid'); }}
+                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'grid' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+                data-testid="button-view-grid"
+                aria-label="Vue grille"
+              >
+                <Icon glyph={GridViewIcon} size={16} />
+              </button>
+              <button
+                onClick={() => { haptic('light'); setViewMode('list'); }}
+                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'list' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+                data-testid="button-view-list"
+                aria-label="Vue liste"
+              >
+                <Icon glyph={ListViewIcon} size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -286,11 +290,19 @@ export function Discover() {
                   {gridCampaigns.length} résultat{gridCampaigns.length > 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {gridCampaigns.map((c) => (
-                  <CampaignCard key={c.campaign_id} c={c} joining={joining} onJoin={handleJoin} />
-                ))}
-              </div>
+              {viewMode === 'grid' ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {gridCampaigns.map((c) => (
+                    <CampaignCard key={c.campaign_id} c={c} joining={joining} onJoin={handleJoin} />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {gridCampaigns.map((c) => (
+                    <CampaignListRow key={c.campaign_id} c={c} joining={joining} onJoin={handleJoin} />
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </>
@@ -449,6 +461,80 @@ function SkeletonGrid() {
         </Card>
       ))}
     </div>
+  );
+}
+
+/* ── Ligne produit en vue liste ── */
+function CampaignListRow({
+  c,
+  joining,
+  onJoin,
+}: {
+  c: DiscoveryCampaign;
+  joining: string | null;
+  onJoin: (c: DiscoveryCampaign) => void;
+}) {
+  const netGain = getNetGain(c);
+  const imgUrl = getFirstImageUrl(c.product_image_url);
+  const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
+
+  return (
+    <Card className="flex items-center gap-4 p-3 transition hover:shadow-md">
+      <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
+        <SafeImage
+          src={imgUrl}
+          alt={c.product_name ?? c.campaign_name}
+          className="h-16 w-16 rounded-xl object-cover sm:h-20 sm:w-20"
+          iconSize={22}
+        />
+      </Link>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+            {c.product_name ?? c.campaign_name}
+          </p>
+          {isTopMatch && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#efedff] px-2 py-0.5 text-[9px] font-bold text-[#5b49e8]">
+              <Icon glyph={SparklesIcon} size={10} /> Top
+            </span>
+          )}
+          {c.product_type === 'digital' && (
+            <span className="inline-flex shrink-0 rounded-full bg-[#292541] px-2 py-0.5 text-[9px] font-bold text-white">
+              Digital
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 truncate text-xs text-[#9290a2]">
+          {c.merchant_name} · {c.product_category ?? 'Divers'}
+        </p>
+        <div className="mt-1.5 flex items-center gap-4">
+          <span className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</span>
+          <span className="text-xs font-bold text-[#278e69]">+{money(netGain)} / vente</span>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        {c.is_joined ? (
+          <Link href={`/seller/share/${c.campaign_id}`}>
+            <Button variant="success" testId={`share-list-${c.campaign_id}`}>
+              Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            onClick={() => onJoin(c)}
+            disabled={joining === c.campaign_id}
+            testId={`join-list-${c.campaign_id}`}
+          >
+            {joining === c.campaign_id ? '…' : 'Rejoindre'}
+          </Button>
+        )}
+        <Link href={`/seller/product/${c.campaign_id}`}>
+          <Button variant="soft" testId={`view-list-${c.campaign_id}`}>Détails</Button>
+        </Link>
+      </div>
+    </Card>
   );
 }
 

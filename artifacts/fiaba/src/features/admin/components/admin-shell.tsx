@@ -10,6 +10,7 @@ import { haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 import { useAuth } from '@/hooks/use-auth';
+import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 
 /* Bottom nav items (4 shortcuts + Plus button) */
 const bottomNav = [
@@ -23,10 +24,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
+  const { unreadCount: unreadNotifs } = useUnreadNotifications();
   const [disputeCount, setDisputeCount] = useState(0);
   const [fraudCount, setFraudCount] = useState(0);
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
     async function loadBadges() {
@@ -43,13 +44,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
         .select('id', { count: 'exact', head: true })
         .in('status', ['pending', 'flagged', 'open']);
       setFraudCount(fCount ?? 0);
-
-      // Count unread notifications
-      const { count: nCount } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_read', false);
-      setUnreadNotifs(nCount ?? 0);
     }
     loadBadges();
   }, []);
@@ -74,8 +68,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
       >
         <Icon glyph={item.glyph} size={isMobile ? 18 : 17} />
         {item.label}
-        {item.href === '/admin/disputes' && disputeCount > 0 && <span className="ml-auto rounded-full bg-[#fff0f1] px-1.5 py-0.5 text-[9px] text-[#c45667]">{disputeCount}</span>}
-        {item.href === '/admin/fraud' && fraudCount > 0 && <span className="ml-auto rounded-full bg-[#fff4de] px-1.5 py-0.5 text-[9px] text-[#ac741e]">{fraudCount}</span>}
+        {item.href === '/admin/disputes' && disputeCount > 0 && <span className="ml-auto rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white">{disputeCount}</span>}
+        {item.href === '/admin/fraud' && fraudCount > 0 && <span className="ml-auto rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white">{fraudCount}</span>}
       </Link>
     );
   };
@@ -111,7 +105,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
           <div className="hidden lg:block">
             <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8b88a0]">Console administrateur</p>
-            <p className="mt-1 text-sm font-bold text-[#38324f]">Plateforme · Sénégal</p>
+            <p className="mt-1 text-sm font-bold text-[#38324f]">{profile?.full_name ?? 'Administrateur'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -121,10 +115,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
               data-testid="button-admin-notifications"
             >
               <Icon glyph={Notification01Icon} size={17} />
-              {unreadNotifs > 0 && <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />}
+              {unreadNotifs > 0 && (
+                <span className="absolute -right-1 -top-1 grid min-h-[18px] min-w-[18px] place-items-center rounded-full bg-[#ef6d78] px-1 text-[9px] font-bold text-white ring-2 ring-[#f8f8fc]" data-testid="badge-admin-notifications">{unreadNotifs > 99 ? '99+' : unreadNotifs}</span>
+              )}
             </button>
           </Link>
-          <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-admin-initials">AD</span>
+          <Link href="/admin/settings" className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4] transition hover:bg-[#cec8f5]" data-testid="text-admin-initials">
+            {(profile?.full_name ?? 'A').replace(/@/g, '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'A'}
+          </Link>
         </div>
       </header>
 

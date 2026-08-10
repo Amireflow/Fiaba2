@@ -736,9 +736,9 @@ function Home() {
               <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-[11px] font-bold text-[#5e51c9]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#5b49e8]" /> Monétisez votre influence au Sénégal
               </div>
-              <h1 className="mt-6 max-w-[650px] font-[var(--app-font-serif)] text-[clamp(3rem,7vw,6.5rem)] font-bold leading-[.95] tracking-[-.05em] sm:tracking-[-.08em] text-[#27223f]">
+              <h1 className="mt-6 max-w-[650px] font-[var(--app-font-serif)] text-[clamp(3.15rem,7vw,6.5rem)] font-bold leading-[.95] tracking-[-.06em] text-[#27223f]">
                 Votre audience <br />
-                <span className="inline-block text-[#5b49e8] pr-3">mérite un salaire.</span>
+                <span className="text-[#5b49e8]">mérite un salaire.</span>
               </h1>
               <p className="mt-6 max-w-lg text-base leading-7 text-[#6b677e]">
                 Fiaba connecte les créateurs de contenu et les boutiques au Sénégal. Obtenez votre lien unique, partagez-le sur WhatsApp et Instagram, et recevez vos commissions directement sur Wave ou Orange Money.

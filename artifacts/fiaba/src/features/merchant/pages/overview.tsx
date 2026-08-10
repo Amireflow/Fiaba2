@@ -57,28 +57,27 @@ export function Overview() {
         return;
       }
 
-      // Fetch recent orders
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('id, customer_name, total_amount, merchant_amount, commission_amount, status, created_at')
-        .eq('merchant_id', merchantId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      setOrders((orderData as OrderRow[] | null) ?? []);
+      // Fetch orders, sellers, and campaigns in parallel with Promise.all
+      const [orderRes, sellerRes, campRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, customer_name, total_amount, merchant_amount, commission_amount, status, created_at')
+          .eq('merchant_id', merchantId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('sellers')
+          .select('id, status')
+          .eq('merchant_id', merchantId),
+        supabase
+          .from('campaigns')
+          .select('id, name, status')
+          .eq('merchant_id', merchantId),
+      ]);
 
-      // Fetch sellers
-      const { data: sellerData } = await supabase
-        .from('sellers')
-        .select('id, status')
-        .eq('merchant_id', merchantId);
-      setSellers((sellerData as SellerRow[] | null) ?? []);
-
-      // Fetch campaigns
-      const { data: campData } = await supabase
-        .from('campaigns')
-        .select('id, name, status')
-        .eq('merchant_id', merchantId);
-      setCampaigns((campData as CampaignRow[] | null) ?? []);
+      setOrders((orderRes.data as OrderRow[] | null) ?? []);
+      setSellers((sellerRes.data as SellerRow[] | null) ?? []);
+      setCampaigns((campRes.data as CampaignRow[] | null) ?? []);
 
       setLoading(false);
     }

@@ -21,14 +21,13 @@ export type DiscoveryCampaign = {
   merchant_slug: string | null;
   niche_id: string | null;
   niche_name: string | null;
-  match_score: number; // 0-100, based on niche overlap
+  match_score: number;
   is_joined: boolean;
 };
 
 /**
- * Hook that fetches active campaigns with product + merchant info,
- * synthesizes discovery entries for active products without explicit campaigns,
- * matches them against the seller's niches, and tracks joined campaigns.
+ * Hook qu'exécute les requêtes de découverte en parallèle (Promise.all)
+ * pour un chargement ultrarapide du catalogue vendeurs.
  */
 export function useSellerDiscovery() {
   const { profile } = useAuth();
@@ -47,58 +46,48 @@ export function useSellerDiscovery() {
     setError(null);
 
     try {
-      // 1. Get seller record
-      const { data: seller } = await supabase
-        .from('sellers')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .maybeSingle();
+      // 1. Exécution simultanée des requêtes initiales (Vendeur, Campagnes, Produits)
+      const [sellerRes, campRes, prodRes] = await Promise.all([
+        supabase.from('sellers').select('id').eq('profile_id', profile.id).maybeSingle(),
+        supabase
+          .from('campaigns')
+          .select(`
+            id, name, description, commission, commission_type, model, goal,
+            product_id, niche_id, merchant_id,
+            products:product_id (id, name, price, image_url, category),
+            merchants:merchant_id (id, name, slug),
+            niches:niche_id (id, name)
+          `)
+          .eq('status', 'active'),
+        supabase
+          .from('products')
+          .select(`
+            id, name, price, image_url, category, description, merchant_id,
+            merchants:merchant_id (id, name, slug)
+          `)
+          .eq('status', 'actif'),
+      ]);
 
-      const sId = (seller as { id: string } | null)?.id ?? null;
+      const sId = (sellerRes.data as { id: string } | null)?.id ?? null;
       setSellerId(sId);
 
-      // 2. Get seller niches
+      // 2. Exécution simultanée des niches et campagnes rejointes si le profil vendeur existe
       let sellerNicheIds: string[] = [];
-      if (sId) {
-        const { data: sn } = await supabase
-          .from('seller_niches')
-          .select('niche_id')
-          .eq('seller_id', sId);
-        sellerNicheIds = ((sn as { niche_id: string }[] | null) ?? []).map((x) => x.niche_id);
-      }
-
-      // 3. Get joined campaign IDs
       let joinedIds: string[] = [];
+
       if (sId) {
-        const { data: joined } = await supabase
-          .from('campaign_sellers')
-          .select('campaign_id')
-          .eq('seller_id', sId);
-        joinedIds = ((joined as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
+        const [nicheRes, joinedRes] = await Promise.all([
+          supabase.from('seller_niches').select('niche_id').eq('seller_id', sId),
+          supabase.from('campaign_sellers').select('campaign_id').eq('seller_id', sId),
+        ]);
+        sellerNicheIds = ((nicheRes.data as { niche_id: string }[] | null) ?? []).map((x) => x.niche_id);
+        joinedIds = ((joinedRes.data as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
       }
 
-      // 4. Fetch active campaigns with product + merchant
-      const { data: rawCampaigns } = await supabase
-        .from('campaigns')
-        .select(`
-          id, name, description, commission, commission_type, model, goal,
-          product_id, niche_id, merchant_id,
-          products:product_id (id, name, price, image_url, category),
-          merchants:merchant_id (id, name, slug),
-          niches:niche_id (id, name)
-        `)
-        .eq('status', 'active');
+      const rawCampaigns = campRes.data ?? [];
+      const rawProducts = prodRes.data ?? [];
 
-      // 5. Fetch all active products
-      const { data: rawProducts } = await supabase
-        .from('products')
-        .select(`
-          id, name, price, image_url, category, description, merchant_id,
-          merchants:merchant_id (id, name, slug)
-        `)
-        .eq('status', 'actif');
-
-      const activeCampaignsList = (rawCampaigns as unknown[] ?? []).map((row): DiscoveryCampaign => {
+      const activeCampaignsList = (rawCampaigns as unknown[]).map((row): DiscoveryCampaign => {
         const c = row as {
           id: string; name: string; description: string | null;
           commission: number; commission_type: string | null; model: string;
@@ -139,12 +128,12 @@ export function useSellerDiscovery() {
         };
       });
 
-      // 6. Synthesize discovery entries for active products without explicit campaigns
+      // 3. Synthèse ultra-rapide des produits actifs n'ayant pas encore de campagne explicite
       const existingProductIds = new Set(
         activeCampaignsList.map((c) => c.product_id).filter(Boolean)
       );
 
-      const syntheticCampaigns: DiscoveryCampaign[] = (rawProducts as any[] ?? [])
+      const syntheticCampaigns: DiscoveryCampaign[] = (rawProducts as any[])
         .filter((p) => !existingProductIds.has(p.id))
         .map((p) => {
           const compId = `prod-camp-${p.id}`;
@@ -186,14 +175,18 @@ export function useSellerDiscovery() {
   }, [fetchDiscovery]);
 
   /**
-   * Join a campaign: insert into campaign_sellers + create tracking link.
-   * Auto-creates real campaign entry in Supabase if joining a product-derived discovery item.
+   * Rejoint une campagne avec mise à jour optimiste et création rapide du lien de suivi.
    */
   const joinCampaign = useCallback(async (campaignId: string): Promise<{ error: string | null }> => {
     if (!sellerId) return { error: 'Profil vendeur introuvable' };
     haptic('medium');
 
     let targetCampaignId = campaignId;
+
+    // Mise à jour optimiste instantanée (0ms)
+    setCampaigns((prev) =>
+      prev.map((c) => (c.campaign_id === campaignId ? { ...c, is_joined: true } : c))
+    );
 
     if (campaignId.startsWith('prod-camp-')) {
       const productId = campaignId.replace('prod-camp-', '');
@@ -225,17 +218,19 @@ export function useSellerDiscovery() {
       }
     }
 
-    // Insert campaign_sellers
     const { error: joinErr } = await supabase
       .from('campaign_sellers')
       .insert({ campaign_id: targetCampaignId, seller_id: sellerId } as never);
 
     if (joinErr && !joinErr.message.includes('unique constraint')) {
       haptic('error');
+      // Annulation de la mise à jour optimiste en cas d'échec
+      setCampaigns((prev) =>
+        prev.map((c) => (c.campaign_id === campaignId ? { ...c, is_joined: false } : c))
+      );
       return { error: joinErr.message };
     }
 
-    // Create tracking link
     const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     const sellerCode = `F-${sellerId.slice(0, 6).toUpperCase()}`;
     const signature = `${token}.${sellerCode}.${targetCampaignId.slice(0, 8)}`;
@@ -251,9 +246,8 @@ export function useSellerDiscovery() {
     } as never);
 
     haptic('success');
-    fetchDiscovery();
     return { error: null };
-  }, [sellerId, fetchDiscovery]);
+  }, [sellerId]);
 
   return { campaigns, loading, error, sellerId, joinCampaign, refetch: fetchDiscovery };
 }

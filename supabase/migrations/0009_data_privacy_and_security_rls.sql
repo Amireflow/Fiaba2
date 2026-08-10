@@ -17,6 +17,20 @@ as $$
 $$;
 
 -- ----------------------------------------------------------------------------
+-- 1b. Politiques RLS sur public.profiles (Autoriser lecture Admin)
+-- ----------------------------------------------------------------------------
+alter table public.profiles enable row level security;
+
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_select" on public.profiles;
+
+create policy "profiles_select" on public.profiles
+  for select using (
+    auth.uid() = id
+    or public.is_admin()
+  );
+
+-- ----------------------------------------------------------------------------
 -- 2. Refonte des Politiques RLS sur public.orders
 -- ----------------------------------------------------------------------------
 alter table public.orders enable row level security;

@@ -64,13 +64,54 @@ export function Sellers() {
         return;
       }
 
-      // Fetch sellers for this merchant
-      const { data: sellerRows } = await supabase
+      // 1. Fetch campaigns for this merchant
+      const { data: merchantCampaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('merchant_id', merchantId);
+      const campaignIds = ((merchantCampaigns as { id: string }[] | null) ?? []).map((c) => c.id);
+
+      // 2. Fetch seller_ids from campaign_sellers
+      let joinedSellerIds: string[] = [];
+      if (campaignIds.length > 0) {
+        const { data: csData } = await supabase
+          .from('campaign_sellers')
+          .select('seller_id')
+          .in('campaign_id', campaignIds);
+        joinedSellerIds = ((csData as { seller_id: string }[] | null) ?? []).map((cs) => cs.seller_id);
+      }
+
+      // 3. Fetch seller_ids from orders
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('seller_id')
+        .eq('merchant_id', merchantId)
+        .not('seller_id', 'is', null);
+      const orderSellerIds = ((orderData as { seller_id: string }[] | null) ?? []).map((o) => o.seller_id!);
+
+      // 4. Fetch direct sellers
+      const { data: directSellers } = await supabase
+        .from('sellers')
+        .select('id')
+        .eq('merchant_id', merchantId);
+      const directSellerIds = ((directSellers as { id: string }[] | null) ?? []).map((s) => s.id);
+
+      // Combine all unique seller IDs
+      const allSellerIds = [...new Set([...directSellerIds, ...joinedSellerIds, ...orderSellerIds])];
+
+      if (allSellerIds.length === 0) {
+        setSellers([]);
+        setLoading(false);
+        return;
+      }
+
+      // 5. Fetch full seller records for all collected seller IDs
+      const { data: allSellerRows } = await supabase
         .from('sellers')
         .select('id, display_name, status, followers, phone, joined_at, invited_at, profile_id')
-        .eq('merchant_id', merchantId);
+        .in('id', allSellerIds);
 
-      const rows = (sellerRows as { id: string; display_name: string; status: string; followers: number; phone: string | null; joined_at: string | null; invited_at: string; profile_id: string | null }[] | null) ?? [];
+      const rows = (allSellerRows as { id: string; display_name: string; status: string; followers: number; phone: string | null; joined_at: string | null; invited_at: string; profile_id: string | null }[] | null) ?? [];
       if (rows.length === 0) {
         setSellers([]);
         setLoading(false);

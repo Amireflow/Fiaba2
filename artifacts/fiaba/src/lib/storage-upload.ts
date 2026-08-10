@@ -1,8 +1,10 @@
 import { supabase } from '@/lib/supabase';
+import { compressImageFile } from '@/lib/utils';
 
 /**
  * Upload an image file to Supabase Storage (bucket: 'products' or fallback 'product-images').
- * Fallback to Base64 Data URL if storage bucket is unavailable or RLS denies access.
+ * Automatically compresses heavy photos client-side before uploading.
+ * Fallback to lightweight WebP Data URL (~100KB) if storage bucket is unavailable or RLS denies access.
  */
 export async function uploadImageToSupabase(
   file: File,
@@ -14,7 +16,7 @@ export async function uploadImageToSupabase(
     const filePath = `public/${fileName}`;
 
     // Attempt Supabase Storage Upload
-    const { data, error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -22,8 +24,7 @@ export async function uploadImageToSupabase(
       });
 
     if (uploadErr) {
-      console.warn(`Supabase Storage upload to '${bucketName}' failed, falling back to base64:`, uploadErr.message);
-      return uploadAsBase64(file);
+      return uploadAsCompressedBase64(file);
     }
 
     // Get Public URL
@@ -35,15 +36,14 @@ export async function uploadImageToSupabase(
       return { url: publicUrlData.publicUrl, error: null };
     }
 
-    return uploadAsBase64(file);
+    return uploadAsCompressedBase64(file);
   } catch (err: any) {
-    console.warn('Storage upload error, using base64 fallback:', err);
-    return uploadAsBase64(file);
+    return uploadAsCompressedBase64(file);
   }
 }
 
 /**
- * Upload multiple image files concurrently to Supabase Storage.
+ * Upload multiple image files concurrently to Supabase Storage with client-side compression.
  */
 export async function uploadMultipleImagesToSupabase(
   files: FileList | File[],
@@ -73,7 +73,6 @@ export function parseImageUrls(rawImageUrl: string | null | undefined): string[]
   const trimmed = rawImageUrl.trim();
   if (!trimmed) return [];
 
-  // Try parsing JSON array
   if (trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -83,22 +82,22 @@ export function parseImageUrls(rawImageUrl: string | null | undefined): string[]
     }
   }
 
-  // Comma-separated or single string
   return trimmed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
 /**
- * Fallback helper to convert an image file to a data URL string.
+ * Compression client-side ultra rapide via WebP/JPEG Data URL (~100-150KB).
  */
-function uploadAsBase64(file: File): Promise<{ url: string | null; error: string | null }> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      resolve({ url: reader.result as string, error: null });
-    };
-    reader.onerror = () => {
-      resolve({ url: null, error: 'Impossible de lire le fichier image' });
-    };
-    reader.readAsDataURL(file);
-  });
+async function uploadAsCompressedBase64(file: File): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const compressedDataUrl = await compressImageFile(file, 1000, 1000, 0.82);
+    return { url: compressedDataUrl, error: null };
+  } catch (err) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ url: reader.result as string, error: null });
+      reader.onerror = () => resolve({ url: null, error: 'Impossible de lire le fichier image' });
+      reader.readAsDataURL(file);
+    });
+  }
 }

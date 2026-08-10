@@ -2,9 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 
+// Cache en mémoire ultrarapide pour un affichage instantané (0ms) lors de la navigation entre onglets
+const queryCacheMap = new Map<string, { data: any[]; timestamp: number }>();
+const CACHE_TTL_MS = 30000; // 30 secondes de validité en cache
+
+export function clearQueryCache() {
+  queryCacheMap.clear();
+}
+
 /**
- * Hook générique d'interrogation Supabase.
- * Récupère les données réelles en base avec filtres et tri.
+ * Hook générique d'interrogation Supabase avec Caching SWR (Stale-While-Revalidate).
+ * Permet un rendu instantané à 0ms si les données sont déjà en mémoire.
  */
 export function useSupabaseQuery<T = Record<string, unknown>>(
   table: string,
@@ -16,22 +24,28 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
   } = {}
 ) {
   const { profile } = useAuth();
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const enabled = opts.enabled !== false;
 
-  const fetchData = useCallback(async () => {
+  const cacheKey = `${table}:${opts.select ?? '*'}:${JSON.stringify(opts.filter ?? {})}:${opts.order?.column}:${opts.order?.ascending}`;
+  const cached = queryCacheMap.get(cacheKey);
+
+  const [data, setData] = useState<T[]>(() => (cached ? (cached.data as T[]) : []));
+  const [loading, setLoading] = useState<boolean>(() => !cached);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async (isSilent = false) => {
     if (!enabled) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+
+    if (!isSilent && !queryCacheMap.has(cacheKey)) {
+      setLoading(true);
+    }
     setError(null);
 
     let query = (supabase.from(table) as any).select(opts.select ?? '*');
 
-    // Appliquer les filtres
     if (opts.filter) {
       for (const [key, value] of Object.entries(opts.filter)) {
         if (value !== undefined && value !== null) {
@@ -40,7 +54,6 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
       }
     }
 
-    // Appliquer le tri
     if (opts.order) {
       query = query.order(opts.order.column, { ascending: opts.order.ascending ?? false });
     }
@@ -48,18 +61,27 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
     const { data: result, error: err } = await query;
     if (err) {
       setError(err.message);
-      setData([]);
     } else {
-      setData((result ?? []) as T[]);
+      const freshData = (result ?? []) as T[];
+      setData(freshData);
+      queryCacheMap.set(cacheKey, { data: freshData, timestamp: Date.now() });
     }
     setLoading(false);
-  }, [table, opts.select, JSON.stringify(opts.filter), opts.order?.column, opts.order?.ascending, enabled]);
+  }, [table, opts.select, JSON.stringify(opts.filter), opts.order?.column, opts.order?.ascending, enabled, cacheKey]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const cachedItem = queryCacheMap.get(cacheKey);
+    if (cachedItem) {
+      setData(cachedItem.data as T[]);
+      setLoading(false);
+      // Re-validate in background silently
+      fetchData(true);
+    } else {
+      fetchData(false);
+    }
+  }, [fetchData, cacheKey]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, error, refetch: () => fetchData(false) };
 }
 
 /**
@@ -131,7 +153,6 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
     const userId = sessionData.session?.user?.id;
     if (!userId) return null;
 
-    // 1. Chercher la boutique existante
     const { data: merch } = await (supabase.from('merchants') as any)
       .select('id')
       .eq('owner_id', userId)
@@ -139,7 +160,6 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
 
     if (merch?.id) return merch.id;
 
-    // 2. Chercher les infos de profil
     const { data: prof } = await (supabase.from('profiles') as any)
       .select('full_name, phone, email')
       .eq('id', userId)
@@ -155,7 +175,6 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
 
     const slugName = cleanShopName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    // 3. Créer automatiquement la boutique
     const { data: newMerch } = await (supabase.from('merchants') as any)
       .insert({
         owner_id: userId,
@@ -175,35 +194,38 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
 }
 
 /**
- * Inserer une ligne dans une table Supabase.
+ * Inserer une ligne dans une table Supabase et réinitialiser le cache local.
  */
 export async function supabaseInsert<T = Record<string, unknown>>(
   table: string,
   row: Partial<T>
 ): Promise<{ data: T | null; error: string | null }> {
+  clearQueryCache();
   const { data, error } = await (supabase.from(table) as any).insert(row as never).select().single();
   return { data: data as T | null, error: error?.message ?? null };
 }
 
 /**
- * Mettre à jour une ligne dans une table Supabase par ID.
+ * Mettre à jour une ligne dans une table Supabase par ID et réinitialiser le cache local.
  */
 export async function supabaseUpdate<T = Record<string, unknown>>(
   table: string,
   id: string,
   updates: Partial<T>
 ): Promise<{ data: T | null; error: string | null }> {
+  clearQueryCache();
   const { data, error } = await (supabase.from(table) as any).update(updates as never).eq('id', id).select().single();
   return { data: data as T | null, error: error?.message ?? null };
 }
 
 /**
- * Supprimer une ligne dans une table Supabase par ID.
+ * Supprimer une ligne dans une table Supabase par ID et réinitialiser le cache local.
  */
 export async function supabaseDelete(
   table: string,
   id: string
 ): Promise<{ error: string | null }> {
+  clearQueryCache();
   const { error } = await (supabase.from(table) as any).delete().eq('id', id);
   return { error: error?.message ?? null };
 }

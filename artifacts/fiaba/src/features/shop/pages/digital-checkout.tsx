@@ -124,6 +124,44 @@ export function DigitalCheckout() {
 
       if (campErr || !raw) {
         let productId = id.startsWith('prod-camp-') ? id.replace('prod-camp-', '') : id;
+
+        // Chercher une campagne active pour ce produit
+        const { data: campByProd } = await supabase
+          .from('campaigns')
+          .select(`
+            id, name, commission, commission_type, model,
+            product_id, merchant_id,
+            products:product_id (id, name, price, image_url, description, type, digital_file_url, digital_access_instructions),
+            merchants:merchant_id (id, name)
+          `)
+          .eq('product_id', productId)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+
+        if (campByProd) {
+          const c = campByProd as any;
+          setCampaign({
+            campaign_id: c.id,
+            campaign_name: c.name,
+            commission: c.commission,
+            commission_type: c.commission_type,
+            model: c.model,
+            product_id: c.product_id,
+            product_name: c.products?.name ?? c.name,
+            product_price: c.products?.price ?? 0,
+            product_image_url: c.products?.image_url ?? null,
+            product_description: c.products?.description ?? null,
+            digital_file_url: c.products?.digital_file_url ?? null,
+            digital_access_instructions: c.products?.digital_access_instructions ?? null,
+            merchant_id: c.merchant_id,
+            merchant_name: formatShopName(c.merchants?.name),
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Aucune campagne : fallback sur le produit direct
         const { data: prodRaw } = await supabase
           .from('products')
           .select('id, name, price, image_url, description, type, digital_file_url, digital_access_instructions, merchant_id, merchants:merchant_id(id, name)')
@@ -133,7 +171,7 @@ export function DigitalCheckout() {
         if (prodRaw) {
           const p = prodRaw as any;
           setCampaign({
-            campaign_id: id,
+            campaign_id: p.id,
             campaign_name: `Offre ${p.name}`,
             commission: 0,
             commission_type: 'percentage',
@@ -203,17 +241,31 @@ export function DigitalCheckout() {
           setSellerInfo({ displayName: null, sellerCode: tl.seller_code });
         }
       } else if (sellerParam) {
-        const { data: seller } = await supabase
-          .from('sellers')
-          .select('id, seller_code')
+        // Chercher d'abord dans tracking_links (cohérent avec checkout.tsx)
+        const { data: linkByCode } = await supabase
+          .from('tracking_links')
+          .select('seller_id, seller_code')
           .eq('seller_code', sellerParam.toUpperCase())
-          .maybeSingle();
+          .eq('is_active', true)
+          .limit(1);
 
-        const s = seller as { id: string; seller_code: string } | null;
-        if (s) {
-          setResolvedSellerId(s.id);
-          setResolvedSellerCode(s.seller_code);
-          setSellerInfo({ displayName: null, sellerCode: s.seller_code });
+        const found = (linkByCode as { seller_id: string; seller_code: string }[] | null)?.[0];
+        if (found) {
+          setResolvedSellerId(found.seller_id);
+          setResolvedSellerCode(found.seller_code);
+          setSellerInfo({ displayName: null, sellerCode: found.seller_code });
+        } else {
+          // Fallback : chercher directement dans sellers par display_name
+          const { data: sRow } = await (supabase.from('sellers') as any)
+            .select('id, display_name')
+            .or(`id.eq.${sellerParam},display_name.ilike.${sellerParam}`)
+            .maybeSingle();
+
+          if (sRow) {
+            setResolvedSellerId(sRow.id);
+            setResolvedSellerCode(sRow.display_name || sellerParam);
+            setSellerInfo({ displayName: null, sellerCode: sRow.display_name || sellerParam });
+          }
         }
       }
     }

@@ -195,6 +195,52 @@ export function Checkout() {
 
       if (campErr || !raw) {
         let productId = id.startsWith('prod-camp-') ? id.replace('prod-camp-', '') : id;
+
+        // Chercher une campagne active pour ce produit
+        const { data: campByProd } = await supabase
+          .from('campaigns')
+          .select(`
+            id, name, commission, commission_type, model,
+            product_id, merchant_id,
+            products:product_id (id, name, price, image_url, description, type, digital_file_url, digital_access_instructions),
+            merchants:merchant_id (id, name)
+          `)
+          .eq('product_id', productId)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+
+        if (campByProd) {
+          const c = campByProd as any;
+          setCampaign({
+            campaign_id: c.id,
+            campaign_name: c.name,
+            commission: c.commission,
+            commission_type: c.commission_type,
+            model: c.model,
+            product_id: c.product_id,
+            product_name: c.products?.name ?? c.name,
+            product_price: c.products?.price ?? 0,
+            product_image_url: c.products?.image_url ?? null,
+            product_description: c.products?.description ?? null,
+            product_type: c.products?.type ?? 'physique',
+            digital_file_url: c.products?.digital_file_url ?? null,
+            digital_access_instructions: c.products?.digital_access_instructions ?? null,
+            merchant_id: c.merchant_id,
+            merchant_name: formatShopName(c.merchants?.name),
+          });
+
+          const { data: zoneData } = await supabase
+            .from('delivery_zones')
+            .select('id, name, fee')
+            .eq('merchant_id', c.merchant_id)
+            .eq('is_active', true);
+          setZones(((zoneData as ZoneInfo[] | null) ?? []));
+          setLoading(false);
+          return;
+        }
+
+        // Aucune campagne : fallback sur le produit direct
         const { data: prodRaw } = await supabase
           .from('products')
           .select('id, name, price, image_url, description, type, digital_file_url, digital_access_instructions, merchant_id, merchants:merchant_id(id, name)')
@@ -204,7 +250,7 @@ export function Checkout() {
         if (prodRaw) {
           const p = prodRaw as any;
           setCampaign({
-            campaign_id: id,
+            campaign_id: p.id,
             campaign_name: `Offre ${p.name}`,
             commission: 0,
             commission_type: 'percentage',

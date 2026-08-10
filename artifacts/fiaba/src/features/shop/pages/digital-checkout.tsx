@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import {
-  ArrowLeft01Icon,
   CheckmarkCircle02Icon,
   Store01Icon,
   Wallet01Icon,
   ShieldKeyIcon,
-  LockKeyIcon,
   Cancel01Icon,
   SmartPhone01Icon,
   SparklesIcon,
-  Alert01Icon,
   Download01Icon,
   Share02Icon,
 } from '@hugeicons/core-free-icons';
@@ -19,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { money, haptic, friendlyErrorMessage, formatShopName } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
-import { parseImageUrls } from '@/lib/storage-upload';
 import { SafeImage } from '@/components/shared/safe-image';
 import { trackEvent } from '@/lib/analytics';
 
@@ -391,59 +387,61 @@ export function DigitalCheckout() {
     );
   }
 
-  const imageUrls = parseImageUrls(campaign.product_image_url);
-  const primaryImage = imageUrls[0] ?? null;
-
   return (
-    <div className="min-h-[100dvh] bg-[#f8f7fc] text-[#292541]">
+    <div className="min-h-[100dvh] bg-[#f8f8fc] text-[#292541]">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-white/90 px-5 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#eceaf5] bg-white/90 px-4 backdrop-blur-xl sm:px-6">
         <Link href="/" className="flex items-center gap-2 text-sm font-bold text-[#292541]">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#5b49e8] text-white">
             <Icon glyph={Store01Icon} size={18} />
           </span>
-          Fiaba Digital
+          Fiaba
         </Link>
-        <div className="flex items-center gap-1.5 rounded-full bg-[#efedff] px-3 py-1 text-xs font-bold text-[#5b49e8]">
-          <Icon glyph={SparklesIcon} size={14} /> Accès Instantané
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#efedff] px-3 py-1 text-[11px] font-bold text-[#5b49e8]">
+          <Icon glyph={SparklesIcon} size={13} /> Accès instantané
+        </span>
       </header>
 
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-10">
         {step === 'checkout' ? (
-          <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-            {/* Left Column: Product Showcase */}
-            <div className="space-y-5">
-              <div className="overflow-hidden rounded-3xl bg-white">
+          <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:items-start">
+            {/* Colonne produit */}
+            <div className="min-w-0 space-y-4">
+              <div className="overflow-hidden rounded-[22px] bg-white">
                 <SafeImage
                   src={campaign.product_image_url}
                   alt={campaign.product_name}
-                  className="h-64 w-full object-cover"
+                  className="aspect-[16/10] w-full object-cover"
                   fallbackGlyph={SparklesIcon}
-                  iconSize={48}
+                  iconSize={44}
                 />
 
-                <div className="p-6">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7faf2] px-3 py-1 text-[11px] font-bold text-[#278e69]">
-                    <Icon glyph={CheckmarkCircle02Icon} size={13} /> Produit Numérique Certifié
-                  </span>
+                <div className="p-5 sm:p-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7faf2] px-3 py-1 text-[11px] font-bold text-[#278e69]">
+                      <Icon glyph={CheckmarkCircle02Icon} size={13} /> Produit numérique vérifié
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#efedff] px-3 py-1 text-[11px] font-bold text-[#5b49e8]">
+                      <Icon glyph={Download01Icon} size={13} /> Livraison instantanée
+                    </span>
+                  </div>
 
-                  <h1 className="mt-3 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">
+                  <h1 className="mt-3 font-[Space_Grotesk] text-xl font-bold tracking-[-.03em] text-[#292541] sm:text-2xl">
                     {campaign.product_name}
                   </h1>
 
-                  <p className="mt-1 text-xs font-bold text-[#5b49e8]">
-                    Vendu par {campaign.merchant_name}
+                  <p className="mt-1 text-xs text-[#9290a2]">
+                    Vendu par <strong className="text-[#292541]">{campaign.merchant_name}</strong>
                   </p>
 
                   {campaign.product_description && (
-                    <p className="mt-4 text-xs leading-relaxed text-[#686380] whitespace-pre-line">
+                    <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-[#686380]">
                       {campaign.product_description}
                     </p>
                   )}
 
-                  <div className="mt-6 flex items-center justify-between pt-4">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#9290a2]">Prix de la ressource</span>
+                  <div className="mt-5 flex items-center justify-between border-t border-[#f0eff5] pt-5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Prix de la ressource</span>
                     <strong className="font-[Space_Grotesk] text-2xl font-bold text-[#5b49e8]">
                       {money(campaign.product_price)}
                     </strong>
@@ -451,190 +449,182 @@ export function DigitalCheckout() {
                 </div>
               </div>
 
-              {/* Attribution info */}
+              {/* Attribution */}
               {sellerInfo && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-xs">
+                <div className="flex items-center gap-3 rounded-[22px] bg-[#efedff] p-4">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] font-[Space_Grotesk] text-sm font-bold text-white">
                     {(sellerInfo.sellerCode || 'V').slice(0, 2).toUpperCase()}
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-[#292541]">
                       Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode}</span>
                     </p>
-                    <p className="text-[10px] text-[#77738a]">Recommandation partenaire vérifiée.</p>
+                    <p className="text-[10px] text-[#77738a]">Partenaire certifié Fiaba</p>
                   </div>
+                  <Icon glyph={CheckmarkCircle02Icon} size={18} className="shrink-0 text-[#278e69]" />
                 </div>
               )}
 
-              {/* Trust Badges */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Réassurance */}
+              <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]">
                     <Icon glyph={ShieldKeyIcon} size={16} />
                   </span>
                   <div className="text-[11px]">
-                    <p className="font-bold text-[#292541]">Paiement Sécurisé</p>
-                    <p className="text-[#9290a2]">Wave & OM</p>
+                    <p className="font-bold text-[#292541]">Paiement sécurisé</p>
+                    <p className="text-[#9290a2]">Wave & Orange Money</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                    <Icon glyph={SparklesIcon} size={16} />
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+                    <Icon glyph={Download01Icon} size={16} />
                   </span>
                   <div className="text-[11px]">
-                    <p className="font-bold text-[#292541]">Accès Immédiat</p>
-                    <p className="text-[#9290a2]">Après paiement</p>
+                    <p className="font-bold text-[#292541]">Accès immédiat</p>
+                    <p className="text-[#9290a2]">Après le paiement</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Instant Checkout Form */}
-            <div>
-              <div className="rounded-3xl bg-white p-6">
-                <h2 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">
-                  Obtenir votre accès en 1 clic
-                </h2>
-                <p className="mt-1 text-xs text-[#77738a]">
-                  Renseignez vos coordonnées pour recevoir votre lien de téléchargement.
-                </p>
+            {/* Colonne formulaire */}
+            <div className="rounded-[22px] bg-white p-5 sm:p-6 lg:sticky lg:top-24">
+              <h2 className="font-[Space_Grotesk] text-lg font-bold tracking-[-.03em] text-[#292541]">
+                Finaliser votre achat
+              </h2>
+              <p className="mt-1 text-xs text-[#77738a]">
+                Votre lien de téléchargement est débloqué dès le paiement confirmé.
+              </p>
 
-                <form onSubmit={handleStartPayment} className="mt-5 space-y-4">
-                  {/* Name */}
-                  <div>
-                    <label className="text-xs font-bold text-[#292541]">Nom complet *</label>
+              <form onSubmit={handleStartPayment} className="mt-5 space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="text-xs font-bold text-[#292541]">Nom complet *</label>
+                  <input
+                    type="text"
+                    value={form.customerName}
+                    onChange={(e) => setField('customerName', e.target.value)}
+                    placeholder="Ex. Aminata Ndiaye"
+                    className={`mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${
+                      errors.customerName ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'
+                    } placeholder:text-[#b8b4c8]`}
+                    data-testid="input-digital-customer-name"
+                  />
+                  {errors.customerName && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.customerName}</p>}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-xs font-bold text-[#292541]">Numéro WhatsApp *</label>
+                  <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${
+                    errors.phone ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'
+                  }`}>
+                    <Icon glyph={SmartPhone01Icon} size={16} />
                     <input
                       type="text"
-                      value={form.customerName}
-                      onChange={(e) => setField('customerName', e.target.value)}
-                      placeholder="Ex. Aminata Ndiaye"
-                      className={`mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${
-                        errors.customerName ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'
-                      } placeholder:text-[#b8b4c8]`}
-                      data-testid="input-digital-customer-name"
+                      value={form.phone}
+                      onChange={(e) => setField('phone', e.target.value)}
+                      placeholder="77 123 45 67"
+                      className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]"
+                      data-testid="input-digital-phone"
                     />
-                    {errors.customerName && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.customerName}</p>}
                   </div>
+                  {errors.phone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.phone}</p>}
+                </div>
 
-                  {/* Phone */}
-                  <div>
-                    <label className="text-xs font-bold text-[#292541]">Numéro WhatsApp *</label>
-                    <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${
-                      errors.phone ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'
-                    }`}>
-                      <Icon glyph={SmartPhone01Icon} size={16} />
-                      <input
-                        type="text"
-                        value={form.phone}
-                        onChange={(e) => setField('phone', e.target.value)}
-                        placeholder="77 123 45 67"
-                        className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]"
-                        data-testid="input-digital-phone"
-                      />
-                    </div>
-                    {errors.phone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.phone}</p>}
-                  </div>
-
-                  {/* Payment Method Selector */}
-                  <div>
-                    <label className="text-xs font-bold text-[#292541]">Méthode de paiement mobile</label>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                {/* Payment Method Selector */}
+                <div>
+                  <label className="text-xs font-bold text-[#292541]">Méthode de paiement</label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {([
+                      { id: 'wave' as const, label: 'Wave' },
+                      { id: 'orange' as const, label: 'Orange Money' },
+                    ]).map((m) => (
                       <button
+                        key={m.id}
                         type="button"
-                        onClick={() => { haptic('light'); setField('paymentMethod', 'wave'); }}
-                        className={`flex items-center gap-2.5 rounded-xl p-3 text-left transition ${
-                          form.paymentMethod === 'wave' ? 'bg-[#f6f5ff]' : 'bg-[#f4f3f8] hover:bg-[#eae8f5]'
+                        onClick={() => { haptic('light'); setField('paymentMethod', m.id); }}
+                        className={`flex items-center gap-2.5 rounded-xl border-2 px-3.5 py-3 text-left transition ${
+                          form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'
                         }`}
-                        data-testid="button-select-wave"
+                        data-testid={m.id === 'wave' ? 'button-select-wave' : 'button-select-orange'}
                       >
-                        <span className={`grid h-4 w-4 place-items-center rounded-full ${form.paymentMethod === 'wave' ? 'bg-[#5b49e8]' : 'bg-[#c4c0d6]'}`}>
-                          {form.paymentMethod === 'wave' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 ${form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
+                          {form.paymentMethod === m.id && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </span>
-                        <span className="text-xs font-bold text-[#292541]">Wave</span>
+                        <span className="text-xs font-bold text-[#292541]">{m.label}</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => { haptic('light'); setField('paymentMethod', 'orange'); }}
-                        className={`flex items-center gap-2.5 rounded-xl p-3 text-left transition ${
-                          form.paymentMethod === 'orange' ? 'bg-[#f6f5ff]' : 'bg-[#f4f3f8] hover:bg-[#eae8f5]'
-                        }`}
-                        data-testid="button-select-orange"
-                      >
-                        <span className={`grid h-4 w-4 place-items-center rounded-full ${form.paymentMethod === 'orange' ? 'bg-[#5b49e8]' : 'bg-[#c4c0d6]'}`}>
-                          {form.paymentMethod === 'orange' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                        </span>
-                        <span className="text-xs font-bold text-[#292541]">Orange Money</span>
-                      </button>
-                    </div>
+                    ))}
                   </div>
+                </div>
 
-                  {/* Payment Number */}
-                  <div>
-                    <label className="text-xs font-bold text-[#292541]">Numéro {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'} *</label>
-                    <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${
-                      errors.paymentNumber ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'
-                    }`}>
-                      <Icon glyph={SmartPhone01Icon} size={16} />
-                      <input
-                        type="text"
-                        value={form.paymentNumber}
-                        onChange={(e) => setField('paymentNumber', e.target.value)}
-                        placeholder="77 123 45 67"
-                        className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]"
-                        data-testid="input-digital-payment-number"
-                      />
-                    </div>
-                    {errors.paymentNumber && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.paymentNumber}</p>}
+                {/* Payment Number */}
+                <div>
+                  <label className="text-xs font-bold text-[#292541]">Numéro {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'} *</label>
+                  <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${
+                    errors.paymentNumber ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'
+                  }`}>
+                    <Icon glyph={SmartPhone01Icon} size={16} />
+                    <input
+                      type="text"
+                      value={form.paymentNumber}
+                      onChange={(e) => setField('paymentNumber', e.target.value)}
+                      placeholder="77 123 45 67"
+                      className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]"
+                      data-testid="input-digital-payment-number"
+                    />
                   </div>
+                  {errors.paymentNumber && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.paymentNumber}</p>}
+                </div>
 
-                  {/* Pricing Summary */}
-                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs space-y-1.5">
-                    <div className="flex justify-between"><span className="text-[#77738a]">Montant du fichier</span><span className="font-bold">{money(campaign.product_price)}</span></div>
-                    <div className="flex justify-between"><span className="text-[#77738a]">Frais de livraison</span><span className="font-bold text-[#278e69]">0 FCFA (Offerts)</span></div>
-                    <div className="flex justify-between pt-2 font-bold text-sm">
-                      <span>Total à régler</span>
-                      <span className="text-[#5b49e8] font-[Space_Grotesk]">{money(campaign.product_price)}</span>
-                    </div>
+                {/* Pricing Summary */}
+                <div className="space-y-2 rounded-2xl bg-[#f8f7fc] p-4 text-sm">
+                  <div className="flex justify-between text-xs"><span className="text-[#77738a]">Montant du fichier</span><span className="font-bold text-[#292541]">{money(campaign.product_price)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-[#77738a]">Frais de livraison</span><span className="font-bold text-[#278e69]">Offerts</span></div>
+                  <div className="flex items-baseline justify-between border-t border-[#eceaf5] pt-2.5">
+                    <span className="text-sm font-bold text-[#292541]">Total à régler</span>
+                    <strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(campaign.product_price)}</strong>
                   </div>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white hover:bg-[#4a3bc7] transition disabled:opacity-60 flex items-center justify-center gap-2"
-                    data-testid="button-submit-digital-payment"
-                  >
-                    ⚡ Payer {money(campaign.product_price)} & Télécharger
-                  </button>
-                </form>
-              </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7] disabled:opacity-60"
+                  data-testid="button-submit-digital-payment"
+                >
+                  Payer {money(campaign.product_price)} & Télécharger
+                </button>
+
+                <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[#278e69]">
+                  <Icon glyph={ShieldKeyIcon} size={13} /> Transaction chiffrée de bout en bout
+                </p>
+              </form>
             </div>
           </div>
         ) : (
           /* STEP 2: INSTANT DOWNLOAD & ACCESS */
           confirmedOrder && (
-            <div className="mx-auto max-w-xl text-center space-y-6">
+            <div className="mx-auto max-w-lg space-y-5 py-4 text-center">
               <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#e7faf2] text-[#278e69]">
                 <Icon glyph={CheckmarkCircle02Icon} size={40} />
               </div>
 
               <div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#e7faf2] px-3 py-1 text-xs font-bold text-[#278e69]">
-                  Paiement Réussi · Commande {confirmedOrder.id}
-                </span>
-                <h1 className="mt-3 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">
-                  Félicitations {confirmedOrder.customerName} !
+                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">
+                  Paiement confirmé
                 </h1>
-                <p className="mt-1 text-sm text-[#77738a]">
-                  Votre accès au produit <strong className="text-[#292541]">{confirmedOrder.productName}</strong> est débloqué.
+                <p className="mt-2 text-sm text-[#77738a]">
+                  Merci {confirmedOrder.customerName}. Votre accès à <strong className="text-[#292541]">{confirmedOrder.productName}</strong> est débloqué <span className="text-[#9290a2]">({confirmedOrder.id})</span>.
                 </p>
               </div>
 
-              {/* Prominent Digital Access Box */}
-              <div className="rounded-3xl bg-white p-6 text-left space-y-4">
-                <div className="flex items-center gap-2.5 text-[#5b49e8]">
-                  <Icon glyph={SparklesIcon} size={22} />
-                  <h2 className="font-[Space_Grotesk] text-lg font-bold">Votre Téléchargement</h2>
+              {/* Digital Access Box */}
+              <div className="space-y-3 rounded-[22px] border-2 border-[#5b49e8]/20 bg-[#f6f5ff] p-5 text-left sm:p-6">
+                <div className="flex items-center gap-2 text-[#5b49e8]">
+                  <Icon glyph={Download01Icon} size={20} />
+                  <h2 className="font-[Space_Grotesk] text-base font-bold">Votre téléchargement</h2>
                 </div>
 
                 {confirmedOrder.digitalFileUrl ? (
@@ -643,11 +633,11 @@ export function DigitalCheckout() {
                     target="_blank"
                     rel="noopener noreferrer"
                     download
-                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] py-4 px-5 text-sm font-bold text-white hover:bg-[#4a3bc7] transition"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] px-5 py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7]"
                     data-testid="button-download-now"
                   >
-                    <Icon glyph={Download01Icon} size={20} />
-                    ⚡ Télécharger le fichier maintenant
+                    <Icon glyph={Download01Icon} size={18} />
+                    Télécharger le fichier maintenant
                   </a>
                 ) : (
                   <p className="rounded-xl bg-[#fff4de] p-3 text-xs font-bold text-[#ac741e]">
@@ -656,8 +646,8 @@ export function DigitalCheckout() {
                 )}
 
                 {confirmedOrder.digitalAccessInstructions && (
-                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs text-[#292541] space-y-1">
-                    <p className="font-bold text-[#5b49e8]">Instructions complémentaires :</p>
+                  <div className="space-y-1 rounded-xl border border-[#e4ddff] bg-white p-3.5 text-xs text-[#292541]">
+                    <p className="font-bold text-[#5b49e8]">Instructions d'accès :</p>
                     <p className="whitespace-pre-line text-[#514b71]">{confirmedOrder.digitalAccessInstructions}</p>
                   </div>
                 )}
@@ -666,26 +656,26 @@ export function DigitalCheckout() {
                   href={`https://wa.me/?text=${encodeURIComponent(`Bonjour ! Voici l'accès direct à mon achat ${confirmedOrder.productName} : ${confirmedOrder.digitalFileUrl ?? ''}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25d366] py-3 px-4 text-xs font-bold text-white transition hover:bg-[#20ba5a]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25d366] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#20ba5a]"
                   data-testid="button-share-whatsapp"
                 >
-                  <Icon glyph={Share02Icon} size={16} />
-                  Sauvegarder et recevoir le lien sur mon WhatsApp
+                  <Icon glyph={Share02Icon} size={15} />
+                  Recevoir le lien sur mon WhatsApp
                 </a>
               </div>
 
               {/* Order Details Card */}
-              <div className="rounded-2xl bg-white p-5 text-left">
+              <div className="rounded-[22px] bg-white p-5 text-left sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Reçu de paiement</p>
-                <div className="mt-3 space-y-2 text-xs">
+                <div className="mt-3 space-y-2.5 text-sm">
                   <div className="flex justify-between"><span className="text-[#77738a]">Ressource</span><span className="font-bold text-[#292541]">{confirmedOrder.productName}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Boutique</span><span className="font-bold text-[#292541]">{confirmedOrder.merchantName}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Mode de paiement</span><span className="font-bold text-[#292541]">{confirmedOrder.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}</span></div>
-                  <div className="flex justify-between pt-2 font-bold text-sm"><span>Total Payé</span><strong className="text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
+                  <div className="flex items-baseline justify-between border-t border-[#f0eff5] pt-3"><span className="font-bold text-[#292541]">Total payé</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
                 </div>
               </div>
 
-              <Link href="/" className="inline-block w-full rounded-2xl bg-[#f0edf9] py-3.5 text-center text-xs font-bold text-[#5b49e8] hover:bg-[#e4ddff] transition">
+              <Link href="/" className="inline-block w-full rounded-2xl bg-[#5b49e8] py-4 text-center text-sm font-bold text-white transition hover:bg-[#4a3bc7]">
                 Retour à l'accueil
               </Link>
             </div>
@@ -696,19 +686,19 @@ export function DigitalCheckout() {
       {/* Mobile Money Simulation Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6">
+          <div className="w-full max-w-md rounded-[28px] border border-[#eceaf5] bg-white p-6 shadow-2xl">
             <div className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#efedff] text-[#5b49e8] mb-4">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
                 <Icon glyph={Wallet01Icon} size={28} />
               </div>
               <h3 className="font-[Space_Grotesk] text-xl font-bold text-[#292541]">
-                Simulation Paiement Digital {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}
+                Paiement {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}
               </h3>
               <p className="mt-1 text-xs text-[#77738a]">
-                Veuillez valider le paiement mobile pour débloquer le fichier.
+                Mode test : choisissez le résultat de la transaction mobile.
               </p>
 
-              <div className="mt-5 rounded-2xl bg-[#f8f7fc] p-4 text-left space-y-2">
+              <div className="mt-5 space-y-2 rounded-2xl bg-[#f8f7fc] p-4 text-left">
                 <div className="flex justify-between text-xs">
                   <span className="text-[#9290a2]">Client</span>
                   <span className="font-bold text-[#292541]">{form.customerName}</span>
@@ -717,7 +707,7 @@ export function DigitalCheckout() {
                   <span className="text-[#9290a2]">Produit</span>
                   <span className="font-bold text-[#292541]">{campaign.product_name}</span>
                 </div>
-                <div className="flex justify-between text-sm pt-2 mt-2 font-bold">
+                <div className="mt-2 flex justify-between border-t border-[#e9e6f1] pt-2 text-sm font-bold">
                   <span>Montant total</span>
                   <span className="text-[#278e69]">{money(campaign.product_price)}</span>
                 </div>
@@ -728,7 +718,7 @@ export function DigitalCheckout() {
                   type="button"
                   disabled={submitting}
                   onClick={() => handleSimulatedPayment('success')}
-                  className="w-full rounded-2xl bg-[#278e69] py-3.5 text-sm font-bold text-white hover:bg-[#207556] transition flex items-center justify-center gap-2"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#278e69] py-3.5 text-sm font-bold text-white transition hover:bg-[#207556]"
                   data-testid="button-simulate-digital-success"
                 >
                   {submitting ? (
@@ -736,7 +726,7 @@ export function DigitalCheckout() {
                   ) : (
                     <>
                       <Icon glyph={CheckmarkCircle02Icon} size={18} />
-                      Simuler Succès (Paiement Réussi & Déblocage)
+                      Simuler un paiement réussi
                     </>
                   )}
                 </button>
@@ -745,18 +735,18 @@ export function DigitalCheckout() {
                   type="button"
                   disabled={submitting}
                   onClick={() => handleSimulatedPayment('failure')}
-                  className="w-full rounded-2xl bg-[#fff0f1] py-3.5 text-sm font-bold text-[#c45667] hover:bg-[#ffe3e6] transition flex items-center justify-center gap-2"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#fff0f1] py-3.5 text-sm font-bold text-[#c45667] transition hover:bg-[#ffe3e6]"
                   data-testid="button-simulate-digital-failure"
                 >
                   <Icon glyph={Cancel01Icon} size={18} />
-                  Simuler Échec (Paiement Échoué)
+                  Simuler un échec
                 </button>
 
                 <button
                   type="button"
                   disabled={submitting}
                   onClick={() => setShowPaymentModal(false)}
-                  className="w-full rounded-2xl py-2.5 text-xs font-bold text-[#9290a2] hover:text-[#292541] transition"
+                  className="w-full rounded-2xl py-2.5 text-xs font-bold text-[#9290a2] transition hover:text-[#292541]"
                 >
                   Annuler
                 </button>

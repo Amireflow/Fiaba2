@@ -13,7 +13,6 @@ import {
   ShoppingBag01Icon,
   MapPinIcon,
   SmartPhone01Icon,
-  UserGroupIcon,
   Alert01Icon,
   SparklesIcon,
 } from '@hugeicons/core-free-icons';
@@ -23,6 +22,7 @@ import { money, haptic, friendlyErrorMessage, formatShopName } from '@/lib/utils
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
 import { parseImageUrls } from '@/lib/storage-upload';
+import { SafeImage } from '@/components/shared/safe-image';
 import { trackEvent } from '@/lib/analytics';
 
 /* ── Types ── */
@@ -661,233 +661,202 @@ export function Checkout() {
   }
 
   const stepIndex = steps.findIndex((s) => s.id === step);
+  const galleryImages = parseImageUrls(campaign.product_image_url);
+  const currentImage = galleryImages[activeImageIndex] ?? galleryImages[0];
+  const isDigital = campaign.product_type === 'digital';
 
   return (
-    <div className="min-h-[100dvh] bg-[#f8f8fc]">
+    <div className="min-h-[100dvh] bg-[#f8f8fc] text-[#292541]">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-white/90 px-5 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#eceaf5] bg-white/90 px-4 backdrop-blur-xl sm:px-6">
         <Link href="/" className="flex items-center gap-2 text-sm font-bold text-[#292541]">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#5b49e8] text-white"><Icon glyph={Store01Icon} size={18} /></span>
           Fiaba
         </Link>
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#278e69]">
-          <Icon glyph={LockKeyIcon} size={14} /> Paiement sécurisé
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7faf2] px-3 py-1 text-[11px] font-bold text-[#278e69]">
+          <Icon glyph={LockKeyIcon} size={13} /> Paiement sécurisé
+        </span>
       </header>
 
-      <div className="mx-auto max-w-2xl px-5 py-6">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-10">
         {/* Stepper */}
-        <div className="flex items-center justify-between">
-          {steps.map((s, i) => (
-            <div key={s.id} className="flex flex-1 items-center">
-              <div className="flex flex-col items-center gap-1.5">
-                <span className={`grid h-9 w-9 place-items-center rounded-full transition ${i <= stepIndex ? 'bg-[#5b49e8] text-white' : 'bg-[#e4e1ff] text-[#9290a2]'}`}>
-                  <Icon glyph={s.glyph} size={16} />
-                </span>
-                <span className={`text-[10px] font-bold ${i <= stepIndex ? 'text-[#5b49e8]' : 'text-[#9290a2]'}`}>{s.label}</span>
-              </div>
-              {i < steps.length - 1 && <div className={`mx-2 h-0.5 flex-1 rounded-full ${i < stepIndex ? 'bg-[#5b49e8]' : 'bg-[#e4e1ff]'}`} />}
-            </div>
-          ))}
-        </div>
+        <ol className="flex items-center">
+          {steps.slice(0, 3).map((s, i) => {
+            const done = i < stepIndex;
+            const active = i === stepIndex;
+            return (
+              <li key={s.id} className={`flex items-center ${i < 2 ? 'flex-1' : ''}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full transition ${
+                    done
+                      ? 'bg-[#278e69] text-white'
+                      : active
+                        ? 'bg-[#5b49e8] text-white'
+                        : 'border border-[#e4e1ff] bg-white text-[#9290a2]'
+                  }`}>
+                    <Icon glyph={done ? CheckmarkCircle02Icon : s.glyph} size={15} />
+                  </span>
+                  <span className={`hidden text-xs font-bold sm:block ${active ? 'text-[#292541]' : done ? 'text-[#278e69]' : 'text-[#9290a2]'}`}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < 2 && <span className={`mx-3 h-px flex-1 ${done ? 'bg-[#278e69]' : 'bg-[#e4e1ff]'}`} />}
+              </li>
+            );
+          })}
+        </ol>
 
-        {/* Step content */}
-        <div className="mt-8">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
+        {/* Colonne principale : étapes */}
+        <div className="min-w-0">
           {/* STEP 1: PRODUCT */}
           {step === 'product' && (
             <div className="space-y-4">
-              <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">{campaign.product_name}</h1>
-              <p className="text-sm text-[#77738a]">par <strong className="text-[#292541]">{campaign.merchant_name}</strong></p>
-
-              {/* Product image gallery */}
-              {(() => {
-                const images = parseImageUrls(campaign.product_image_url);
-                const currentImg = images[activeImageIndex] || images[0];
-
-                const handlePrevImage = () => {
-                  haptic('light');
-                  setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-                };
-
-                const handleNextImage = () => {
-                  haptic('light');
-                  setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-                };
-
-                return (
-                  <div className="overflow-hidden rounded-3xl bg-white p-3 border border-[#f1effa] shadow-sm">
-                    {images.length > 0 ? (
-                      <div className="space-y-3">
-                        {/* Main Square Aspect-Ratio Image Container */}
-                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#f8f7fc] group">
-                          <img
-                            src={currentImg}
-                            alt={campaign.product_name}
-                            className="h-full w-full object-cover transition-all duration-300"
-                          />
-
-                          {/* Navigation Arrows */}
-                          {images.length > 1 && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handlePrevImage}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white hover:scale-105 active:scale-95"
-                                aria-label="Image précédente"
-                                data-testid="button-gallery-prev"
-                              >
-                                <Icon glyph={ArrowLeft01Icon} size={20} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleNextImage}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white hover:scale-105 active:scale-95"
-                                aria-label="Image suivante"
-                                data-testid="button-gallery-next"
-                              >
-                                <Icon glyph={ArrowRight01Icon} size={20} />
-                              </button>
-
-                              {/* Index badge */}
-                              <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md">
-                                {activeImageIndex + 1} / {images.length}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Thumbnails list with thin border and reduced border-radius */}
-                        {images.length > 1 && (
-                          <div className="flex gap-2 overflow-x-auto px-0.5 py-1 scrollbar-none">
-                            {images.map((img, idx) => (
-                              <button
-                                key={img + idx}
-                                type="button"
-                                onClick={() => { haptic('light'); setActiveImageIndex(idx); }}
-                                className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border transition-all p-0.5 ${
-                                  idx === activeImageIndex
-                                    ? 'border-[#5b49e8] ring-2 ring-[#5b49e8]/20 scale-105'
-                                    : 'border-[#e0dceb] opacity-75 hover:opacity-100 hover:border-[#b8b4c8]'
-                                }`}
-                                data-testid={`thumbnail-${idx}`}
-                              >
-                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full rounded-md object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="grid aspect-square w-full place-items-center bg-[#f8f7fc] rounded-2xl">
-                        <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
-                          <Icon glyph={Store01Icon} size={36} />
+              {/* Galerie produit */}
+              <div className="overflow-hidden rounded-[22px] bg-white p-3">
+                {galleryImages.length > 0 ? (
+                  <div className="space-y-2.5">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-[#f4f3f8]">
+                      <img
+                        src={currentImage}
+                        alt={campaign.product_name}
+                        className="h-full w-full object-cover"
+                      />
+                      {galleryImages.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { haptic('light'); setActiveImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1)); }}
+                            className="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white"
+                            aria-label="Image précédente"
+                            data-testid="button-gallery-prev"
+                          >
+                            <Icon glyph={ArrowLeft01Icon} size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { haptic('light'); setActiveImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1)); }}
+                            className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white"
+                            aria-label="Image suivante"
+                            data-testid="button-gallery-next"
+                          >
+                            <Icon glyph={ArrowRight01Icon} size={18} />
+                          </button>
+                          <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">
+                            {activeImageIndex + 1} / {galleryImages.length}
+                          </span>
+                        </>
+                      )}
+                      {isDigital && (
+                        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#292541]/85 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">
+                          <Icon glyph={SparklesIcon} size={12} /> Digital · Instantané
                         </span>
+                      )}
+                    </div>
+
+                    {galleryImages.length > 1 && (
+                      <div className="scrollbar-none flex gap-2 overflow-x-auto py-0.5">
+                        {galleryImages.map((img, idx) => (
+                          <button
+                            key={img + idx}
+                            type="button"
+                            onClick={() => { haptic('light'); setActiveImageIndex(idx); }}
+                            className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border p-0.5 transition ${
+                              idx === activeImageIndex
+                                ? 'border-[#5b49e8] ring-2 ring-[#5b49e8]/20'
+                                : 'border-[#e9e6f1] opacity-70 hover:opacity-100'
+                            }`}
+                            data-testid={`thumbnail-${idx}`}
+                          >
+                            <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full rounded-md object-cover" />
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
-                );
-              })()}
+                ) : (
+                  <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl bg-[#f4f3f8]">
+                    <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                      <Icon glyph={Store01Icon} size={30} />
+                    </span>
+                  </div>
+                )}
+              </div>
 
-              {/* Product description */}
-              {campaign.product_description && (
-                <div className="rounded-2xl bg-white p-5 space-y-1.5" data-testid="product-description-card">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Description du produit</p>
-                  <p className="text-sm leading-relaxed text-[#514b71] whitespace-pre-line">{campaign.product_description}</p>
-                </div>
-              )}
+              {/* Infos + prix + quantité */}
+              <div className="rounded-[22px] bg-white p-5 sm:p-6">
+                <h1 className="font-[Space_Grotesk] text-xl font-bold tracking-[-.03em] text-[#292541] sm:text-2xl">{campaign.product_name}</h1>
+                <p className="mt-1 text-xs text-[#9290a2]">Vendu par <strong className="text-[#292541]">{campaign.merchant_name}</strong></p>
 
-              {/* Price + quantity */}
-              <div className="rounded-2xl bg-white p-5">
-                <div className="flex items-center justify-between">
+                {campaign.product_description && (
+                  <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-[#686380]" data-testid="product-description-card">{campaign.product_description}</p>
+                )}
+
+                <div className="mt-5 flex items-center justify-between border-t border-[#f0eff5] pt-5">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Prix unitaire</p>
-                    <strong className="font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(campaign.product_price)}</strong>
+                    <strong className="mt-0.5 block font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(campaign.product_price)}</strong>
                   </div>
-                  <div>
+                  <div className="text-right">
                     <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Quantité</p>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => { haptic('light'); setField('quantity', Math.max(1, form.quantity - 1)); }} className="grid h-9 w-9 place-items-center rounded-xl bg-[#f0eff5] text-[#292541]" data-testid="button-qty-minus">−</button>
-                      <span className="w-8 text-center font-[Space_Grotesk] text-lg font-bold text-[#292541]">{form.quantity}</span>
-                      <button onClick={() => { haptic('light'); setField('quantity', form.quantity + 1); }} className="grid h-9 w-9 place-items-center rounded-xl bg-[#f0eff5] text-[#292541]" data-testid="button-qty-plus">+</button>
+                    <div className="flex items-center gap-1 rounded-full bg-[#f4f3f8] p-1">
+                      <button onClick={() => { haptic('light'); setField('quantity', Math.max(1, form.quantity - 1)); }} className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-bold text-[#292541] shadow-sm transition hover:text-[#5b49e8]" data-testid="button-qty-minus">−</button>
+                      <span className="w-8 text-center font-[Space_Grotesk] text-base font-bold text-[#292541]">{form.quantity}</span>
+                      <button onClick={() => { haptic('light'); setField('quantity', form.quantity + 1); }} className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-bold text-[#292541] shadow-sm transition hover:text-[#5b49e8]" data-testid="button-qty-plus">+</button>
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 flex items-center justify-between border-t border-[#f0eff5] pt-4">
-                  <span className="text-sm text-[#77738a]">Sous-total</span>
-                  <strong className="font-[Space_Grotesk] text-xl font-bold text-[#292541]">{money(subtotal)}</strong>
-                </div>
               </div>
 
-              {/* Trust badges */}
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                {[
-                  [ShieldKeyIcon, 'Paiement sécurisé'],
-                  [DeliveryTruck01Icon, 'Livraison nationale'],
-                  [CheckmarkCircle02Icon, 'Produit vérifié'],
-                ].map(([g, l]) => (
-                  <div key={l as string} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-2.5 sm:p-3 text-center min-w-0">
-                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]"><Icon glyph={g as IconType} size={16} /></span>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-[#77738a] leading-tight break-words">{l as string}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Seller attribution badge */}
+              {/* Attribution vendeur */}
               {linkStatus === 'valid' && sellerInfo && (
-                <div className="rounded-2xl bg-[#efedff] p-4" data-testid="seller-attribution-badge">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-sm">
-                      {(sellerInfo.sellerCode || 'V').slice(0, 2).toUpperCase()}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                        <p className="text-xs font-bold text-[#292541]">
-                          Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode}</span>
-                        </p>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#278e69] shrink-0 bg-[#e7faf2] px-2 py-0.5 rounded-md">
-                          <Icon glyph={LockKeyIcon} size={11} /> Partenaire certifié
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[10px] text-[#77738a]">Recommandation certifiée et sécurisée.</p>
-                    </div>
+                <div className="flex items-center gap-3 rounded-[22px] bg-[#efedff] p-4" data-testid="seller-attribution-badge">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] font-[Space_Grotesk] text-sm font-bold text-white">
+                    {(sellerInfo.sellerCode || 'V').slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-[#292541]">
+                      Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode}</span>
+                    </p>
+                    <p className="text-[10px] text-[#77738a]">Partenaire certifié Fiaba</p>
                   </div>
+                  <Icon glyph={CheckmarkCircle02Icon} size={18} className="shrink-0 text-[#278e69]" />
                 </div>
               )}
               {linkStatus === 'invalid' && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#fff0f1] p-4" data-testid="seller-attribution-error">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#c45667] text-white"><Icon glyph={Alert01Icon} size={20} /></span>
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 rounded-[22px] bg-[#fff0f1] p-4" data-testid="seller-attribution-error">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#c45667] text-white"><Icon glyph={Alert01Icon} size={18} /></span>
+                  <div className="min-w-0">
                     <p className="text-xs font-bold text-[#c45667]">Lien non vérifié</p>
                     <p className="text-[10px] text-[#77738a]">{linkError ?? 'Le lien pourrait être expiré ou modifié.'}</p>
                   </div>
                 </div>
               )}
               {linkStatus === 'none' && (
-                <div className="rounded-2xl bg-white p-4">
-                  <label className="text-xs font-bold text-[#292541]">Code vendeur (optionnel)</label>
-                  <p className="mt-0.5 text-[10px] text-[#77738a]">Si un vendeur vous a recommandé ce produit, entrez son code pour le créditer.</p>
+                <div className="rounded-[22px] bg-white p-5">
+                  <label className="text-xs font-bold text-[#292541]">Code vendeur <span className="font-normal text-[#9290a2]">(optionnel)</span></label>
                   <input
                     value={form.sellerCode}
                     onChange={(e) => setField('sellerCode', e.target.value.toUpperCase())}
                     placeholder="Ex. MARIFALL"
-                    className="mt-2 w-full rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-4 py-2.5 text-sm font-bold tracking-wider outline-none focus:border-[#5b49e8]"
+                    className="mt-2 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm font-bold tracking-wider text-[#292541] outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8] placeholder:text-[#b8b4c8]"
                     data-testid="input-seller-code"
                   />
                 </div>
               )}
 
               <button onClick={() => { haptic('medium'); nextStep(); }} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7]" data-testid="button-next-delivery">
-                Continuer vers la livraison
+                {isDigital ? 'Continuer' : 'Continuer vers la livraison'}
               </button>
 
-              <div className="pt-2 text-center">
+              <div className="text-center">
                 <button
                   type="button"
                   onClick={() => { haptic('light'); setShowReportModal(true); }}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#9290a2] hover:text-[#c45667] transition"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#b8b4c8] transition hover:text-[#c45667]"
                   data-testid="button-open-report"
                 >
-                  <Icon glyph={Alert01Icon} size={14} /> Signaler ce produit ou cette offre
+                  <Icon glyph={Alert01Icon} size={13} /> Signaler cette offre
                 </button>
               </div>
             </div>
@@ -896,26 +865,26 @@ export function Checkout() {
           {/* STEP 2: DELIVERY */}
           {step === 'delivery' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <button onClick={() => { haptic('light'); prevStep(); }} className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#292541]" data-testid="button-back-product"><Icon glyph={ArrowLeft01Icon} size={16} /></button>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">
-                  {campaign.product_type === 'digital' ? 'Vos coordonnées' : 'Livraison'}
+              <div className="flex items-center gap-3">
+                <button onClick={() => { haptic('light'); prevStep(); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#292541] shadow-sm transition hover:text-[#5b49e8]" data-testid="button-back-product"><Icon glyph={ArrowLeft01Icon} size={16} /></button>
+                <h1 className="font-[Space_Grotesk] text-xl font-bold tracking-[-.03em] text-[#292541] sm:text-2xl">
+                  {isDigital ? 'Vos coordonnées' : 'Adresse de livraison'}
                 </h1>
               </div>
 
-              {campaign.product_type === 'digital' && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4 border border-[#d8cdff]">
+              {isDigital && (
+                <div className="flex items-center gap-3 rounded-[22px] bg-[#efedff] p-4">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white">
                     <Icon glyph={SparklesIcon} size={20} />
                   </span>
                   <div>
-                    <p className="text-xs font-bold text-[#5b49e8]">Produit Digital · Accès Instantané</p>
-                    <p className="text-[11px] text-[#514b71] mt-0.5">Aucun frais de port. Votre fichier vous sera délivré directement après confirmation du paiement.</p>
+                    <p className="text-xs font-bold text-[#5b49e8]">Produit digital · Accès instantané</p>
+                    <p className="mt-0.5 text-[11px] text-[#514b71]">Aucun frais de port. Votre fichier est délivré juste après le paiement.</p>
                   </div>
                 </div>
               )}
 
-              <div className="space-y-4 rounded-2xl bg-white p-5">
+              <div className="space-y-4 rounded-[22px] bg-white p-5 sm:p-6">
                 {/* Name */}
                 <div>
                   <label className="text-xs font-bold text-[#292541]">Nom complet *</label>
@@ -934,7 +903,7 @@ export function Checkout() {
                 </div>
 
                 {/* Physical Delivery Fields (Only if not digital) */}
-                {campaign.product_type !== 'digital' && (
+                {!isDigital && (
                   <>
                     {/* Zone */}
                     <div>
@@ -967,21 +936,11 @@ export function Checkout() {
 
                     {/* Note */}
                     <div>
-                      <label className="text-xs font-bold text-[#292541]">Note (optionnel)</label>
+                      <label className="text-xs font-bold text-[#292541]">Note <span className="font-normal text-[#9290a2]">(optionnel)</span></label>
                       <input value={form.note} onChange={(e) => setField('note', e.target.value)} placeholder="Ex. Appeler avant livraison" className="mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8] placeholder:text-[#b8b4c8]" data-testid="input-note" />
                     </div>
                   </>
                 )}
-              </div>
-
-              {/* Summary */}
-              <div className="rounded-2xl bg-[#f6f5ff] p-5">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Frais de livraison</span><span className="font-bold text-[#278e69]">{campaign.product_type === 'digital' ? '0 FCFA (Gratuit)' : money(deliveryFee)}</span></div>
-                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(campaign.product_type === 'digital' ? subtotal : total)}</strong></div>
-                </div>
               </div>
 
               <button onClick={() => { haptic('medium'); nextStep(); }} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7]" data-testid="button-next-payment">
@@ -993,90 +952,82 @@ export function Checkout() {
           {/* STEP 3: PAYMENT */}
           {step === 'payment' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <button onClick={() => { haptic('light'); prevStep(); }} className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#292541]" data-testid="button-back-delivery"><Icon glyph={ArrowLeft01Icon} size={16} /></button>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">Paiement</h1>
+              <div className="flex items-center gap-3">
+                <button onClick={() => { haptic('light'); prevStep(); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#292541] shadow-sm transition hover:text-[#5b49e8]" data-testid="button-back-delivery"><Icon glyph={ArrowLeft01Icon} size={16} /></button>
+                <h1 className="font-[Space_Grotesk] text-xl font-bold tracking-[-.03em] text-[#292541] sm:text-2xl">Paiement</h1>
               </div>
 
               {/* Payment method selector */}
-              <div className="space-y-3 rounded-2xl bg-white p-5">
+              <div className="rounded-[22px] bg-white p-5 sm:p-6">
                 <p className="text-xs font-bold text-[#292541]">Méthode de paiement</p>
-                {([
-                  { id: 'wave' as const, label: 'Wave', desc: 'Paiement instantané via Wave' },
-                  { id: 'orange' as const, label: 'Orange Money', desc: 'Transfert via Orange Money' },
-                  ...(campaign.product_type === 'digital' ? [] : [{ id: 'cod' as const, label: 'Paiement à la livraison', desc: 'Payez en espèces à réception' }]),
-                ]).map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => { haptic('light'); setField('paymentMethod', m.id); }}
-                    className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition ${form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
-                    data-testid={`payment-${m.id}`}
-                  >
-                    <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
-                      {form.paymentMethod === m.id && <span className="h-2 w-2 rounded-full bg-white" />}
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-[#292541]">{m.label}</p>
-                      <p className="text-[10px] text-[#77738a]">{m.desc}</p>
+                <div className="mt-3 space-y-2">
+                  {([
+                    { id: 'wave' as const, label: 'Wave', desc: 'Paiement mobile instantané' },
+                    { id: 'orange' as const, label: 'Orange Money', desc: 'Paiement mobile instantané' },
+                    ...(isDigital ? [] : [{ id: 'cod' as const, label: 'À la livraison', desc: 'Payez en espèces à réception' }]),
+                  ]).map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => { haptic('light'); setField('paymentMethod', m.id); }}
+                      className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition ${form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
+                      data-testid={`payment-${m.id}`}
+                    >
+                      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${form.paymentMethod === m.id ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
+                        {form.paymentMethod === m.id && <span className="h-2 w-2 rounded-full bg-white" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-[#292541]">{m.label}</span>
+                        <span className="block text-[10px] text-[#77738a]">{m.desc}</span>
+                      </span>
+                      {form.paymentMethod === m.id && <Icon glyph={CheckmarkCircle02Icon} size={18} className="shrink-0 text-[#5b49e8]" />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Payment number (if not COD) */}
+                {form.paymentMethod !== 'cod' && (
+                  <div className="mt-4 border-t border-[#f0eff5] pt-4">
+                    <label className="text-xs font-bold text-[#292541]">Numéro {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'} *</label>
+                    <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${errors.paymentNumber ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'}`}>
+                      <Icon glyph={SmartPhone01Icon} size={16} />
+                      <input value={form.paymentNumber} onChange={(e) => setField('paymentNumber', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]" data-testid="input-payment-number" />
                     </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Payment number (if not COD) */}
-              {form.paymentMethod !== 'cod' && (
-                <div className="rounded-2xl bg-white p-5">
-                  <label className="text-xs font-bold text-[#292541]">Numéro {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'} *</label>
-                  <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${errors.paymentNumber ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'}`}>
-                    <Icon glyph={SmartPhone01Icon} size={16} />
-                    <input value={form.paymentNumber} onChange={(e) => setField('paymentNumber', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]" data-testid="input-payment-number" />
+                    {errors.paymentNumber && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.paymentNumber}</p>}
+                    <p className="mt-2 flex items-center gap-1 text-[10px] text-[#9290a2]"><Icon glyph={LockKeyIcon} size={12} /> Vos informations sont chiffrées et sécurisées.</p>
                   </div>
-                  {errors.paymentNumber && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.paymentNumber}</p>}
-                  <p className="mt-2 flex items-center gap-1 text-[10px] text-[#9290a2]"><Icon glyph={LockKeyIcon} size={12} /> Vos informations sont chiffrées et sécurisées.</p>
-                </div>
-              )}
-
-              {/* Order summary */}
-              <div className="rounded-2xl bg-[#f6f5ff] p-5">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#278e69]">{campaign.product_type === 'digital' ? '0 FCFA (Gratuit)' : money(deliveryFee)}</span></div>
-                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total à payer</span><strong className="font-[Space_Grotesk] text-xl font-bold text-[#5b49e8]">{money(campaign.product_type === 'digital' ? subtotal : total)}</strong></div>
-                </div>
-              </div>
-
-              {/* Security */}
-              <div className="flex items-center gap-2 rounded-2xl bg-[#e7faf2] px-4 py-3 text-xs font-bold text-[#278e69]">
-                <Icon glyph={ShieldKeyIcon} size={16} /> Transaction protégée par chiffrement de bout en bout
+                )}
               </div>
 
               <button onClick={() => { haptic('success'); nextStep(); }} disabled={submitting} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7] disabled:opacity-60" data-testid="button-confirm-order">
-                {submitting ? 'Traitement…' : form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(campaign.product_type === 'digital' ? subtotal : total)}`}
+                {submitting ? 'Traitement…' : form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(isDigital ? subtotal : total)}`}
               </button>
+
+              <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-[#278e69]">
+                <Icon glyph={ShieldKeyIcon} size={14} /> Transaction protégée par chiffrement de bout en bout
+              </p>
             </div>
           )}
 
           {/* STEP 4: CONFIRMATION */}
           {step === 'confirmation' && confirmedOrder && (
-            <div className="space-y-5 text-center">
+            <div className="space-y-5 py-4 text-center">
               <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-[#e7faf2] text-[#278e69]">
                 <Icon glyph={CheckmarkCircle02Icon} size={40} />
               </div>
               <div>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">Commande confirmée !</h1>
+                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">Commande confirmée</h1>
                 <p className="mt-2 text-sm text-[#77738a]">Merci {confirmedOrder.customerName}. Votre commande <strong className="text-[#292541]">{confirmedOrder.id}</strong> est validée.</p>
               </div>
 
               {/* Digital Product Download Box */}
               {confirmedOrder.isDigital && (
-                <div className="rounded-2xl bg-[#f5f3ff] p-5 text-left border-2 border-[#5b49e8]/30 space-y-3">
+                <div className="space-y-3 rounded-[22px] border-2 border-[#5b49e8]/20 bg-[#f6f5ff] p-5 text-left">
                   <div className="flex items-center gap-2 text-[#5b49e8]">
                     <Icon glyph={SparklesIcon} size={20} />
-                    <h3 className="font-[Space_Grotesk] text-base font-bold">Accès à votre Produit Digital</h3>
+                    <h3 className="font-[Space_Grotesk] text-base font-bold">Accès à votre produit digital</h3>
                   </div>
                   <p className="text-xs text-[#514b71]">
-                    Votre paiement a été validé avec succès. Vous pouvez accéder directement à votre ressource ci-dessous.
+                    Paiement validé. Votre ressource est disponible immédiatement ci-dessous.
                   </p>
 
                   {confirmedOrder.digitalFileUrl && (
@@ -1085,15 +1036,15 @@ export function Checkout() {
                       target="_blank"
                       rel="noopener noreferrer"
                       download
-                      className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] py-3.5 px-4 text-sm font-bold text-white shadow-md hover:bg-[#4a3bc7] transition"
+                      className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] px-4 py-3.5 text-sm font-bold text-white transition hover:bg-[#4a3bc7]"
                       data-testid="button-download-digital-file"
                     >
-                      ⚡ Télécharger mon fichier (PDF / Ressource)
+                      Télécharger mon fichier
                     </a>
                   )}
 
                   {confirmedOrder.digitalAccessInstructions && (
-                    <div className="rounded-xl bg-white p-3.5 text-xs text-[#292541] border border-[#e4ddff] space-y-1">
+                    <div className="space-y-1 rounded-xl border border-[#e4ddff] bg-white p-3.5 text-xs text-[#292541]">
                       <p className="font-bold text-[#5b49e8]">Instructions d'accès :</p>
                       <p className="whitespace-pre-line text-[#514b71]">{confirmedOrder.digitalAccessInstructions}</p>
                     </div>
@@ -1103,25 +1054,25 @@ export function Checkout() {
                     href={`https://wa.me/?text=${encodeURIComponent(`Bonjour ! Voici l'accès à ma commande ${confirmedOrder.productName} : ${confirmedOrder.digitalFileUrl ?? ''}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25d366] py-2.5 px-4 text-xs font-bold text-white transition hover:bg-[#20ba5a]"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25d366] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#20ba5a]"
                   >
                     Envoyer le lien sur mon WhatsApp
                   </a>
                 </div>
               )}
 
-              <div className="rounded-2xl bg-white p-5 text-left">
+              <div className="rounded-[22px] bg-white p-5 text-left sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Détails de la commande</p>
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-[#77738a]">Produit</span><span className="font-bold text-[#292541]">{confirmedOrder.productName} × {confirmedOrder.quantity}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#278e69]">{confirmedOrder.isDigital ? 'Accès Instantané (0 F)' : `${confirmedOrder.zone} · ${money(confirmedOrder.deliveryFee)}`}</span></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#278e69]">{confirmedOrder.isDigital ? 'Instantanée (offerte)' : `${confirmedOrder.zone} · ${money(confirmedOrder.deliveryFee)}`}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Paiement</span><span className="font-bold text-[#292541]">{confirmedOrder.paymentMethod === 'wave' ? 'Wave' : confirmedOrder.paymentMethod === 'orange' ? 'Orange Money' : 'À la livraison'}</span></div>
                   <div className="flex justify-between border-t border-[#f0eff5] pt-3"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
                 </div>
               </div>
 
               {!confirmedOrder.isDigital && (
-                <div className="rounded-2xl bg-[#fff4de] p-4 text-left">
+                <div className="rounded-[22px] bg-[#fff4de] p-4 text-left">
                   <p className="text-xs font-bold text-[#ac741e]">Prochaines étapes</p>
                   <ul className="mt-2 space-y-1.5 text-xs text-[#77738a]">
                     <li className="flex items-center gap-2"><Icon glyph={Store01Icon} size={14} /> {confirmedOrder.merchantName} prépare votre commande</li>
@@ -1136,6 +1087,57 @@ export function Checkout() {
               </Link>
             </div>
           )}
+        </div>
+
+        {/* Sidebar : récapitulatif (masquée sur la confirmation) */}
+        {step !== 'confirmation' && (
+          <aside className="space-y-4 lg:sticky lg:top-24">
+            <div className="rounded-[22px] bg-white p-5">
+              <div className="flex items-center gap-3">
+                <SafeImage
+                  src={campaign.product_image_url}
+                  alt={campaign.product_name}
+                  className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                  iconSize={20}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#292541]">{campaign.product_name}</p>
+                  <p className="truncate text-[11px] text-[#9290a2]">{campaign.merchant_name}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2 border-t border-[#f0eff5] pt-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#77738a]">Sous-total{form.quantity > 1 ? ` × ${form.quantity}` : ''}</span>
+                  <span className="font-bold text-[#292541]">{money(subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#77738a]">Livraison{selectedZone ? ` · ${selectedZone.name}` : ''}</span>
+                  <span className="font-bold text-[#278e69]">
+                    {isDigital ? 'Offerte' : selectedZone ? money(deliveryFee) : '—'}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between border-t border-[#f0eff5] pt-3">
+                  <span className="font-bold text-[#292541]">Total</span>
+                  <strong className="font-[Space_Grotesk] text-xl font-bold text-[#5b49e8]">{money(isDigital ? subtotal : total)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                [ShieldKeyIcon, 'Paiement sécurisé'],
+                [DeliveryTruck01Icon, isDigital ? 'Accès instantané' : 'Livraison suivie'],
+                [CheckmarkCircle02Icon, 'Produit vérifié'],
+              ] as [IconType, string][]).map(([g, l]) => (
+                <div key={l} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 text-center">
+                  <Icon glyph={g} size={16} className="text-[#5b49e8]" />
+                  <span className="text-[9px] font-bold leading-tight text-[#9290a2]">{l}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
         </div>
       </div>
 

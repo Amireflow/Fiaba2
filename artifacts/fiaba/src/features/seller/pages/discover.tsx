@@ -8,6 +8,7 @@ import {
   Search01Icon,
   SparklesIcon,
   Tick01Icon,
+  FilterIcon,
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { money, haptic } from '@/lib/utils';
@@ -51,6 +52,7 @@ export function Discover() {
   const [sortBy, setSortBy] = useState<SortOption>('matching');
   const [joining, setJoining] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Categories list with counts
   const categories = useMemo(() => {
@@ -132,9 +134,9 @@ export function Discover() {
       title="Découvrir les produits"
       description="Trouvez les meilleures offres des boutiques au Sénégal. Partagez ce que vous aimez et recevez vos commissions directement."
     >
-      {/* Barre de filtres unifiée */}
+      {/* Barre de filtres simplifiée */}
       <div className="mt-5 space-y-3">
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9290a2]">
               <Icon glyph={Search01Icon} size={17} />
@@ -148,61 +150,81 @@ export function Discover() {
               data-testid="input-seller-search"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="grid grid-cols-3 gap-2 lg:flex lg:items-center">
-              <select
-                value={formatFilter}
-                onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
-                className={`${sellerSelectClass} lg:w-auto`}
-                data-testid="select-format-filter"
-              >
-                <option value="tous">Format</option>
-                <option value="physique">Physique</option>
-                <option value="digital">Digital</option>
-              </select>
-              <select
-                value={modelFilter}
-                onChange={(e) => setModelFilter(e.target.value as ModelFilter)}
-                className={`${sellerSelectClass} lg:w-auto`}
-                data-testid="select-model-filter"
-              >
-                <option value="tous">Modèle</option>
-                <option value="commission">Commission %</option>
-                <option value="marge">Marge</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className={`${sellerSelectClass} lg:w-auto`}
-                data-testid="select-sort-by"
-              >
-                <option value="matching">Match idéal</option>
-                <option value="gain_desc">Gain le plus élevé</option>
-                <option value="price_asc">Prix croissant</option>
-                <option value="price_desc">Prix décroissant</option>
-              </select>
-            </div>
-            {/* Toggle vue grille/liste */}
-            <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#f4f3f8] p-1">
-              <button
-                onClick={() => { haptic('light'); setViewMode('grid'); }}
-                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'grid' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
-                data-testid="button-view-grid"
-                aria-label="Vue grille"
-              >
-                <Icon glyph={GridViewIcon} size={16} />
-              </button>
-              <button
-                onClick={() => { haptic('light'); setViewMode('list'); }}
-                className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'list' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
-                data-testid="button-view-list"
-                aria-label="Vue liste"
-              >
-                <Icon glyph={ListViewIcon} size={16} />
-              </button>
-            </div>
+          {/* Toggle vue grille/liste */}
+          <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#f4f3f8] p-1">
+            <button
+              onClick={() => { haptic('light'); setViewMode('grid'); }}
+              className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'grid' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+              data-testid="button-view-grid"
+              aria-label="Vue grille"
+            >
+              <Icon glyph={GridViewIcon} size={16} />
+            </button>
+            <button
+              onClick={() => { haptic('light'); setViewMode('list'); }}
+              className={`grid h-8 w-8 place-items-center rounded-lg transition ${viewMode === 'list' ? 'bg-white text-[#5b49e8] shadow-sm' : 'text-[#9290a2] hover:text-[#514b71]'}`}
+              data-testid="button-view-list"
+              aria-label="Vue liste"
+            >
+              <Icon glyph={ListViewIcon} size={16} />
+            </button>
           </div>
+          {/* Bouton filtres avancés */}
+          <button
+            onClick={() => { haptic('light'); setShowAdvanced(!showAdvanced); }}
+            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition ${showAdvanced ? 'bg-[#5b49e8] text-white' : 'bg-[#f4f3f8] text-[#67627b] hover:bg-[#e4e1ff] hover:text-[#5b49e8]'}`}
+            data-testid="button-advanced-filters"
+          >
+            <Icon glyph={FilterIcon} size={15} />
+            Avancés
+          </button>
         </div>
+
+        {/* Panneau filtres avancés (dépliable) */}
+        {showAdvanced && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[#f8f7fc] p-3">
+            <select
+              value={formatFilter}
+              onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
+              className={`${sellerSelectClass} mt-0 w-auto`}
+              data-testid="select-format-filter"
+            >
+              <option value="tous">Tous les formats</option>
+              <option value="physique">Physique</option>
+              <option value="digital">Digital</option>
+            </select>
+            <select
+              value={modelFilter}
+              onChange={(e) => setModelFilter(e.target.value as ModelFilter)}
+              className={`${sellerSelectClass} mt-0 w-auto`}
+              data-testid="select-model-filter"
+            >
+              <option value="tous">Tous les modèles</option>
+              <option value="commission">Commission %</option>
+              <option value="marge">Marge</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className={`${sellerSelectClass} mt-0 w-auto`}
+              data-testid="select-sort-by"
+            >
+              <option value="matching">Match idéal</option>
+              <option value="gain_desc">Gain le plus élevé</option>
+              <option value="price_asc">Prix croissant</option>
+              <option value="price_desc">Prix décroissant</option>
+            </select>
+            {(formatFilter !== 'tous' || modelFilter !== 'tous' || sortBy !== 'matching') && (
+              <button
+                onClick={() => { haptic('light'); setFormatFilter('tous'); setModelFilter('tous'); setSortBy('matching'); }}
+                className="text-xs font-bold text-[#5b49e8] hover:underline"
+                data-testid="button-reset-advanced"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Category Chips with Horizontal Scroll */}
         <div className="merchant-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
@@ -253,6 +275,8 @@ export function Discover() {
                   setCategoryFilter('Tous');
                   setModelFilter('tous');
                   setFormatFilter('tous');
+                  setSortBy('matching');
+                  setShowAdvanced(false);
                 }}
               >
                 Réinitialiser les filtres
@@ -479,19 +503,19 @@ function CampaignListRow({
   const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
 
   return (
-    <Card className="flex items-center gap-4 p-3 transition hover:shadow-md">
+    <Card className="flex flex-col gap-4 p-4 transition hover:shadow-md sm:flex-row sm:items-center">
       <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
         <SafeImage
           src={imgUrl}
           alt={c.product_name ?? c.campaign_name}
-          className="h-16 w-16 rounded-xl object-cover sm:h-20 sm:w-20"
+          className="h-32 w-full rounded-xl object-cover sm:h-20 sm:w-24"
           iconSize={22}
         />
       </Link>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">
             {c.product_name ?? c.campaign_name}
           </p>
           {isTopMatch && (
@@ -505,24 +529,32 @@ function CampaignListRow({
             </span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-xs text-[#9290a2]">
+        <p className="mt-1 truncate text-xs text-[#9290a2]">
           {c.merchant_name} · {c.product_category ?? 'Divers'}
         </p>
-        <div className="mt-1.5 flex items-center gap-4">
-          <span className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</span>
-          <span className="text-xs font-bold text-[#278e69]">+{money(netGain)} / vente</span>
+        <div className="mt-2 flex items-center gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[#9290a2]">Prix</p>
+            <p className="text-sm font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</p>
+          </div>
+          <div className="h-8 w-px bg-[#f0eff5]" />
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-[#278e69]">Gain / vente</p>
+            <p className="text-sm font-bold text-[#278e69]">+{money(netGain)}</p>
+          </div>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 sm:flex-col">
         {c.is_joined ? (
-          <Link href={`/seller/share/${c.campaign_id}`}>
-            <Button variant="success" testId={`share-list-${c.campaign_id}`}>
+          <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 sm:w-full">
+            <Button variant="success" className="w-full" testId={`share-list-${c.campaign_id}`}>
               Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
             </Button>
           </Link>
         ) : (
           <Button
+            className="flex-1 sm:w-full"
             onClick={() => onJoin(c)}
             disabled={joining === c.campaign_id}
             testId={`join-list-${c.campaign_id}`}
@@ -530,8 +562,8 @@ function CampaignListRow({
             {joining === c.campaign_id ? '…' : 'Rejoindre'}
           </Button>
         )}
-        <Link href={`/seller/product/${c.campaign_id}`}>
-          <Button variant="soft" testId={`view-list-${c.campaign_id}`}>Détails</Button>
+        <Link href={`/seller/product/${c.campaign_id}`} className="flex-1 sm:w-full">
+          <Button variant="soft" className="w-full" testId={`view-list-${c.campaign_id}`}>Détails</Button>
         </Link>
       </div>
     </Card>

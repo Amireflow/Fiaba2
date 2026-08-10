@@ -242,7 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, fullName: string, role: 'marchand' | 'vendeur' | 'admin') => {
-      const res = await supabase.auth.signUp({
+      return supabase.auth.signUp({
         email,
         password,
         options: {
@@ -253,14 +253,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           },
         },
       });
-
-      if (res.data?.user) {
-        setSession(res.data.session);
-        await fetchUserData(res.data.user.id);
-      }
-      return res;
     },
-    [fetchUserData]
+    []
   );
 
   const signOut = useCallback(async () => {

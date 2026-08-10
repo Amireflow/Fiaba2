@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { money, haptic } from '@/lib/utils';
+import { trackEvent } from '@/lib/analytics';
+import { getFirstImageUrl } from '@/lib/storage-upload';
 import {
   SellerBadge,
   SellerButton as Button,
@@ -187,6 +189,12 @@ export function Share() {
 
   function shareTo(channel: typeof shareChannels[number]) {
     const url = channel.url(fullLink, message);
+    // Analytics: share_clicked (CDC §25)
+    trackEvent('share_clicked', {
+      entityType: 'campaign',
+      entityId: campaign?.campaignId ?? '',
+      metadata: { channel: channel.id },
+    });
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
@@ -208,7 +216,7 @@ export function Share() {
 
       {/* Product preview card */}
       <Card className="mt-4 overflow-hidden p-0">
-        {campaign.productImage && <img src={campaign.productImage} alt={campaign.productName} className="h-48 w-full object-cover" />}
+        {getFirstImageUrl(campaign.productImage) && <img src={getFirstImageUrl(campaign.productImage)!} alt={campaign.productName} className="h-48 w-full object-cover" />}
         <div className="p-5">
           <div className="flex items-start gap-4">
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={24} /></span>

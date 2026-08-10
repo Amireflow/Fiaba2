@@ -86,6 +86,14 @@ export function parseImageUrls(rawImageUrl: string | null | undefined): string[]
 }
 
 /**
+ * Extrait la première URL d'image valide en gérant le format JSON array ou chaîne simple.
+ */
+export function getFirstImageUrl(rawImageUrl: string | null | undefined): string | null {
+  const urls = parseImageUrls(rawImageUrl);
+  return urls.length > 0 ? urls[0] : null;
+}
+
+/**
  * Compression client-side ultra rapide via WebP/JPEG Data URL (~100-150KB).
  */
 async function uploadAsCompressedBase64(file: File): Promise<{ url: string | null; error: string | null }> {

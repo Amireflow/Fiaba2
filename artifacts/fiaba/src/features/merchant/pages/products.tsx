@@ -1,10 +1,11 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'wouter';
 import { Delete02Icon, Edit02Icon, Store01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { useMerchantId, useSupabaseQuery, supabaseDelete } from '@/hooks/use-supabase-query';
+import { getFirstImageUrl } from '@/lib/storage-upload';
 import {
   Badge,
   ConfirmDialog,
@@ -106,8 +107,8 @@ export function Products() {
               return (
                 <div key={p.id} className="grid grid-cols-[2fr_1fr_1fr_.8fr_1fr] items-center gap-4 border-b border-[#f1eef7] px-5 py-4 last:border-b-0 transition hover:bg-[#faf9fd]">
                   <div className="flex items-center gap-3">
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                    {getFirstImageUrl(p.image_url) ? (
+                      <img src={getFirstImageUrl(p.image_url)!} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
                     ) : (
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={20} /></span>
                     )}

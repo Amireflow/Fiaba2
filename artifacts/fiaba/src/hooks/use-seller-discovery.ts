@@ -46,9 +46,9 @@ export function useSellerDiscovery() {
     setError(null);
 
     try {
-      // 1. Exécution simultanée des requêtes initiales (Vendeur, Campagnes, Produits)
-      const [sellerRes, campRes, prodRes] = await Promise.all([
-        supabase.from('sellers').select('id').eq('profile_id', profile.id).maybeSingle(),
+      // 1. Exécution simultanée des requêtes initiales (Vendeur, Campagnes, Produits, Profil)
+      const [sellerRes, campRes, prodRes, profileRes] = await Promise.all([
+        supabase.from('sellers').select('id, city').eq('profile_id', profile.id).maybeSingle(),
         supabase
           .from('campaigns')
           .select(`
@@ -66,22 +66,40 @@ export function useSellerDiscovery() {
             merchants:merchant_id (id, name, slug)
           `)
           .eq('status', 'actif'),
+        supabase.from('profiles').select('city').eq('id', profile.id).maybeSingle(),
       ]);
 
-      const sId = (sellerRes.data as { id: string } | null)?.id ?? null;
+      const sId = (sellerRes.data as { id: string; city: string | null } | null)?.id ?? null;
       setSellerId(sId);
+      const sellerCity = (sellerRes.data as { city: string | null } | null)?.city
+        ?? (profileRes.data as { city: string | null } | null)?.city
+        ?? null;
 
-      // 2. Exécution simultanée des niches et campagnes rejointes si le profil vendeur existe
+      // 2. Exécution simultanée des niches, campagnes rejointes, zones de livraison, et historique ventes
       let sellerNicheIds: string[] = [];
       let joinedIds: string[] = [];
+      let merchantZoneMap: Record<string, string[]> = {}; // merchant_id → zone names
+      let sellerSalesCount = 0;
 
       if (sId) {
-        const [nicheRes, joinedRes] = await Promise.all([
+        const merchantIds = ((campRes.data as any[]) ?? []).map((c) => c.merchant_id);
+        const [nicheRes, joinedRes, zonesRes, salesRes] = await Promise.all([
           supabase.from('seller_niches').select('niche_id').eq('seller_id', sId),
           supabase.from('campaign_sellers').select('campaign_id').eq('seller_id', sId),
+          merchantIds.length > 0
+            ? supabase.from('delivery_zones').select('merchant_id, name').in('merchant_id', merchantIds).eq('is_active', true)
+            : Promise.resolve({ data: [] as any[] }),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).eq('seller_id', sId),
         ]);
         sellerNicheIds = ((nicheRes.data as { niche_id: string }[] | null) ?? []).map((x) => x.niche_id);
         joinedIds = ((joinedRes.data as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
+        sellerSalesCount = salesRes.count ?? 0;
+
+        // Build merchant → zone names map
+        (zonesRes.data as { merchant_id: string; name: string }[] | null)?.forEach((z) => {
+          if (!merchantZoneMap[z.merchant_id]) merchantZoneMap[z.merchant_id] = [];
+          merchantZoneMap[z.merchant_id].push(z.name.toLowerCase());
+        });
       }
 
       const rawCampaigns = campRes.data ?? [];
@@ -98,12 +116,41 @@ export function useSellerDiscovery() {
           niches: { id: string; name: string } | null;
         };
 
+        // ── Matching engine (CDC §10) ──
         let matchScore = 10;
+
+        // Factor 1: Niche compatibility (40 points max)
         if (c.niche_id && sellerNicheIds.includes(c.niche_id)) {
-          matchScore = 100;
+          matchScore += 40;
         } else if (sellerNicheIds.length === 0) {
-          matchScore = 50;
+          matchScore += 15; // New seller, neutral
         }
+
+        // Factor 2: Zone compatibility (30 points max)
+        const merchantZones = merchantZoneMap[c.merchant_id] ?? [];
+        if (sellerCity && merchantZones.length > 0) {
+          const cityLower = sellerCity.toLowerCase();
+          if (merchantZones.some((z) => z.includes(cityLower) || cityLower.includes(z))) {
+            matchScore += 30;
+          }
+        } else if (merchantZones.length === 0) {
+          matchScore += 10; // No zone restriction
+        }
+
+        // Factor 3: Performance history (15 points max)
+        if (sellerSalesCount > 10) matchScore += 15;
+        else if (sellerSalesCount > 3) matchScore += 10;
+        else if (sellerSalesCount > 0) matchScore += 5;
+
+        // Factor 4: Commission level (15 points max) — higher commission = more attractive
+        const commissionPct = c.commission_type === 'fixed' && c.products?.price
+          ? (c.commission / c.products.price) * 100
+          : c.commission;
+        if (commissionPct >= 15) matchScore += 15;
+        else if (commissionPct >= 10) matchScore += 10;
+        else if (commissionPct >= 5) matchScore += 5;
+
+        matchScore = Math.min(100, matchScore);
 
         return {
           campaign_id: c.id,
@@ -137,6 +184,29 @@ export function useSellerDiscovery() {
         .filter((p) => !existingProductIds.has(p.id))
         .map((p) => {
           const compId = `prod-camp-${p.id}`;
+
+          // Apply same matching factors for synthetic campaigns
+          let synthScore = 10;
+          // Niche: match by category if seller has niches
+          if (sellerNicheIds.length === 0) synthScore += 15;
+          // Zone
+          const merchantZones = merchantZoneMap[p.merchant_id] ?? [];
+          if (sellerCity && merchantZones.length > 0) {
+            const cityLower = sellerCity.toLowerCase();
+            if (merchantZones.some((z) => z.includes(cityLower) || cityLower.includes(z))) {
+              synthScore += 30;
+            }
+          } else if (merchantZones.length === 0) {
+            synthScore += 10;
+          }
+          // Performance
+          if (sellerSalesCount > 10) synthScore += 15;
+          else if (sellerSalesCount > 3) synthScore += 10;
+          else if (sellerSalesCount > 0) synthScore += 5;
+          // Commission (default 10% for synthetic)
+          synthScore += 10;
+          synthScore = Math.min(100, synthScore);
+
           return {
             campaign_id: compId,
             campaign_name: `Offre ${p.name}`,
@@ -155,7 +225,7 @@ export function useSellerDiscovery() {
             merchant_slug: p.merchants?.slug ?? null,
             niche_id: null,
             niche_name: p.category ?? 'Général',
-            match_score: 80,
+            match_score: synthScore,
             is_joined: joinedIds.includes(compId),
           };
         });

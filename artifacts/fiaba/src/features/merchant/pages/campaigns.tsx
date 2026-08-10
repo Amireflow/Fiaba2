@@ -15,6 +15,8 @@ import {
   ProgressBar,
 } from '../components/merchant-ui';
 
+import { getFirstImageUrl } from '@/lib/storage-upload';
+
 type CampaignRow = {
   id: string;
   name: string;
@@ -24,6 +26,8 @@ type CampaignRow = {
   model: string;
   status: string;
   goal: number | null;
+  product_id: string | null;
+  products: { name: string; image_url: string | null } | null;
 };
 
 const statusMap: Record<string, { label: string; tone: 'mint' | 'amber' | 'slate' }> = {
@@ -36,7 +40,7 @@ export function Campaigns() {
   const { toast } = useToast();
   const { merchantId } = useMerchantId();
   const { data: campaigns, loading, refetch } = useSupabaseQuery<CampaignRow>('campaigns', {
-    select: 'id, name, description, commission, commission_type, model, status, goal',
+    select: 'id, name, description, commission, commission_type, model, status, goal, product_id, products:product_id (name, image_url)',
     filter: { merchant_id: merchantId },
     order: { column: 'created_at', ascending: false },
     enabled: !!merchantId,
@@ -116,13 +120,21 @@ export function Campaigns() {
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {campaigns.map((c) => {
             const st = statusMap[c.status] ?? statusMap.terminee;
+            const imgUrl = getFirstImageUrl(c.products?.image_url);
             return (
               <Card key={c.id}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Badge tone={st.tone}>{st.label}</Badge>
-                    <h3 className="mt-2 font-[Space_Grotesk] text-lg font-bold tracking-[-.04em] text-[#292541]">{c.name}</h3>
-                    {c.description && <p className="mt-1 text-xs leading-5 text-[#77738a]">{c.description}</p>}
+                  <div className="flex items-start gap-3 min-w-0">
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={c.products?.name ?? c.name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-[#eee]" />
+                    ) : (
+                      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Chart02Icon} size={20} /></span>
+                    )}
+                    <div className="min-w-0">
+                      <Badge tone={st.tone}>{st.label}</Badge>
+                      <h3 className="mt-1 font-[Space_Grotesk] text-lg font-bold tracking-[-.04em] text-[#292541] truncate">{c.name}</h3>
+                      {c.description && <p className="mt-0.5 text-xs leading-5 text-[#77738a] line-clamp-1">{c.description}</p>}
+                    </div>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Link href={`/merchant/campaigns/${c.id}/edit`}><button className="grid h-8 w-8 place-items-center rounded-lg bg-[#f0eff5] text-[#67627b]" data-testid={`edit-${c.id}`}><Icon glyph={Edit02Icon} size={15} /></button></Link>

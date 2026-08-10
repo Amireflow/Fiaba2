@@ -21,6 +21,7 @@ import { money, haptic, friendlyErrorMessage } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
 import { parseImageUrls } from '@/lib/storage-upload';
+import { trackEvent } from '@/lib/analytics';
 
 /* ── Types ── */
 
@@ -106,6 +107,7 @@ export function Checkout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Seller attribution state
   const [sellerInfo, setSellerInfo] = useState<{ sellerId: string; sellerCode: string; campaignId: string; trackingLinkId: string } | null>(null);
@@ -248,6 +250,13 @@ export function Checkout() {
           referrer: document.referrer || null,
         } as never);
 
+        // Analytics: tracking_link_clicked (CDC §25)
+        trackEvent('tracking_link_clicked', {
+          entityType: 'tracking_link',
+          entityId: tl.id,
+          metadata: { campaign_id: tl.campaign_id, seller_id: tl.seller_id },
+        });
+
         await (supabase.from('tracking_links') as any)
           .update({ clicks: tl.clicks + 1 })
           .eq('id', tl.id);
@@ -336,7 +345,12 @@ export function Checkout() {
     }
     if (step === 'payment') {
       if (!validateStep('payment')) { toast({ title: 'Paiement incomplet', description: 'Vérifiez vos informations de paiement.' }); return; }
-      submitOrder();
+      if (form.paymentMethod === 'wave' || form.paymentMethod === 'orange') {
+        haptic('light');
+        setShowPaymentModal(true);
+      } else {
+        processFinalizeOrder('success');
+      }
     }
   }
 
@@ -345,23 +359,31 @@ export function Checkout() {
     if (step === 'payment') setStep('delivery');
   }
 
-  async function submitOrder() {
+  async function handleSimulatedPayment(outcome: 'success' | 'failure') {
+    if (outcome === 'failure') {
+      setShowPaymentModal(false);
+      haptic('error');
+      toast({
+        title: 'Paiement échoué',
+        description: 'Le paiement en ligne a été refusé ou annulé. Veuillez réessayer ou choisir un autre mode de paiement.',
+      });
+      return;
+    }
+    setShowPaymentModal(false);
+    await processFinalizeOrder('success');
+  }
+
+  async function processFinalizeOrder(outcome: 'success' = 'success') {
     if (!campaign || submitting) return;
     setSubmitting(true);
     haptic('success');
 
-    // Calculate commission
-    let commissionAmount = 0;
-    let sellerAttributed = false;
-
-    if (sellerInfo) {
-      sellerAttributed = true;
-      if (campaign.commission_type === 'fixed') {
-        commissionAmount = campaign.commission * form.quantity;
-      } else {
-        commissionAmount = Math.round((campaign.product_price * form.quantity * campaign.commission) / 100);
-      }
-    }
+    // Analytics: checkout_started + order_created (CDC §25)
+    trackEvent('checkout_started', {
+      entityType: 'campaign',
+      entityId: campaign.campaign_id,
+      metadata: { quantity: form.quantity, product: campaign.product_name },
+    });
 
     // Try to find seller by code if not already attributed from link
     let resolvedSellerId = sellerInfo?.sellerId;
@@ -379,42 +401,76 @@ export function Checkout() {
       if (found) {
         resolvedSellerId = found.seller_id;
         resolvedSellerCode = found.seller_code;
-        sellerAttributed = true;
-        if (campaign.commission_type === 'fixed') {
-          commissionAmount = campaign.commission * form.quantity;
-        } else {
-          commissionAmount = Math.round((campaign.product_price * form.quantity * campaign.commission) / 100);
-        }
       }
     }
 
-    // Insert order
-    const { data: orderRow, error: orderErr } = await (supabase
+    // ── Server-side calculation via RPC (CDC §23) ──
+    const { data: calc, error: calcErr } = await (supabase.rpc as any)('calculate_order_total', {
+      p_campaign_id: campaign.campaign_id,
+      p_quantity: form.quantity,
+      p_zone_id: form.zoneId || null,
+      p_seller_id: resolvedSellerId ?? null,
+    });
+
+    if (calcErr || !calc) {
+      setSubmitting(false);
+      haptic('error');
+      toast({ title: 'Erreur de calcul', description: friendlyErrorMessage(calcErr) || 'Impossible de calculer le total.' });
+      return;
+    }
+
+    const serverCalc = calc[0] as {
+      product_price: number;
+      subtotal: number;
+      delivery_fee: number;
+      commission_amount: number;
+      platform_fee_amount: number;
+      platform_fee_rate: number;
+      merchant_amount: number;
+      total_amount: number;
+      model: string;
+      commission_type: string;
+      commission_rate: number;
+      seller_attributed: boolean;
+    };
+
+    const serverTotal = serverCalc.total_amount;
+    const serverCommission = serverCalc.commission_amount;
+    const serverDeliveryFee = serverCalc.delivery_fee;
+    const serverMerchantAmount = serverCalc.merchant_amount;
+    const serverPlatformFee = serverCalc.platform_fee_amount;
+
+    // Generate client-side UUID to prevent RLS SELECT error for anonymous customers
+    const orderId = crypto.randomUUID();
+
+    // Insert order with server-calculated amounts
+    const { error: orderErr } = await (supabase
       .from('orders') as any)
       .insert({
+        id: orderId,
         merchant_id: campaign.merchant_id,
         seller_id: resolvedSellerId ?? null,
         campaign_id: campaign.campaign_id,
         customer_name: form.customerName.trim(),
         customer_phone: form.phone.trim(),
         customer_address: form.address.trim(),
-        total_amount: total,
-        commission_amount: commissionAmount,
+        total_amount: serverTotal,
+        commission_amount: serverCommission,
         status: 'a_preparer',
         status_v2: 'created',
         zone_name: form.zoneName || selectedZone?.name || null,
-        delivery_fee: deliveryFee,
+        delivery_fee: serverDeliveryFee,
         payment_method: paymentMethodMap[form.paymentMethod],
-        commission_model: campaign.model as 'commission' | 'marge',
-        commission_type: (campaign.commission_type ?? 'percentage') as 'percentage' | 'fixed',
-        commission_rate: campaign.commission,
-        snapshot_product_price: campaign.product_price,
-        snapshot_commission_amount: commissionAmount,
-        merchant_amount: total - commissionAmount - deliveryFee,
-        platform_fee: 0,
-      })
-      .select('id')
-      .single();
+        commission_model: serverCalc.model as 'commission' | 'marge',
+        commission_type: serverCalc.commission_type as 'percentage' | 'fixed',
+        commission_rate: serverCalc.commission_rate,
+        snapshot_product_price: serverCalc.product_price,
+        snapshot_commission_amount: serverCommission,
+        merchant_amount: serverMerchantAmount,
+        platform_fee: serverPlatformFee,
+        platform_fee_amount: serverPlatformFee,
+        platform_fee_rate: serverCalc.platform_fee_rate,
+      });
 
     if (orderErr) {
       setSubmitting(false);
@@ -423,7 +479,12 @@ export function Checkout() {
       return;
     }
 
-    const orderId = (orderRow as { id: string }).id;
+    // Analytics: order_created (CDC §25)
+    trackEvent('order_created', {
+      entityType: 'order',
+      entityId: orderId,
+      metadata: { total: serverTotal, commission: serverCommission, seller_attributed: !!resolvedSellerId },
+    });
 
     // Insert order item
     if (campaign.product_id) {
@@ -431,25 +492,8 @@ export function Checkout() {
         order_id: orderId,
         product_id: campaign.product_id,
         product_name: campaign.product_name,
-        unit_price: campaign.product_price,
+        unit_price: serverCalc.product_price,
         quantity: form.quantity,
-      } as never);
-    }
-
-    // Insert commission if seller attributed
-    if (sellerAttributed && resolvedSellerId && commissionAmount > 0) {
-      const availableAt = new Date();
-      availableAt.setDate(availableAt.getDate() + 14); // 14-day safety period
-
-      await supabase.from('commissions').insert({
-        seller_id: resolvedSellerId,
-        order_id: orderId,
-        campaign_id: campaign.campaign_id,
-        amount: commissionAmount,
-        is_paid: false,
-        status: 'pending',
-        model: campaign.model as 'commission' | 'marge',
-        available_at: availableAt.toISOString(),
       } as never);
     }
 
@@ -462,18 +506,18 @@ export function Checkout() {
       merchantName: campaign.merchant_name,
       quantity: form.quantity,
       zone: form.zoneName || selectedZone?.name || '—',
-      deliveryFee,
-      total,
+      deliveryFee: serverDeliveryFee,
+      total: serverTotal,
       customerName: form.customerName.trim(),
       phone: form.phone.trim(),
       paymentMethod: form.paymentMethod,
       sellerCode: resolvedSellerCode ?? null,
-      commissionAmount,
+      commissionAmount: serverCommission,
     });
     setStep('confirmation');
     toast({
       title: 'Commande confirmée !',
-      description: `${orderShortId} · ${money(total)} · Votre commande a bien été enregistrée.`,
+      description: `${orderShortId} · ${money(serverTotal)} · Votre commande a bien été enregistrée.`,
     });
   }
 
@@ -828,6 +872,86 @@ export function Checkout() {
           )}
         </div>
       </div>
+
+      {/* Simulation Modal for Online Payment */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl border border-[#eceaf5]">
+            <div className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#efedff] text-[#5b49e8] mb-4">
+                <Icon glyph={Wallet01Icon} size={28} />
+              </div>
+              <h3 className="font-[Space_Grotesk] text-xl font-bold text-[#292541]">
+                Simulation de Paiement {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}
+              </h3>
+              <p className="mt-1 text-xs text-[#77738a]">
+                Mode Test : Veuillez choisir le résultat du paiement en ligne.
+              </p>
+
+              <div className="mt-5 rounded-2xl bg-[#f8f7fc] p-4 text-left space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#9290a2]">Client</span>
+                  <span className="font-bold text-[#292541]">{form.customerName}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#9290a2]">Téléphone</span>
+                  <span className="font-bold text-[#292541]">{form.phone}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#9290a2]">Mode de paiement</span>
+                  <span className="font-bold text-[#5b49e8]">
+                    {form.paymentMethod === 'wave' ? 'Wave Mobile Money' : 'Orange Money'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-[#e9e6f1] pt-2 mt-2 font-bold">
+                  <span>Montant total</span>
+                  <span className="text-[#278e69]">{money(total)}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSimulatedPayment('success')}
+                  className="w-full rounded-2xl bg-[#278e69] py-3.5 text-sm font-bold text-white shadow-md hover:bg-[#207556] transition flex items-center justify-center gap-2"
+                  data-testid="button-simulate-payment-success"
+                >
+                  {submitting ? (
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      <Icon glyph={CheckmarkCircle02Icon} size={18} />
+                      Simuler Succès (Paiement Réussi)
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSimulatedPayment('failure')}
+                  className="w-full rounded-2xl bg-[#fff0f1] border border-[#fbd4d8] py-3.5 text-sm font-bold text-[#c45667] hover:bg-[#ffe3e6] transition flex items-center justify-center gap-2"
+                  data-testid="button-simulate-payment-failure"
+                >
+                  <Icon glyph={Cancel01Icon} size={18} />
+                  Simuler Échec (Paiement Échoué)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setShowPaymentModal(false)}
+                  className="w-full rounded-2xl py-2.5 text-xs font-bold text-[#9290a2] hover:text-[#292541] transition"
+                  data-testid="button-cancel-payment-modal"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

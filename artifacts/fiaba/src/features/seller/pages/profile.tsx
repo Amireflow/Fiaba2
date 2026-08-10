@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { friendlyErrorMessage, calculateTrustScore } from '@/lib/utils';
 import { Chart02Icon, StarIcon, Tick01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
@@ -99,7 +100,7 @@ export function SellerProfile() {
   }
 
   const getInitials = (name: string) => (name || 'Vendeur').split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
-  const trustScore = authProfile?.trust_score ?? 85;
+  const trustScore = calculateTrustScore(authProfile);
 
   return (
     <Page

@@ -13,12 +13,14 @@ import {
   SellerEmptyState,
   SellerPage as Page,
 } from '../components/seller-ui';
+import { getFirstImageUrl } from '@/lib/storage-upload';
 
 type JoinedCampaign = {
   campaign_seller_id: string;
   campaign_id: string;
   campaign_name: string;
   product_name: string | null;
+  product_image_url: string | null;
   merchant_name: string;
   commission: number;
   commission_type: string | null;
@@ -78,7 +80,7 @@ export function SellerCampaigns() {
         .select(`
           id, name, commission, commission_type, model, status,
           product_id, merchant_id,
-          products:product_id (name),
+          products:product_id (name, image_url),
           merchants:merchant_id (name)
         `)
         .in('id', campaignIds);
@@ -116,7 +118,7 @@ export function SellerCampaigns() {
         }) as {
           id: string; name: string; commission: number; commission_type: string | null;
           model: string; status: string;
-          products: { name: string } | null;
+          products: { name: string; image_url: string | null } | null;
           merchants: { name: string } | null;
         } | undefined;
 
@@ -129,6 +131,7 @@ export function SellerCampaigns() {
             campaign_id: j.campaign_id,
             campaign_name: c.name,
             product_name: c.products?.name ?? null,
+            product_image_url: c.products?.image_url ?? null,
             merchant_name: c.merchants?.name ?? 'Boutique',
             commission: c.commission,
             commission_type: c.commission_type,
@@ -163,7 +166,7 @@ export function SellerCampaigns() {
     toast({ title: 'Code copié', description: `Code ${c.seller_code} prêt à partager.` });
   }
 
-  async function confirmLeave() {
+  async function handleLeave() {
     if (!toLeave) return;
     setLeaving(true);
     haptic('warning');
@@ -174,9 +177,10 @@ export function SellerCampaigns() {
 
     setLeaving(false);
     if (error) {
-      toast({ title: 'Erreur', description: error.message });
+      toast({ title: 'Erreur', description: error.message || 'Impossible de quitter la campagne.' });
     } else {
-      setCampaigns((prev) => prev.filter((c) => c.campaign_id !== toLeave.campaign_id));
+      setCampaigns((prev) => prev.filter((c) => c.campaign_seller_id !== toLeave.campaign_seller_id));
+      haptic('success');
       toast({ title: 'Campagne quittée', description: `${toLeave.campaign_name} n'est plus dans vos campagnes.` });
     }
     setToLeave(null);
@@ -237,23 +241,32 @@ export function SellerCampaigns() {
         </Card>
       ) : (
         <div className="mt-5 space-y-4">
-          {campaigns.map((c) => (
-            <Card key={c.campaign_id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.campaign_name}</p>
-                  <p className="mt-0.5 text-xs text-[#9290a2]">{c.product_name ?? 'Produit'} · {c.merchant_name}</p>
+          {campaigns.map((c) => {
+            const imgUrl = getFirstImageUrl(c.product_image_url);
+            return (
+              <Card key={c.campaign_id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={c.product_name ?? c.campaign_name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-[#eee]" />
+                    ) : (
+                      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Chart02Icon} size={20} /></span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-[Space_Grotesk] text-base font-bold text-[#292541] truncate">{c.campaign_name}</p>
+                      <p className="mt-0.5 text-xs text-[#9290a2] truncate">{c.product_name ?? 'Produit'} · {c.merchant_name}</p>
+                    </div>
+                  </div>
+                  <SellerBadge tone={toneFor(c.status)}>{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
                 </div>
-                <SellerBadge tone={toneFor(c.status)}>{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
-              </div>
 
-              {/* Stats inline */}
-              <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-3 text-center sm:grid-cols-4">
-                <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.clicks}</p></div>
-                <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.sales}</p></div>
-                <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
-                <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{money(c.earnings)}</p></div>
-              </div>
+                {/* Stats inline */}
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-3 text-center sm:grid-cols-4">
+                  <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.clicks}</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.sales}</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{money(c.earnings)}</p></div>
+                </div>
 
               {/* Link + code */}
               <div className="mt-4 space-y-2">
@@ -280,7 +293,8 @@ export function SellerCampaigns() {
                 <Button variant="ghost" onClick={() => { haptic('light'); setToLeave(c); }} testId={`leave-${c.campaign_id}`}>Quitter</Button>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -292,7 +306,7 @@ export function SellerCampaigns() {
             <p className="mt-2 text-sm leading-5 text-[#77738a]">Vous ne gagnerez plus de commissions sur les futures ventes de « {toLeave.campaign_name} ».</p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setToLeave(null)}>Annuler</Button>
-              <Button variant="danger" onClick={confirmLeave} disabled={leaving}>{leaving ? '…' : 'Quitter'}</Button>
+              <Button variant="danger" onClick={handleLeave} disabled={leaving}>{leaving ? '…' : 'Quitter'}</Button>
             </div>
           </div>
         </div>

@@ -142,3 +142,43 @@ export function compressImageFile(
     img.src = url;
   });
 }
+
+/**
+ * Algorithme dynamique de Trust Score (0 à 100).
+ * Démarre à 0 pour un compte vierge et augmente selon la complétude, la vérification et les ventes livrées.
+ */
+export function calculateTrustScore(profile?: {
+  verification_status?: string | null;
+  phone?: string | null;
+  full_name?: string | null;
+  created_at?: string | null;
+  trust_score?: number | null;
+} | null, salesCount: number = 0, disputesCount: number = 0): number {
+  if (profile?.verification_status === 'suspended' || profile?.verification_status === 'refused') {
+    return 0;
+  }
+
+  let score = 0;
+
+  // 1. Complétude Identité & Vérification (max 30 pts)
+  if (profile?.full_name && profile.full_name.trim().length > 3) score += 10;
+  if (profile?.phone && profile.phone.trim().length > 5) score += 10;
+  if (profile?.verification_status === 'verified') score += 10;
+
+  // 2. Performance des ventes livrées (max 40 pts)
+  if (salesCount >= 1) score += 10;
+  if (salesCount >= 5) score += 15;
+  if (salesCount >= 20) score += 15;
+
+  // 3. Ancienneté du compte (max 10 pts)
+  if (profile?.created_at) {
+    const ageDays = (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 3600 * 24);
+    if (ageDays >= 30) score += 10;
+    else score += Math.min(10, Math.floor(ageDays / 3));
+  }
+
+  // 4. Pénalité de litiges (-25 pts par litige)
+  score -= disputesCount * 25;
+
+  return Math.max(0, Math.min(100, score));
+}

@@ -155,10 +155,10 @@ export function Onboarding() {
       toast({ title: 'Profil configuré !', description: 'Bienvenue sur Fiaba.' });
       setSubmitting(false);
 
-      const finalRole = (profile?.role || role) as string;
-      if (finalRole === 'marchand') {
+      const targetRole = profile?.role || role;
+      if (targetRole === 'marchand') {
         setLocation('/merchant');
-      } else if (finalRole === 'admin') {
+      } else if (targetRole === 'admin') {
         setLocation('/admin');
       } else {
         setLocation('/seller');

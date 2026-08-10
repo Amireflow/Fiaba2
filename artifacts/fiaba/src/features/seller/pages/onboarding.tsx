@@ -5,6 +5,7 @@ import { Icon } from '@/components/shared/icon';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { haptic } from '@/lib/utils';
+import { trackEvent } from '@/lib/analytics';
 
 const NICHES = [
   'Tech', 'Mode', 'Beauté', 'Maison', 'Food', 'Sport',
@@ -97,6 +98,10 @@ export function SellerOnboarding() {
       }
 
       haptic('success');
+      // Analytics: niche_selected (CDC §25)
+      trackEvent('niche_selected', {
+        metadata: { niches: selectedNiches, city },
+      });
       await fetchProfile(profile.id);
       setLocation('/seller');
     } catch (e) {

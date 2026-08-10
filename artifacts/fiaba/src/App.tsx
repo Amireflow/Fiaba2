@@ -679,11 +679,11 @@ function Home() {
             ) : (
               <>
                 <button
-                  className="px-4 py-2 text-sm font-bold text-[#5d5772]"
-                  onClick={() => setLocation("/sign-in")}
+                  className="rounded-full border border-[#d9d5e5] bg-white px-4 py-2 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition"
+                  onClick={() => { haptic('light'); setLocation("/sign-in"); }}
                   data-testid="button-login"
                 >
-                  Se connecter
+                  Connexion
                 </button>
                 <Button className="px-4 py-2.5" onClick={() => setLocation("/sign-up")} testId="button-header-start">
                   Devenir créateur
@@ -711,9 +711,18 @@ function Home() {
                 Accéder à mon {dashboardLabel}
               </Button>
             ) : (
-              <Button className="mt-2 w-full" onClick={() => setLocation("/sign-up")} testId="button-mobile-start">
-                Devenir créateur
-              </Button>
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  className="w-full rounded-full border border-[#d9d5e5] bg-white py-2.5 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition"
+                  onClick={() => { haptic('light'); setLocation("/sign-in"); }}
+                  data-testid="button-mobile-login"
+                >
+                  Connexion
+                </button>
+                <Button className="w-full py-2.5" onClick={() => setLocation("/sign-up")} testId="button-mobile-start">
+                  Devenir créateur
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -728,12 +737,11 @@ function Home() {
                 <span className="h-1.5 w-1.5 rounded-full bg-[#5b49e8]" /> Monétisez votre influence au Sénégal
               </div>
               <h1 className="mt-6 max-w-[650px] font-[var(--app-font-serif)] text-[clamp(3.15rem,7vw,6.5rem)] font-bold leading-[.92] tracking-[-.09em] text-[#27223f]">
-                Votre audience
-                <br />
-                <span className="text-[#5b49e8]">mérite un salaire.</span>
+                Partagez les produits que vous aimez. <br />
+                <span className="bg-gradient-to-r from-[#5b49e8] via-[#7d6cf0] to-[#b374e8] bg-clip-text text-transparent">Gagnez à chaque vente.</span>
               </h1>
-              <p className="mt-7 max-w-[500px] text-base leading-7 text-[#706c81] sm:text-lg">
-                Fiaba transforme vos recommandations en revenus. Partagez des produits que vous aimez, gagnez à chaque vente sur WhatsApp, Instagram, TikTok. Construit à Dakar, pensé pour les créateurs sénégalais.
+              <p className="mt-6 max-w-lg text-base leading-7 text-[#6b677e]">
+                Fiaba connecte les créateurs de contenu et les boutiques au Sénégal. Obtenez votre lien unique, partagez-le sur WhatsApp et Instagram, et recevez vos commissions directement sur Wave ou Orange Money.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {isLoggedIn ? (
@@ -741,9 +749,18 @@ function Home() {
                     Accéder à mon {dashboardLabel} {icon(ArrowUpRight01Icon, 17)}
                   </Button>
                 ) : (
-                  <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
-                    Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
-                  </Button>
+                  <div className="flex flex-wrap gap-3">
+                    <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
+                      Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
+                    </Button>
+                    <button
+                      className="rounded-full border border-[#d9d5e5] bg-white px-5 py-3 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition shadow-sm"
+                      onClick={() => { haptic('light'); setLocation("/sign-in"); }}
+                      data-testid="button-hero-login"
+                    >
+                      Connexion
+                    </button>
+                  </div>
                 )}
                 <a
                   href="#espace"

@@ -6,6 +6,8 @@ import { money, haptic } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useSellerDiscovery, type DiscoveryCampaign } from '@/hooks/use-seller-discovery';
 import { supabase } from '@/lib/supabase';
+import { trackEvent } from '@/lib/analytics';
+import { getFirstImageUrl } from '@/lib/storage-upload';
 import {
   PotentialBadge,
   SellerBadge,
@@ -53,6 +55,13 @@ export function Discover() {
     setJoining(null);
     if (error) {
       haptic('error');
+    } else {
+      // Analytics: campaign_joined (CDC §25)
+      trackEvent('campaign_joined', {
+        entityType: 'campaign',
+        entityId: c.campaign_id,
+        metadata: { match_score: c.match_score, product: c.product_name },
+      });
     }
   }
 
@@ -146,8 +155,8 @@ export function Discover() {
                           <p className="font-[Space_Grotesk] text-base font-bold text-[#292541]">{c.product_name ?? c.campaign_name}</p>
                           <p className="mt-0.5 text-xs text-[#9290a2]">{c.merchant_name} · {c.product_category ?? 'Divers'}</p>
                         </div>
-                        {c.product_image_url ? (
-                          <img src={c.product_image_url} alt={c.product_name ?? ''} className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                        {getFirstImageUrl(c.product_image_url) ? (
+                          <img src={getFirstImageUrl(c.product_image_url)!} alt={c.product_name ?? ''} className="h-12 w-12 shrink-0 rounded-xl object-cover" />
                         ) : (
                           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={22} /></span>
                         )}

@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useSellerQuery } from '@/hooks/use-supabase-query';
 import { calculatePayoutFee, DEFAULT_PAYOUT_FEE_RULE } from '@/lib/monetization';
 import type { PayoutFeeRule } from '@/types/entities';
+import { trackEvent } from '@/lib/analytics';
 import {
   SellerButton as Button,
   SellerCard as Card,
@@ -101,6 +102,11 @@ export function EarningWithdraw() {
     if (error) {
       toast({ title: 'Erreur de demande', description: error.message });
     } else {
+      // Analytics: payout_requested (CDC §25)
+      trackEvent('payout_requested', {
+        entityType: 'payout',
+        metadata: { amount: amt, fee: feeCalc.feeAmount, net: feeCalc.netAmount, account },
+      });
       toast({
         title: 'Demande envoyée !',
         description: `Demande de ${money(feeCalc.netAmount)} envoyée vers votre compte ${account}.`,

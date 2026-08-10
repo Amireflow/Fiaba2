@@ -134,6 +134,39 @@ export function ProductForm() {
       return;
     }
 
+    // ── Enforce subscription quota (CDC §7.2) ──
+    if (!isEdit) {
+      // Get merchant's plan max_active_products
+      const { data: sub } = await (supabase.from('merchant_subscriptions') as any)
+        .select('plan_id')
+        .eq('merchant_id', activeMerchantId)
+        .maybeSingle();
+
+      let maxProducts = 5; // Free plan default
+      if (sub?.plan_id) {
+        const { data: plan } = await (supabase.from('subscription_plans') as any)
+          .select('max_active_products')
+          .eq('id', sub.plan_id)
+          .maybeSingle();
+        if (plan?.max_active_products) maxProducts = plan.max_active_products;
+      }
+
+      const { count: activeCount } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('merchant_id', activeMerchantId)
+        .in('status', ['actif', 'active', 'brouillon']);
+
+      if ((activeCount ?? 0) >= maxProducts) {
+        haptic('error');
+        toast({
+          title: 'Quota atteint',
+          description: `Vous avez atteint la limite de ${maxProducts} produits. Passez au plan Premium pour en ajouter plus.`,
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     haptic('medium');
 

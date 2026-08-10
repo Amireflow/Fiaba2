@@ -134,6 +134,38 @@ export function CampaignForm() {
       return;
     }
 
+    // ── Enforce subscription quota (CDC §7.2) ──
+    if (!isEdit) {
+      const { data: sub } = await (supabase.from('merchant_subscriptions') as any)
+        .select('plan_id')
+        .eq('merchant_id', activeMerchantId)
+        .maybeSingle();
+
+      let maxCampaigns = 2; // Free plan default
+      if (sub?.plan_id) {
+        const { data: plan } = await (supabase.from('subscription_plans') as any)
+          .select('max_active_campaigns')
+          .eq('id', sub.plan_id)
+          .maybeSingle();
+        if (plan?.max_active_campaigns) maxCampaigns = plan.max_active_campaigns;
+      }
+
+      const { count: activeCount } = await supabase
+        .from('campaigns')
+        .select('id', { count: 'exact', head: true })
+        .eq('merchant_id', activeMerchantId)
+        .eq('status', 'active');
+
+      if ((activeCount ?? 0) >= maxCampaigns) {
+        haptic('error');
+        toast({
+          title: 'Quota atteint',
+          description: `Vous avez atteint la limite de ${maxCampaigns} campagnes actives. Passez au plan Premium pour en créer plus.`,
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     haptic('medium');
 

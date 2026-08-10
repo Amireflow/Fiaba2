@@ -7,6 +7,8 @@ import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { useSellerDiscovery } from '@/hooks/use-seller-discovery';
+import { trackEvent } from '@/lib/analytics';
+import { getFirstImageUrl } from '@/lib/storage-upload';
 import {
   PotentialBadge,
   SellerBadge,
@@ -123,6 +125,12 @@ export function ProductDetail() {
         is_joined: isJoined,
       });
 
+      // Analytics: campaign_viewed + product_viewed (CDC §25)
+      trackEvent('campaign_viewed', { entityType: 'campaign', entityId: c.id });
+      if (c.product_id) {
+        trackEvent('product_viewed', { entityType: 'product', entityId: c.product_id });
+      }
+
       const { data: zoneData } = await supabase
         .from('delivery_zones')
         .select('id, name, fee')
@@ -199,8 +207,8 @@ export function ProductDetail() {
 
         {/* Product visual + description */}
         <Card className="mt-4 overflow-hidden p-0 max-w-full">
-          {campaign.product_image_url ? (
-            <img src={campaign.product_image_url} alt={campaign.product_name ?? ''} className="h-48 sm:h-64 w-full object-cover max-w-full" />
+          {getFirstImageUrl(campaign.product_image_url) ? (
+            <img src={getFirstImageUrl(campaign.product_image_url)!} alt={campaign.product_name ?? ''} className="h-48 sm:h-64 w-full object-cover max-w-full" />
           ) : (
             <div className="grid h-48 sm:h-64 w-full place-items-center bg-[#f8f7fc]">
               <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={36} /></span>

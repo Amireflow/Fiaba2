@@ -15,6 +15,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { haptic, friendlyErrorMessage } from '@/lib/utils';
+import { trackEvent } from '@/lib/analytics';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -410,6 +411,8 @@ export function SignUpPage() {
       : (formattedUsername || fullName);
 
     const finalRole = email.trim().toLowerCase().startsWith('admin') ? 'admin' : role;
+    // Analytics: signup_started (CDC §25)
+    trackEvent('signup_started', { metadata: { role: finalRole } });
     const { error } = await signUpWithEmail(email, password, displayTitle, finalRole);
     setLoading(false);
 
@@ -422,18 +425,14 @@ export function SignUpPage() {
       });
     } else {
       haptic('success');
+      // Analytics: signup_completed (CDC §25)
+      trackEvent('signup_completed', { metadata: { role: finalRole } });
       setAlert({
         tone: 'success',
         title: 'Compte créé !',
-        message: 'Votre compte a été créé avec succès.',
+        message: 'Votre compte a été créé avec succès. Complétons maintenant votre profil.',
       });
-      if (finalRole === 'marchand') {
-        setLocation('/merchant');
-      } else if (finalRole === 'admin') {
-        setLocation('/admin');
-      } else {
-        setLocation('/seller');
-      }
+      setLocation('/onboarding');
     }
   };
 

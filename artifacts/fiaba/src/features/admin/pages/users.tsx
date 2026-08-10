@@ -15,6 +15,7 @@ import {
   adminInputClass,
 } from '../components/admin-ui';
 import type { AdminUser, VerificationStatus } from '@/types/entities';
+import { calculateTrustScore } from '@/lib/utils';
 
 type ProfileRow = {
   id: string;
@@ -182,7 +183,7 @@ export function AdminUsers() {
       email: p.email || 'Non renseigné',
       city: p.city || 'Dakar',
       status: (p.verification_status === 'verified' ? 'Vérifié' : 'En attente') as VerificationStatus,
-      trustScore: p.trust_score || 50,
+      trustScore: calculateTrustScore(p, stats.salesCount, stats.disputes),
       salesCount: stats.salesCount,
       volume: stats.volume,
       sales: stats.salesCount,

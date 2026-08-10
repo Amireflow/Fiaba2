@@ -26,6 +26,9 @@ type FormState = {
   stock: string;
   description: string;
   images: string[];
+  type: 'physique' | 'digital';
+  digital_file_url: string;
+  digital_access_instructions: string;
 };
 
 const emptyForm: FormState = {
@@ -35,6 +38,9 @@ const emptyForm: FormState = {
   stock: '',
   description: '',
   images: [],
+  type: 'physique',
+  digital_file_url: '',
+  digital_access_instructions: '',
 };
 
 export function ProductForm() {
@@ -48,6 +54,7 @@ export function ProductForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingDigitalFile, setUploadingDigitalFile] = useState(false);
 
   // Load existing product from Supabase
   useEffect(() => {
@@ -55,19 +62,32 @@ export function ProductForm() {
     setLoading(true);
     supabase
       .from('products')
-      .select('name, category, price, stock, description, image_url')
+      .select('name, category, price, stock, description, image_url, type, digital_file_url, digital_access_instructions')
       .eq('id', id)
       .single()
       .then(({ data }) => {
         if (data) {
-          const p = data as { name: string; category: string; price: number; stock: number; description: string | null; image_url: string | null };
+          const p = data as {
+            name: string;
+            category: string;
+            price: number;
+            stock: number;
+            description: string | null;
+            image_url: string | null;
+            type: 'physique' | 'digital' | null;
+            digital_file_url: string | null;
+            digital_access_instructions: string | null;
+          };
           setForm({
             name: p.name,
             category: p.category,
             price: String(p.price),
-            stock: String(p.stock),
+            stock: p.type === 'digital' ? '999999' : String(p.stock),
             description: p.description ?? '',
             images: parseImageUrls(p.image_url),
+            type: p.type ?? 'physique',
+            digital_file_url: p.digital_file_url ?? '',
+            digital_access_instructions: p.digital_access_instructions ?? '',
           });
         }
         setLoading(false);
@@ -75,7 +95,13 @@ export function ProductForm() {
   }, [id, isEdit]);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'type' && value === 'digital') {
+        next.stock = '999999';
+      }
+      return next;
+    });
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -98,6 +124,28 @@ export function ProductForm() {
     if (errors.length > 0 && urls.length === 0) {
       haptic('error');
       toast({ title: 'Erreur d\'envoi', description: errors[0] || 'Impossible de télécharger les photos.' });
+    }
+  }
+
+  async function handleDigitalFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingDigitalFile(true);
+    haptic('medium');
+
+    const { urls, errors } = await uploadMultipleImagesToSupabase(files, 'digital-files');
+    setUploadingDigitalFile(false);
+
+    if (urls.length > 0) {
+      haptic('success');
+      setField('digital_file_url', urls[0]);
+      toast({
+        title: 'Fichier digital importé !',
+        description: 'Votre document / ressource est prêt pour le téléchargement automatique.',
+      });
+    } else if (errors.length > 0) {
+      haptic('error');
+      toast({ title: 'Erreur d\'envoi du fichier', description: errors[0] || 'Impossible d\'importer le fichier.' });
     }
   }
 
@@ -127,7 +175,7 @@ export function ProductForm() {
       return;
     }
     const price = Number(form.price);
-    const stock = Number(form.stock);
+    const stock = form.type === 'digital' ? 999999 : Number(form.stock);
     if (!form.name.trim() || isNaN(price) || price < 0 || isNaN(stock) || stock < 0) {
       haptic('error');
       toast({ title: 'Champs invalides', description: 'Vérifiez le nom, le prix et le stock.' });
@@ -187,6 +235,9 @@ export function ProductForm() {
       stock,
       description: form.description.trim(),
       image_url: imageUrlPayload,
+      type: form.type,
+      digital_file_url: form.digital_file_url.trim() || null,
+      digital_access_instructions: form.digital_access_instructions.trim() || null,
       status,
     };
 
@@ -244,11 +295,39 @@ export function ProductForm() {
         {/* Main form */}
         <Card>
           <form onSubmit={save} className="space-y-5">
+            {/* Product Type Switcher */}
+            <Field label="Type de produit">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-1.5 border border-[#ede9f5]">
+                <button
+                  type="button"
+                  onClick={() => setField('type', 'physique')}
+                  className={`rounded-xl py-2.5 px-3 text-xs font-bold transition ${
+                    form.type === 'physique'
+                      ? 'bg-white text-[#292541] shadow-xs'
+                      : 'text-[#807b98] hover:text-[#292541]'
+                  }`}
+                >
+                  📦 Produit Physique
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setField('type', 'digital')}
+                  className={`rounded-xl py-2.5 px-3 text-xs font-bold transition ${
+                    form.type === 'digital'
+                      ? 'bg-[#5b49e8] text-white shadow-xs'
+                      : 'text-[#807b98] hover:text-[#5b49e8]'
+                  }`}
+                >
+                  ⚡ Produit Digital (Ebook, Formation)
+                </button>
+              </div>
+            </Field>
+
             <Field label="Nom du produit">
-              <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="Ex. Coffret Soin Karité" className={inputClass} data-testid="input-name" />
+              <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder={form.type === 'digital' ? 'Ex. Guide E-commerce Sénégal (PDF)' : 'Ex. Coffret Soin Karité'} className={inputClass} data-testid="input-name" />
             </Field>
             <Field label="Description" hint="Visible par vos vendeurs et vos clients. Soyez clair et attractif.">
-              <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Décrivez le produit, ses bénéfices, sa matière première, son origine…" className={`${textareaClass} min-h-28`} data-testid="input-description" />
+              <textarea value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Décrivez le produit, ses bénéfices, son contenu…" className={`${textareaClass} min-h-28`} data-testid="input-description" />
             </Field>
             <Field label="Catégorie">
               <select value={form.category} onChange={(e) => setField('category', e.target.value)} className={selectClass} data-testid="input-category">
@@ -259,11 +338,73 @@ export function ProductForm() {
               <Field label="Prix (FCFA)">
                 <input type="number" min="0" value={form.price} onChange={(e) => setField('price', e.target.value)} placeholder="0" className={inputClass} data-testid="input-price" />
               </Field>
-              <Field label="Stock disponible">
-                <input type="number" min="0" value={form.stock} onChange={(e) => setField('stock', e.target.value)} placeholder="0" className={inputClass} data-testid="input-stock" />
+              <Field label="Stock disponible" hint={form.type === 'digital' ? 'Stock illimité pour les produits digitaux' : undefined}>
+                <input
+                  type="number"
+                  min="0"
+                  disabled={form.type === 'digital'}
+                  value={form.type === 'digital' ? '999999' : form.stock}
+                  onChange={(e) => setField('stock', e.target.value)}
+                  placeholder="0"
+                  className={`${inputClass} ${form.type === 'digital' ? 'bg-[#f4f3f9] text-[#77738a]' : ''}`}
+                  data-testid="input-stock"
+                />
               </Field>
             </div>
-            {form.stock !== '' && Number(form.stock) === 0 && (
+
+            {/* Digital Product Specific Fields */}
+            {form.type === 'digital' && (
+              <div className="space-y-4 rounded-2xl bg-[#f5f3ff] p-4 border border-[#e4ddff]">
+                <p className="text-xs font-bold text-[#5b49e8] uppercase tracking-wider">Configuration du Produit Digital</p>
+                <Field label="Fichier digital (PDF, EPUB, ZIP, MP3, MP4)" hint="Fichier téléchargé automatiquement par le client après paiement.">
+                  <div className="space-y-2">
+                    {form.digital_file_url ? (
+                      <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-[#d8cdff]">
+                        <span className="truncate text-xs font-bold text-[#292541]">{form.digital_file_url}</span>
+                        <button
+                          type="button"
+                          onClick={() => setField('digital_file_url', '')}
+                          className="text-xs font-bold text-[#c45667] hover:underline"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex h-20 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#c5b8ff] bg-white p-3 text-center transition hover:border-[#5b49e8]">
+                        <span className="text-xs font-bold text-[#5b49e8]">
+                          {uploadingDigitalFile ? 'Importation en cours…' : 'Déposer un fichier (PDF, ZIP, etc.)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.epub,.zip,.rar,.mp3,.mp4,.doc,.docx"
+                          className="hidden"
+                          onChange={handleDigitalFileSelect}
+                          disabled={uploadingDigitalFile}
+                        />
+                      </label>
+                    )}
+                    <input
+                      type="text"
+                      value={form.digital_file_url}
+                      onChange={(e) => setField('digital_file_url', e.target.value)}
+                      placeholder="Ou collez une URL de fichier direct (Drive, Dropbox, S3)…"
+                      className={inputClass}
+                    />
+                  </div>
+                </Field>
+
+                <Field label="Instructions ou lien d'accès additionnel (Optionnel)" hint="Ex: Lien d'invitation au groupe Telegram VIP, clé de licence ou lien Notion.">
+                  <textarea
+                    value={form.digital_access_instructions}
+                    onChange={(e) => setField('digital_access_instructions', e.target.value)}
+                    placeholder="Vos instructions d'accès qui seront transmises au client après paiement…"
+                    className={`${textareaClass} min-h-20`}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {form.type === 'physique' && form.stock !== '' && Number(form.stock) === 0 && (
               <p className="rounded-xl bg-[#fff4de] px-4 py-3 text-xs font-bold text-[#ac741e]">Ce produit sera marqué comme « Épuisé ».</p>
             )}
             <div className="flex justify-end gap-2 pt-2">

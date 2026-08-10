@@ -16,6 +16,9 @@ export type DiscoveryCampaign = {
   product_price: number | null;
   product_image_url: string | null;
   product_category: string | null;
+  product_type?: 'physique' | 'digital' | null;
+  digital_file_url?: string | null;
+  digital_access_instructions?: string | null;
   merchant_id: string;
   merchant_name: string;
   merchant_slug: string | null;
@@ -54,7 +57,7 @@ export function useSellerDiscovery() {
           .select(`
             id, name, description, commission, commission_type, model, goal,
             product_id, niche_id, merchant_id,
-            products:product_id (id, name, price, image_url, category),
+            products:product_id (id, name, price, image_url, category, type, digital_file_url, digital_access_instructions),
             merchants:merchant_id (id, name, slug),
             niches:niche_id (id, name)
           `)
@@ -62,7 +65,7 @@ export function useSellerDiscovery() {
         supabase
           .from('products')
           .select(`
-            id, name, price, image_url, category, description, merchant_id,
+            id, name, price, image_url, category, description, type, digital_file_url, digital_access_instructions, merchant_id,
             merchants:merchant_id (id, name, slug)
           `)
           .eq('status', 'actif'),
@@ -125,7 +128,7 @@ export function useSellerDiscovery() {
           commission: number; commission_type: string | null; model: string;
           goal: number | null; product_id: string | null; niche_id: string | null;
           merchant_id: string;
-          products: { id: string; name: string; price: number; image_url: string | null; category: string | null } | null;
+          products: { id: string; name: string; price: number; image_url: string | null; category: string | null; type?: 'physique' | 'digital' | null; digital_file_url?: string | null; digital_access_instructions?: string | null } | null;
           merchants: { id: string; name: string; slug: string | null } | null;
           niches: { id: string; name: string } | null;
         };
@@ -180,6 +183,9 @@ export function useSellerDiscovery() {
           product_price: c.products?.price ?? null,
           product_image_url: c.products?.image_url ?? null,
           product_category: c.products?.category ?? null,
+          product_type: c.products?.type ?? 'physique',
+          digital_file_url: c.products?.digital_file_url ?? null,
+          digital_access_instructions: c.products?.digital_access_instructions ?? null,
           merchant_id: c.merchant_id,
           merchant_name: c.merchants?.name ?? 'Boutique',
           merchant_slug: c.merchants?.slug ?? null,
@@ -235,6 +241,9 @@ export function useSellerDiscovery() {
             product_price: p.price,
             product_image_url: p.image_url,
             product_category: p.category,
+            product_type: p.type ?? 'physique',
+            digital_file_url: p.digital_file_url ?? null,
+            digital_access_instructions: p.digital_access_instructions ?? null,
             merchant_id: p.merchant_id,
             merchant_name: p.merchants?.name ?? 'Boutique',
             merchant_slug: p.merchants?.slug ?? null,

@@ -38,8 +38,8 @@ const filters = ['Tous', 'Actif', 'Brouillon', 'Épuisé'] as const;
 export function Products() {
   const { toast } = useToast();
   const { merchantId } = useMerchantId();
-  const { data: products, loading, refetch } = useSupabaseQuery<ProductRow>('products', {
-    select: 'id, name, category, price, stock, status, description, image_url',
+  const { data: products, loading, refetch } = useSupabaseQuery<ProductRow & { type?: string }>('products', {
+    select: 'id, name, category, price, stock, status, description, image_url, type',
     filter: { merchant_id: merchantId },
     order: { column: 'created_at', ascending: false },
     enabled: !!merchantId,
@@ -114,12 +114,15 @@ export function Products() {
                     )}
                     <div className="min-w-0">
                       <p className="truncate font-bold text-[#292541]">{p.name}</p>
-                      <div className="mt-0.5"><Badge tone={statusLabel === 'Actif' ? 'mint' : statusLabel === 'Épuisé' ? 'rose' : 'slate'}>{statusLabel}</Badge></div>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <Badge tone={statusLabel === 'Actif' ? 'mint' : statusLabel === 'Épuisé' ? 'rose' : 'slate'}>{statusLabel}</Badge>
+                        {p.type === 'digital' && <Badge tone="violet">⚡ Digital</Badge>}
+                      </div>
                     </div>
                   </div>
                   <span className="text-sm font-medium text-[#292541]">{p.category}</span>
                   <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(p.price)}</span>
-                  <span className="text-sm font-medium text-[#292541]">{p.stock}</span>
+                  <span className="text-sm font-medium text-[#292541]">{p.type === 'digital' ? '∞ Illimité' : p.stock}</span>
                   <div className="flex items-center justify-end gap-1.5">
                     <Link href="/merchant/campaigns/new"><Button variant="soft" testId={`campaign-${p.id}`}>Campagne +</Button></Link>
                     <Link href={`/merchant/products/${p.id}/edit`}><Button variant="ghost" testId={`edit-${p.id}`}><Icon glyph={Edit02Icon} size={15} /></Button></Link>

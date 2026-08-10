@@ -15,6 +15,7 @@ import {
   SmartPhone01Icon,
   UserGroupIcon,
   Alert01Icon,
+  SparklesIcon,
 } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +53,9 @@ type CampaignInfo = {
   product_price: number;
   product_image_url: string | null;
   product_description: string | null;
+  product_type?: 'physique' | 'digital' | null;
+  digital_file_url?: string | null;
+  digital_access_instructions?: string | null;
   merchant_id: string;
   merchant_name: string;
 };
@@ -71,6 +75,10 @@ type ConfirmedOrder = {
   paymentMethod: string;
   sellerCode: string | null;
   commissionAmount: number;
+  isDigital?: boolean;
+  digitalDownloadToken?: string | null;
+  digitalFileUrl?: string | null;
+  digitalAccessInstructions?: string | null;
 };
 
 /* ── Helpers ── */
@@ -179,7 +187,7 @@ export function Checkout() {
         .select(`
           id, name, commission, commission_type, model,
           product_id, merchant_id,
-          products:product_id (id, name, price, image_url, description),
+          products:product_id (id, name, price, image_url, description, type, digital_file_url, digital_access_instructions),
           merchants:merchant_id (id, name)
         `)
         .eq('id', id)
@@ -193,7 +201,7 @@ export function Checkout() {
       const c = raw as {
         id: string; name: string; commission: number; commission_type: string | null;
         model: string; product_id: string | null; merchant_id: string;
-        products: { id: string; name: string; price: number; image_url: string | null; description: string | null } | null;
+        products: { id: string; name: string; price: number; image_url: string | null; description: string | null; type?: 'physique' | 'digital' | null; digital_file_url?: string | null; digital_access_instructions?: string | null } | null;
         merchants: { id: string; name: string } | null;
       };
 
@@ -208,6 +216,9 @@ export function Checkout() {
         product_price: c.products?.price ?? 0,
         product_image_url: c.products?.image_url ?? null,
         product_description: c.products?.description ?? null,
+        product_type: c.products?.type ?? 'physique',
+        digital_file_url: c.products?.digital_file_url ?? null,
+        digital_access_instructions: c.products?.digital_access_instructions ?? null,
         merchant_id: c.merchant_id,
         merchant_name: c.merchants?.name ?? 'Boutique',
       });
@@ -502,9 +513,13 @@ export function Checkout() {
       };
     }
 
-    const serverTotal = serverCalc.total_amount;
+    const isDigital = campaign.product_type === 'digital';
+    const digitalDownloadToken = isDigital ? crypto.randomUUID().replace(/-/g, '') : null;
+    const digitalDownloadExpiresAt = isDigital ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null;
+
+    const serverTotal = isDigital ? serverCalc.subtotal : serverCalc.total_amount;
     const serverCommission = serverCalc.commission_amount;
-    const serverDeliveryFee = serverCalc.delivery_fee;
+    const serverDeliveryFee = isDigital ? 0 : serverCalc.delivery_fee;
     const serverMerchantAmount = serverCalc.merchant_amount;
     const serverPlatformFee = serverCalc.platform_fee_amount;
 
@@ -521,12 +536,12 @@ export function Checkout() {
         campaign_id: campaign.campaign_id,
         customer_name: form.customerName.trim(),
         customer_phone: form.phone.trim(),
-        customer_address: form.address.trim(),
+        customer_address: isDigital ? 'Produit Digital (Accès Instantané)' : form.address.trim(),
         total_amount: serverTotal,
         commission_amount: serverCommission,
-        status: 'a_preparer',
-        status_v2: 'created',
-        zone_name: form.zoneName || selectedZone?.name || null,
+        status: isDigital ? 'livree' : 'a_preparer',
+        status_v2: isDigital ? 'delivered' : 'created',
+        zone_name: isDigital ? 'Digital (Instant)' : (form.zoneName || selectedZone?.name || null),
         delivery_fee: serverDeliveryFee,
         payment_method: paymentMethodMap[form.paymentMethod],
         commission_model: serverCalc.model as 'commission' | 'marge',
@@ -538,6 +553,8 @@ export function Checkout() {
         platform_fee: serverPlatformFee,
         platform_fee_amount: serverPlatformFee,
         platform_fee_rate: serverCalc.platform_fee_rate,
+        digital_download_token: digitalDownloadToken,
+        digital_download_expires_at: digitalDownloadExpiresAt,
       });
 
     if (orderErr) {
@@ -551,7 +568,7 @@ export function Checkout() {
     trackEvent('order_created', {
       entityType: 'order',
       entityId: orderId,
-      metadata: { total: serverTotal, commission: serverCommission, seller_attributed: !!resolvedSellerId },
+      metadata: { total: serverTotal, commission: serverCommission, seller_attributed: !!resolvedSellerId, is_digital: isDigital },
     });
 
     // Insert order item
@@ -573,9 +590,9 @@ export function Checkout() {
           order_id: orderId,
           campaign_id: campaign.campaign_id,
           amount: serverCommission,
-          status: 'pending',
+          status: isDigital ? 'available' : 'pending',
           model: serverCalc.model || 'commission',
-          available_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          available_at: new Date().toISOString(),
         })
         .catch(() => {});
     }
@@ -588,7 +605,7 @@ export function Checkout() {
       productName: campaign.product_name,
       merchantName: campaign.merchant_name,
       quantity: form.quantity,
-      zone: form.zoneName || selectedZone?.name || '—',
+      zone: isDigital ? 'Digital (Instant)' : (form.zoneName || selectedZone?.name || '—'),
       deliveryFee: serverDeliveryFee,
       total: serverTotal,
       customerName: form.customerName.trim(),
@@ -596,6 +613,10 @@ export function Checkout() {
       paymentMethod: form.paymentMethod,
       sellerCode: resolvedSellerCode ?? null,
       commissionAmount: serverCommission,
+      isDigital,
+      digitalDownloadToken,
+      digitalFileUrl: campaign.digital_file_url ?? null,
+      digitalAccessInstructions: campaign.digital_access_instructions ?? null,
     });
     setStep('confirmation');
     toast({
@@ -842,8 +863,22 @@ export function Checkout() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <button onClick={() => { haptic('light'); prevStep(); }} className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#292541]" data-testid="button-back-product"><Icon glyph={ArrowLeft01Icon} size={16} /></button>
-                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">Livraison</h1>
+                <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">
+                  {campaign.product_type === 'digital' ? 'Vos coordonnées' : 'Livraison'}
+                </h1>
               </div>
+
+              {campaign.product_type === 'digital' && (
+                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4 border border-[#d8cdff]">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white">
+                    <Icon glyph={SparklesIcon} size={20} />
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-[#5b49e8]">Produit Digital · Accès Instantané</p>
+                    <p className="text-[11px] text-[#514b71] mt-0.5">Aucun frais de port. Votre fichier vous sera délivré directement après confirmation du paiement.</p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4 rounded-2xl bg-white p-5">
                 {/* Name */}
@@ -855,7 +890,7 @@ export function Checkout() {
 
                 {/* Phone */}
                 <div>
-                  <label className="text-xs font-bold text-[#292541]">Téléphone *</label>
+                  <label className="text-xs font-bold text-[#292541]">Téléphone (WhatsApp) *</label>
                   <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${errors.phone ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'}`}>
                     <Icon glyph={SmartPhone01Icon} size={16} />
                     <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]" data-testid="input-phone" />
@@ -863,40 +898,45 @@ export function Checkout() {
                   {errors.phone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.phone}</p>}
                 </div>
 
-                {/* Zone */}
-                <div>
-                  <label className="text-xs font-bold text-[#292541]">Zone de livraison *</label>
-                  <div className="mt-1.5 space-y-2">
-                    {zones.map((z) => (
-                      <button
-                        key={z.id}
-                        onClick={() => { haptic('light'); setField('zoneId', z.id); setField('zoneName', z.name); }}
-                        className={`flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition ${form.zoneId === z.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
-                        data-testid={`zone-${z.id}`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Icon glyph={MapPinIcon} size={16} />
-                          <span className="text-sm font-bold text-[#292541]">{z.name}</span>
-                        </span>
-                        <span className="text-xs font-bold text-[#278e69]">{money(z.fee)}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {errors.zone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.zone}</p>}
-                </div>
+                {/* Physical Delivery Fields (Only if not digital) */}
+                {campaign.product_type !== 'digital' && (
+                  <>
+                    {/* Zone */}
+                    <div>
+                      <label className="text-xs font-bold text-[#292541]">Zone de livraison *</label>
+                      <div className="mt-1.5 space-y-2">
+                        {zones.map((z) => (
+                          <button
+                            key={z.id}
+                            onClick={() => { haptic('light'); setField('zoneId', z.id); setField('zoneName', z.name); }}
+                            className={`flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition ${form.zoneId === z.id ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'}`}
+                            data-testid={`zone-${z.id}`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Icon glyph={MapPinIcon} size={16} />
+                              <span className="text-sm font-bold text-[#292541]">{z.name}</span>
+                            </span>
+                            <span className="text-xs font-bold text-[#278e69]">{money(z.fee)}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {errors.zone && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.zone}</p>}
+                    </div>
 
-                {/* Address */}
-                <div>
-                  <label className="text-xs font-bold text-[#292541]">Adresse précise *</label>
-                  <textarea value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Quartier, rue, repère, point de rencontre…" className={`mt-1.5 w-full min-h-24 resize-none rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${errors.address ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'} placeholder:text-[#b8b4c8]`} data-testid="input-address" />
-                  {errors.address && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.address}</p>}
-                </div>
+                    {/* Address */}
+                    <div>
+                      <label className="text-xs font-bold text-[#292541]">Adresse précise *</label>
+                      <textarea value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Quartier, rue, repère, point de rencontre…" className={`mt-1.5 w-full min-h-24 resize-none rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 ${errors.address ? 'ring-1 ring-[#ef6d78]' : 'focus:ring-[#5b49e8]'} placeholder:text-[#b8b4c8]`} data-testid="input-address" />
+                      {errors.address && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.address}</p>}
+                    </div>
 
-                {/* Note */}
-                <div>
-                  <label className="text-xs font-bold text-[#292541]">Note (optionnel)</label>
-                  <input value={form.note} onChange={(e) => setField('note', e.target.value)} placeholder="Ex. Appeler avant livraison" className="mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8] placeholder:text-[#b8b4c8]" data-testid="input-note" />
-                </div>
+                    {/* Note */}
+                    <div>
+                      <label className="text-xs font-bold text-[#292541]">Note (optionnel)</label>
+                      <input value={form.note} onChange={(e) => setField('note', e.target.value)} placeholder="Ex. Appeler avant livraison" className="mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none transition focus:bg-white focus:ring-1 focus:ring-[#5b49e8] placeholder:text-[#b8b4c8]" data-testid="input-note" />
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Summary */}
@@ -904,8 +944,8 @@ export function Checkout() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison {form.zoneName || '—'}</span><span className="font-bold text-[#292541]">{money(deliveryFee)}</span></div>
-                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(total)}</strong></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">Frais de livraison</span><span className="font-bold text-[#278e69]">{campaign.product_type === 'digital' ? '0 FCFA (Gratuit)' : money(deliveryFee)}</span></div>
+                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(campaign.product_type === 'digital' ? subtotal : total)}</strong></div>
                 </div>
               </div>
 
@@ -929,7 +969,7 @@ export function Checkout() {
                 {([
                   { id: 'wave' as const, label: 'Wave', desc: 'Paiement instantané via Wave' },
                   { id: 'orange' as const, label: 'Orange Money', desc: 'Transfert via Orange Money' },
-                  { id: 'cod' as const, label: 'Paiement à la livraison', desc: 'Payez en espèces à réception' },
+                  ...(campaign.product_type === 'digital' ? [] : [{ id: 'cod' as const, label: 'Paiement à la livraison', desc: 'Payez en espèces à réception' }]),
                 ]).map((m) => (
                   <button
                     key={m.id}
@@ -966,8 +1006,8 @@ export function Checkout() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Récapitulatif</p>
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-[#77738a]">{campaign.product_name} × {form.quantity}</span><span className="font-bold text-[#292541]">{money(subtotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#292541]">{money(deliveryFee)}</span></div>
-                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total à payer</span><strong className="font-[Space_Grotesk] text-xl font-bold text-[#5b49e8]">{money(total)}</strong></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#278e69]">{campaign.product_type === 'digital' ? '0 FCFA (Gratuit)' : money(deliveryFee)}</span></div>
+                  <div className="flex justify-between border-t border-[#e4e1ff] pt-2"><span className="font-bold text-[#292541]">Total à payer</span><strong className="font-[Space_Grotesk] text-xl font-bold text-[#5b49e8]">{money(campaign.product_type === 'digital' ? subtotal : total)}</strong></div>
                 </div>
               </div>
 
@@ -977,7 +1017,7 @@ export function Checkout() {
               </div>
 
               <button onClick={() => { haptic('success'); nextStep(); }} disabled={submitting} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7] disabled:opacity-60" data-testid="button-confirm-order">
-                {submitting ? 'Traitement…' : form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(total)}`}
+                {submitting ? 'Traitement…' : form.paymentMethod === 'cod' ? 'Confirmer la commande' : `Payer ${money(campaign.product_type === 'digital' ? subtotal : total)}`}
               </button>
             </div>
           )}
@@ -990,27 +1030,71 @@ export function Checkout() {
               </div>
               <div>
                 <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">Commande confirmée !</h1>
-                <p className="mt-2 text-sm text-[#77738a]">Merci {confirmedOrder.customerName}. Votre commande <strong className="text-[#292541]">{confirmedOrder.id}</strong> est en préparation.</p>
+                <p className="mt-2 text-sm text-[#77738a]">Merci {confirmedOrder.customerName}. Votre commande <strong className="text-[#292541]">{confirmedOrder.id}</strong> est validée.</p>
               </div>
+
+              {/* Digital Product Download Box */}
+              {confirmedOrder.isDigital && (
+                <div className="rounded-2xl bg-[#f5f3ff] p-5 text-left border-2 border-[#5b49e8]/30 space-y-3">
+                  <div className="flex items-center gap-2 text-[#5b49e8]">
+                    <Icon glyph={SparklesIcon} size={20} />
+                    <h3 className="font-[Space_Grotesk] text-base font-bold">Accès à votre Produit Digital</h3>
+                  </div>
+                  <p className="text-xs text-[#514b71]">
+                    Votre paiement a été validé avec succès. Vous pouvez accéder directement à votre ressource ci-dessous.
+                  </p>
+
+                  {confirmedOrder.digitalFileUrl && (
+                    <a
+                      href={confirmedOrder.digitalFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] py-3.5 px-4 text-sm font-bold text-white shadow-md hover:bg-[#4a3bc7] transition"
+                      data-testid="button-download-digital-file"
+                    >
+                      ⚡ Télécharger mon fichier (PDF / Ressource)
+                    </a>
+                  )}
+
+                  {confirmedOrder.digitalAccessInstructions && (
+                    <div className="rounded-xl bg-white p-3.5 text-xs text-[#292541] border border-[#e4ddff] space-y-1">
+                      <p className="font-bold text-[#5b49e8]">Instructions d'accès :</p>
+                      <p className="whitespace-pre-line text-[#514b71]">{confirmedOrder.digitalAccessInstructions}</p>
+                    </div>
+                  )}
+
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Bonjour ! Voici l'accès à ma commande ${confirmedOrder.productName} : ${confirmedOrder.digitalFileUrl ?? ''}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25d366] py-2.5 px-4 text-xs font-bold text-white transition hover:bg-[#20ba5a]"
+                  >
+                    Envoyer le lien sur mon WhatsApp
+                  </a>
+                </div>
+              )}
 
               <div className="rounded-2xl bg-white p-5 text-left">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Détails de la commande</p>
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-[#77738a]">Produit</span><span className="font-bold text-[#292541]">{confirmedOrder.productName} × {confirmedOrder.quantity}</span></div>
-                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#292541]">{confirmedOrder.zone} · {money(confirmedOrder.deliveryFee)}</span></div>
+                  <div className="flex justify-between"><span className="text-[#77738a]">Livraison</span><span className="font-bold text-[#278e69]">{confirmedOrder.isDigital ? 'Accès Instantané (0 F)' : `${confirmedOrder.zone} · ${money(confirmedOrder.deliveryFee)}`}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Paiement</span><span className="font-bold text-[#292541]">{confirmedOrder.paymentMethod === 'wave' ? 'Wave' : confirmedOrder.paymentMethod === 'orange' ? 'Orange Money' : 'À la livraison'}</span></div>
                   <div className="flex justify-between border-t border-[#f0eff5] pt-3"><span className="font-bold text-[#292541]">Total</span><strong className="font-[Space_Grotesk] text-lg font-bold text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-[#fff4de] p-4 text-left">
-                <p className="text-xs font-bold text-[#ac741e]">Prochaines étapes</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#77738a]">
-                  <li className="flex items-center gap-2"><Icon glyph={Store01Icon} size={14} /> {confirmedOrder.merchantName} prépare votre commande</li>
-                  <li className="flex items-center gap-2"><Icon glyph={DeliveryTruck01Icon} size={14} /> Livraison vers {confirmedOrder.zone}</li>
-                  <li className="flex items-center gap-2"><Icon glyph={SmartPhone01Icon} size={14} /> Vous recevrez un SMS au {confirmedOrder.phone}</li>
-                </ul>
-              </div>
+              {!confirmedOrder.isDigital && (
+                <div className="rounded-2xl bg-[#fff4de] p-4 text-left">
+                  <p className="text-xs font-bold text-[#ac741e]">Prochaines étapes</p>
+                  <ul className="mt-2 space-y-1.5 text-xs text-[#77738a]">
+                    <li className="flex items-center gap-2"><Icon glyph={Store01Icon} size={14} /> {confirmedOrder.merchantName} prépare votre commande</li>
+                    <li className="flex items-center gap-2"><Icon glyph={DeliveryTruck01Icon} size={14} /> Livraison vers {confirmedOrder.zone}</li>
+                    <li className="flex items-center gap-2"><Icon glyph={SmartPhone01Icon} size={14} /> Vous recevrez un SMS au {confirmedOrder.phone}</li>
+                  </ul>
+                </div>
+              )}
 
               <Link href="/" className="inline-block w-full rounded-2xl bg-[#5b49e8] py-4 text-center text-sm font-bold text-white transition hover:bg-[#4a3bc7]" data-testid="link-back-home">
                 Retour à l'accueil

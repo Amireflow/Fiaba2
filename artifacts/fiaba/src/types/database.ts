@@ -164,6 +164,9 @@ export interface Database {
           price: number;
           stock: number;
           image_url: string | null;
+          type: 'physique' | 'digital';
+          digital_file_url: string | null;
+          digital_access_instructions: string | null;
           status: ProductStatus;
           created_at: string;
           updated_at: string;
@@ -177,6 +180,9 @@ export interface Database {
           price: number;
           stock?: number;
           image_url?: string | null;
+          type?: 'physique' | 'digital';
+          digital_file_url?: string | null;
+          digital_access_instructions?: string | null;
           status?: ProductStatus;
         };
         Update: {
@@ -188,6 +194,9 @@ export interface Database {
           price?: number;
           stock?: number;
           image_url?: string | null;
+          type?: 'physique' | 'digital';
+          digital_file_url?: string | null;
+          digital_access_instructions?: string | null;
           status?: ProductStatus;
         };
       };
@@ -283,6 +292,9 @@ export interface Database {
           commission_rate: number | null;
           snapshot_product_price: number | null;
           snapshot_commission_amount: number | null;
+          digital_download_token: string | null;
+          digital_download_count: number;
+          digital_download_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -310,6 +322,9 @@ export interface Database {
           commission_rate?: number | null;
           snapshot_product_price?: number | null;
           snapshot_commission_amount?: number | null;
+          digital_download_token?: string | null;
+          digital_download_count?: number;
+          digital_download_expires_at?: string | null;
         };
         Update: {
           id?: string;
@@ -335,6 +350,9 @@ export interface Database {
           commission_rate?: number | null;
           snapshot_product_price?: number | null;
           snapshot_commission_amount?: number | null;
+          digital_download_token?: string | null;
+          digital_download_count?: number;
+          digital_download_expires_at?: string | null;
         };
       };
       order_items: {

@@ -4,6 +4,8 @@ export type OrderStatus = 'À préparer' | 'En livraison' | 'Livrée' | 'Annulé
 export type CommissionType = 'percentage' | 'fixed';
 export type CommissionModel = 'Commission' | 'Marge';
 
+export type ProductType = 'physique' | 'digital';
+
 export type Product = {
   id: string;
   name: string;
@@ -15,6 +17,9 @@ export type Product = {
   image?: string;
   weight?: number; // en grammes
   lowStockThreshold?: number;
+  type?: ProductType;
+  digitalFileUrl?: string;
+  digitalAccessInstructions?: string;
 };
 
 export type Campaign = {
@@ -52,6 +57,9 @@ export type Order = {
   commissionAmount?: number;
   platformFeeAmount?: number;
   platformFeeRate?: number;
+  digitalDownloadToken?: string;
+  digitalDownloadCount?: number;
+  digitalDownloadExpiresAt?: string;
 };
 
 export type DeliveryZone = [name: string, active: boolean, fee: number];

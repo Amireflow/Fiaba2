@@ -32,6 +32,7 @@ const potentialFromScore = (score: number): 'Fort' | 'Bon' | 'Moyen' =>
 
 type SortOption = 'matching' | 'gain_desc' | 'price_asc' | 'price_desc';
 type ModelFilter = 'tous' | 'commission' | 'marge';
+type FormatFilter = 'tous' | 'physique' | 'digital';
 
 export function Discover() {
   const { profile } = useAuth();
@@ -40,6 +41,7 @@ export function Discover() {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('Tous');
   const [modelFilter, setModelFilter] = useState<ModelFilter>('tous');
+  const [formatFilter, setFormatFilter] = useState<FormatFilter>('tous');
   const [sortBy, setSortBy] = useState<SortOption>('matching');
   const [joining, setJoining] = useState<string | null>(null);
 
@@ -73,6 +75,10 @@ export function Discover() {
         modelFilter === 'tous' ||
         (modelFilter === 'commission' && c.model === 'commission') ||
         (modelFilter === 'marge' && c.model === 'marge');
+      const matchesFormat =
+        formatFilter === 'tous' ||
+        (formatFilter === 'physique' && c.product_type !== 'digital') ||
+        (formatFilter === 'digital' && c.product_type === 'digital');
 
       const q = query.trim().toLowerCase();
       const matchesQuery =
@@ -82,7 +88,7 @@ export function Discover() {
         (c.product_category?.toLowerCase().includes(q) ?? false) ||
         (c.niche_name?.toLowerCase().includes(q) ?? false);
 
-      return matchesCategory && matchesModel && matchesQuery;
+      return matchesCategory && matchesModel && matchesFormat && matchesQuery;
     });
 
     return list.sort((a, b) => {
@@ -91,7 +97,7 @@ export function Discover() {
       if (sortBy === 'price_desc') return (b.product_price ?? 0) - (a.product_price ?? 0);
       return b.match_score - a.match_score;
     });
-  }, [campaigns, categoryFilter, modelFilter, query, sortBy]);
+  }, [campaigns, categoryFilter, modelFilter, formatFilter, query, sortBy]);
 
   const recommended = useMemo(() => filteredAndSorted.filter((c) => c.match_score >= 80), [filteredAndSorted]);
   const topGains = useMemo(() => filteredAndSorted.filter((c) => getNetGain(c) >= 2000), [filteredAndSorted]);
@@ -161,6 +167,18 @@ export function Discover() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Format filter */}
+          <select
+            value={formatFilter}
+            onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
+            className={sellerSelectClass}
+            data-testid="select-format-filter"
+          >
+            <option value="tous">Tous les formats</option>
+            <option value="physique">📦 Produits Physiques</option>
+            <option value="digital">⚡ Produits Digitaux</option>
+          </select>
+
           {/* Rémunération filter */}
           <select
             value={modelFilter}
@@ -240,6 +258,7 @@ export function Discover() {
                   setQuery('');
                   setCategoryFilter('Tous');
                   setModelFilter('tous');
+                  setFormatFilter('tous');
                 }}
               >
                 Réinitialiser les filtres
@@ -297,6 +316,7 @@ export function Discover() {
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <PotentialBadge potential={potential} />
+                          {c.product_type === 'digital' && <SellerBadge tone="mint">⚡ Digital · Instantané</SellerBadge>}
                           {c.niche_name && <SellerBadge tone="violet">{c.niche_name}</SellerBadge>}
                         </div>
 

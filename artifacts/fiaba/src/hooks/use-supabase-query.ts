@@ -149,17 +149,25 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
   if (cachedMerchantId) return cachedMerchantId;
 
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const { data: userData } = await supabase.auth.getUser();
+    let userId = userData.user?.id;
+    if (!userId) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      userId = sessionData.session?.user?.id;
+    }
     if (!userId) return null;
 
-    const { data: merch } = await (supabase.from('merchants') as any)
+    // 1. Chercher la boutique existante
+    const { data: merchRows } = await (supabase.from('merchants') as any)
       .select('id')
       .eq('owner_id', userId)
-      .maybeSingle();
+      .limit(1);
 
-    if (merch?.id) return merch.id;
+    if (merchRows && merchRows.length > 0) {
+      return merchRows[0].id;
+    }
 
+    // 2. Chercher les infos de profil
     const { data: prof } = await (supabase.from('profiles') as any)
       .select('full_name, phone, email')
       .eq('id', userId)
@@ -174,19 +182,30 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
     if (!cleanShopName) cleanShopName = 'Ma Boutique';
 
     const slugName = cleanShopName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const uniqueSlug = `${slugName}-${userId.slice(0, 6)}-${Date.now().toString(36).slice(-4)}`;
 
+    // 3. Créer automatiquement la boutique
     const { data: newMerch } = await (supabase.from('merchants') as any)
       .insert({
         owner_id: userId,
         name: cleanShopName,
-        slug: `${slugName}-${userId.slice(0, 6)}`,
+        slug: uniqueSlug,
         phone: prof?.phone || null,
         email: prof?.email || null,
+        is_active: true,
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
-    return newMerch?.id ?? null;
+    if (newMerch?.id) return newMerch.id;
+
+    // Fallback de sécurité
+    const { data: fallbackMerch } = await (supabase.from('merchants') as any)
+      .select('id')
+      .eq('owner_id', userId)
+      .limit(1);
+
+    return fallbackMerch?.[0]?.id ?? null;
   } catch (err) {
     console.error('getOrCreateMerchantId error:', err);
     return null;

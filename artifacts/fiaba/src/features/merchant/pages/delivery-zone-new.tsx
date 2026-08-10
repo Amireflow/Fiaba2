@@ -46,7 +46,8 @@ export function DeliveryZoneNew() {
     e.preventDefault();
     const activeMerchantId = await getOrCreateMerchantId(merchantId);
     if (!activeMerchantId) {
-      toast({ title: 'Erreur', description: 'Impossible de trouver votre boutique.' });
+      haptic('error');
+      toast({ title: 'Boutique introuvable', description: 'Impossible d\'identifier votre boutique. Veuillez rafraîchir la page.' });
       return;
     }
     const trimmedName = name.trim();

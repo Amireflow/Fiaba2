@@ -44,7 +44,7 @@ import NotFound from "@/pages/not-found";
 import { AdminRouter } from "@/features/admin/admin-router";
 import { MerchantRouter } from "@/features/merchant/merchant-router";
 import { SellerRouter } from "@/features/seller/seller-router";
-import { Checkout } from "@/features/shop/pages/checkout";
+import { CheckoutDispatcher } from "@/features/shop/pages/checkout-dispatcher";
 import { ProductLinkRedirect } from "@/features/shop/pages/product-link-redirect";
 import { Onboarding } from "@/features/merchant/pages/onboarding";
 import { SellerOnboarding } from "@/features/seller/pages/onboarding";
@@ -1309,7 +1309,7 @@ function Router() {
         <Route path="/seller/onboarding" component={SellerOnboarding} />
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/checkout/:id" component={Checkout} />
+        <Route path="/checkout/:id" component={CheckoutDispatcher} />
         <Route path="/p/:id" component={ProductLinkRedirect} />
         <Route path="/merchant/*?" component={MerchantRouter} />
         <Route path="/seller/*?" component={SellerRouter} />

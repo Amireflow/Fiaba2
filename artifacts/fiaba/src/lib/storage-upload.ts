@@ -108,6 +108,11 @@ export function parseImageUrls(rawImageUrl: string | null | undefined): string[]
   const trimmed = rawImageUrl.trim();
   if (!trimmed) return [];
 
+  // Une data URL contient des virgules dans son payload base64 : ne jamais la découper.
+  if (trimmed.startsWith('data:')) {
+    return isSupportedImageUrl(trimmed) ? [trimmed] : [];
+  }
+
   let list: string[] = [];
   if (trimmed.startsWith('[')) {
     try {

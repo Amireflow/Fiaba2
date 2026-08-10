@@ -22,7 +22,15 @@ export function SellerShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobile, setMobile] = useState(false);
   const { toast } = useToast();
-  const { signOut } = useAuth();
+  const { signOut, profile, seller } = useAuth();
+
+  const displayName = seller?.display_name || profile?.full_name || 'Vendeur';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
 
   const handleSignOut = async () => {
     await signOut();
@@ -87,7 +95,7 @@ export function SellerShell({ children }: { children: ReactNode }) {
           </div>
           <div className="hidden lg:block">
             <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8b88a0]">Espace vendeur</p>
-            <p className="mt-1 text-sm font-bold text-[#38324f]">Marième Fall</p>
+            <p className="mt-1 text-sm font-bold text-[#38324f]">{displayName}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -100,7 +108,7 @@ export function SellerShell({ children }: { children: ReactNode }) {
               <i className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#ef6d78]" />
             </button>
           </Link>
-          <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-seller-initials">MF</span>
+          <span className="ml-1 grid h-9 w-9 place-items-center rounded-full bg-[#dfdbff] text-xs font-bold text-[#5140d4]" data-testid="text-seller-initials">{initials}</span>
         </div>
       </header>
 

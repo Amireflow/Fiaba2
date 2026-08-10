@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Store01Icon } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from './icon';
+import { getFirstImageUrl, isSupportedImageUrl } from '@/lib/storage-upload';
 
 interface SafeImageProps {
   src: string | null | undefined;
@@ -23,16 +24,10 @@ export function SafeImage({
     setError(false);
   }, [src]);
 
-  const isValidUrl =
-    src &&
-    typeof src === 'string' &&
-    src.trim().length > 0 &&
-    (src.startsWith('http://') ||
-      src.startsWith('https://') ||
-      src.startsWith('data:image/') ||
-      src.startsWith('/'));
+  // Extract clean URL if src is a JSON array string like '["https://..."]' or raw string
+  const resolvedUrl = getFirstImageUrl(src) || (typeof src === 'string' && isSupportedImageUrl(src) ? src.trim() : null);
 
-  if (!isValidUrl || error) {
+  if (!resolvedUrl || error) {
     return (
       <span className={`grid place-items-center bg-[#efedff] text-[#5b49e8] ${className}`}>
         <Icon glyph={fallbackGlyph} size={iconSize} />
@@ -42,7 +37,7 @@ export function SafeImage({
 
   return (
     <img
-      src={src!}
+      src={resolvedUrl}
       alt={alt}
       className={className}
       onError={() => setError(true)}
@@ -50,3 +45,4 @@ export function SafeImage({
     />
   );
 }
+

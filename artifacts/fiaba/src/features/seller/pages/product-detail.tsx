@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useSellerDiscovery } from '@/hooks/use-seller-discovery';
 import { trackEvent } from '@/lib/analytics';
 import { getFirstImageUrl } from '@/lib/storage-upload';
+import { SafeImage } from '@/components/shared/safe-image';
 import {
   PotentialBadge,
   SellerBadge,
@@ -207,13 +208,13 @@ export function ProductDetail() {
 
         {/* Product visual + description */}
         <Card className="mt-4 overflow-hidden p-0 max-w-full">
-          {getFirstImageUrl(campaign.product_image_url) ? (
-            <img src={getFirstImageUrl(campaign.product_image_url)!} alt={campaign.product_name ?? ''} className="h-48 sm:h-64 w-full object-cover max-w-full" />
-          ) : (
-            <div className="grid h-48 sm:h-64 w-full place-items-center bg-[#f8f7fc]">
-              <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={36} /></span>
-            </div>
-          )}
+          <SafeImage
+            src={campaign.product_image_url}
+            alt={campaign.product_name ?? ''}
+            className="h-48 sm:h-64 w-full object-cover max-w-full"
+            fallbackGlyph={Store01Icon}
+            iconSize={36}
+          />
           <div className="p-4 sm:p-5 min-w-0 max-w-full">
             <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
               <PotentialBadge potential={potential} />

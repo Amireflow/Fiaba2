@@ -20,6 +20,7 @@ import { money, haptic, friendlyErrorMessage, formatShopName } from '@/lib/utils
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
 import { parseImageUrls } from '@/lib/storage-upload';
+import { SafeImage } from '@/components/shared/safe-image';
 import { trackEvent } from '@/lib/analytics';
 
 type Step = 'checkout' | 'access';
@@ -414,13 +415,13 @@ export function DigitalCheckout() {
             {/* Left Column: Product Showcase */}
             <div className="space-y-5">
               <div className="overflow-hidden rounded-3xl bg-white">
-                {primaryImage ? (
-                  <img src={primaryImage} alt={campaign.product_name} className="h-64 w-full object-cover" />
-                ) : (
-                  <div className="grid h-52 place-items-center bg-[#f5f3ff] text-[#5b49e8]">
-                    <Icon glyph={SparklesIcon} size={48} />
-                  </div>
-                )}
+                <SafeImage
+                  src={campaign.product_image_url}
+                  alt={campaign.product_name}
+                  className="h-64 w-full object-cover"
+                  fallbackGlyph={SparklesIcon}
+                  iconSize={48}
+                />
 
                 <div className="p-6">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7faf2] px-3 py-1 text-[11px] font-bold text-[#278e69]">

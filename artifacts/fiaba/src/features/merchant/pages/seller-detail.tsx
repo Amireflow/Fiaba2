@@ -56,21 +56,40 @@ export function SellerDetail() {
 
   useEffect(() => {
     async function loadData() {
-      if (!id || !merchantId) {
+      if (!id) {
         setLoading(false);
         return;
       }
 
-      // Fetch seller (verify it belongs to this merchant via RLS)
-      const { data: sellerRow } = await supabase
+      // Fetch seller by ID or profile_id
+      let { data: sellerRow } = await supabase
         .from('sellers')
         .select('id, display_name, status, followers, phone, joined_at, invited_at, profile_id, merchant_id')
         .eq('id', id)
         .maybeSingle();
 
-      const row = sellerRow as { id: string; display_name: string; status: string; followers: number; phone: string | null; joined_at: string | null; invited_at: string; profile_id: string | null; merchant_id: string } | null;
+      if (!sellerRow) {
+        const { data: altRow } = await supabase
+          .from('sellers')
+          .select('id, display_name, status, followers, phone, joined_at, invited_at, profile_id, merchant_id')
+          .eq('profile_id', id)
+          .maybeSingle();
+        sellerRow = altRow;
+      }
 
-      if (!row || row.merchant_id !== merchantId) {
+      const row = sellerRow as {
+        id: string;
+        display_name: string;
+        status: string;
+        followers: number;
+        phone: string | null;
+        joined_at: string | null;
+        invited_at: string;
+        profile_id: string | null;
+        merchant_id: string | null;
+      } | null;
+
+      if (!row) {
         setSeller(null);
         setLoading(false);
         return;
@@ -91,7 +110,7 @@ export function SellerDetail() {
       const { data: commissions } = await supabase
         .from('commissions')
         .select('amount')
-        .eq('seller_id', id);
+        .eq('seller_id', row.id);
 
       const commissionRows = (commissions as { amount: number }[] | null) ?? [];
       const sales = commissionRows.length;

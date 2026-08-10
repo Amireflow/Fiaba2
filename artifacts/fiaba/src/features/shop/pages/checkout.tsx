@@ -450,9 +450,10 @@ export function Checkout() {
     }
 
     // ── Server-side calculation via RPC with local fallback ──
+    const qty = Math.max(1, Number(form.quantity) || 1);
     const { data: calc } = await (supabase.rpc as any)('calculate_order_total', {
       p_campaign_id: campaign.campaign_id,
-      p_quantity: form.quantity,
+      p_quantity: qty,
       p_zone_id: form.zoneId || null,
       p_seller_id: resolvedSellerId ?? null,
     });
@@ -478,9 +479,9 @@ export function Checkout() {
       // Robust Client Fallback if RPC fails or is unmigrated
       const selectedZone = zones.find((z) => z.id === form.zoneId);
       const fee = selectedZone ? selectedZone.fee : 0;
-      const sub = campaign.product_price * form.quantity;
+      const sub = campaign.product_price * qty;
       const comm = resolvedSellerId
-        ? (campaign.commission_type === 'fixed' ? campaign.commission * form.quantity : Math.round((sub * campaign.commission) / 100))
+        ? (campaign.commission_type === 'fixed' ? campaign.commission * qty : Math.round((sub * campaign.commission) / 100))
         : 0;
       const platformFee = Math.round(sub * 0.05);
 
@@ -559,8 +560,23 @@ export function Checkout() {
         product_id: campaign.product_id,
         product_name: campaign.product_name,
         unit_price: serverCalc.product_price,
-        quantity: form.quantity,
+        quantity: qty,
       } as never);
+    }
+
+    // Explicit commission entry insertion (idempotent fallback if trigger is delayed)
+    if (resolvedSellerId && serverCommission > 0) {
+      await (supabase.from('commissions') as any)
+        .insert({
+          seller_id: resolvedSellerId,
+          order_id: orderId,
+          campaign_id: campaign.campaign_id,
+          amount: serverCommission,
+          status: 'pending',
+          model: serverCalc.model || 'commission',
+          available_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .catch(() => {});
     }
 
     setSubmitting(false);

@@ -63,8 +63,7 @@ export function Overview() {
           .from('orders')
           .select('id, customer_name, total_amount, merchant_amount, commission_amount, status, created_at')
           .eq('merchant_id', merchantId)
-          .order('created_at', { ascending: false })
-          .limit(20),
+          .order('created_at', { ascending: false }),
         supabase
           .from('sellers')
           .select('id, status')
@@ -87,7 +86,7 @@ export function Overview() {
   // Compute stats
   const deliveredOrders = orders.filter((o) => o.status === 'livree');
   const pendingOrders = orders.filter((o) => o.status === 'a_preparer' || o.status === 'en_livraison');
-  const revenue = deliveredOrders.reduce((s, o) => s + o.total_amount, 0);
+  const revenue = deliveredOrders.reduce((s, o) => s + (o.merchant_amount ?? o.total_amount), 0);
   const commissionTotal = orders.reduce((s, o) => s + (o.commission_amount ?? 0), 0);
   const pendingSellers = sellers.filter((s) => s.status === 'invite').length;
   const activeCampaigns = campaigns.filter((c) => c.status === 'active').length;

@@ -679,7 +679,7 @@ function Home() {
             ) : (
               <>
                 <button
-                  className="rounded-full border border-[#d9d5e5] bg-white px-4 py-2 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition"
+                  className="rounded-full bg-[#f0eff5] px-4 py-2 text-xs font-bold text-[#443e62] hover:bg-[#e4e1ff] hover:text-[#5b49e8] transition"
                   onClick={() => { haptic('light'); setLocation("/sign-in"); }}
                   data-testid="button-login"
                 >
@@ -713,7 +713,7 @@ function Home() {
             ) : (
               <div className="mt-3 flex flex-col gap-2">
                 <button
-                  className="w-full rounded-full border border-[#d9d5e5] bg-white py-2.5 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition"
+                  className="w-full rounded-full bg-[#f0eff5] py-2.5 text-xs font-bold text-[#443e62] hover:bg-[#e4e1ff] hover:text-[#5b49e8] transition"
                   onClick={() => { haptic('light'); setLocation("/sign-in"); }}
                   data-testid="button-mobile-login"
                 >
@@ -749,18 +749,9 @@ function Home() {
                     Accéder à mon {dashboardLabel} {icon(ArrowUpRight01Icon, 17)}
                   </Button>
                 ) : (
-                  <div className="flex flex-wrap gap-3">
-                    <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
-                      Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
-                    </Button>
-                    <button
-                      className="rounded-full border border-[#d9d5e5] bg-white px-5 py-3 text-xs font-bold text-[#443e62] hover:bg-[#f0edf9] transition shadow-sm"
-                      onClick={() => { haptic('light'); setLocation("/sign-in"); }}
-                      data-testid="button-hero-login"
-                    >
-                      Connexion
-                    </button>
-                  </div>
+                  <Button onClick={() => setLocation("/sign-up")} testId="button-hero-start">
+                    Devenir créateur Fiaba {icon(ArrowUpRight01Icon, 17)}
+                  </Button>
                 )}
                 <a
                   href="#espace"

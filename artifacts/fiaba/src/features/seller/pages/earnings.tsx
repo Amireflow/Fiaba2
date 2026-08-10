@@ -27,6 +27,14 @@ type CommissionDbRow = {
   id: string;
   amount: number;
   status: string;
+  order_id: string | null;
+  created_at: string;
+};
+
+type OrderDbRow = {
+  id: string;
+  commission_amount: number;
+  status: string;
   created_at: string;
 };
 
@@ -41,21 +49,41 @@ export function Earnings() {
 
   // Fetch commissions
   const { data: rawCommissions, loading: loadingCommissions } = useSellerQuery<CommissionDbRow>('commissions', {
-    select: 'id, amount, status, created_at',
+    select: 'id, amount, status, order_id, created_at',
   });
 
-  // Compute balances
-  const availableBalance = rawCommissions
+  // Fetch orders directly to guarantee 100% accurate commission counts
+  const { data: rawOrders } = useSellerQuery<OrderDbRow>('orders', {
+    select: 'id, commission_amount, status, created_at',
+  });
+
+  // Set of order_ids already recorded in commissions table
+  const commOrderIds = new Set((rawCommissions ?? []).map((c) => c.order_id).filter(Boolean));
+
+  // Compute balances from commissions table
+  let availableBalance = (rawCommissions ?? [])
     .filter((c: CommissionDbRow) => c.status === 'available')
-    .reduce((acc: number, c: CommissionDbRow) => acc + c.amount, 0);
+    .reduce((acc: number, c: CommissionDbRow) => acc + (c.amount ?? 0), 0);
 
-  const pendingBalance = rawCommissions
+  let pendingBalance = (rawCommissions ?? [])
     .filter((c: CommissionDbRow) => c.status === 'pending')
-    .reduce((acc: number, c: CommissionDbRow) => acc + c.amount, 0);
+    .reduce((acc: number, c: CommissionDbRow) => acc + (c.amount ?? 0), 0);
 
-  const totalEarned = rawCommissions
+  let totalEarned = (rawCommissions ?? [])
     .filter((c: CommissionDbRow) => c.status === 'available' || c.status === 'paid')
-    .reduce((acc: number, c: CommissionDbRow) => acc + c.amount, 0);
+    .reduce((acc: number, c: CommissionDbRow) => acc + (c.amount ?? 0), 0);
+
+  // Add commissions from orders that are not yet in commissions table
+  (rawOrders ?? []).forEach((o: OrderDbRow) => {
+    if (!commOrderIds.has(o.id) && o.commission_amount > 0) {
+      if (o.status === 'livree') {
+        availableBalance += o.commission_amount;
+        totalEarned += o.commission_amount;
+      } else if (o.status === 'a_preparer' || o.status === 'en_livraison') {
+        pendingBalance += o.commission_amount;
+      }
+    }
+  });
 
   return (
     <Page

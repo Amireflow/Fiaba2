@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { ArrowDown01Icon, CheckmarkCircle02Icon, Search01Icon, Store01Icon, DeliveryTruck01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
@@ -28,7 +28,7 @@ type OrderRow = {
   payment_method: string | null;
   created_at: string;
   seller_id: string | null;
-  seller_code: string | null;
+  seller_username?: string | null;
 };
 
 type StatusFilter = 'Tous' | 'a_preparer' | 'en_livraison' | 'livree' | 'annulee';
@@ -53,40 +53,52 @@ export function Orders() {
   });
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('Tous');
-  const [sellerCodes, setSellerCodes] = useState<Map<string, string>>(new Map());
+  const [sellerUsernames, setSellerUsernames] = useState<Map<string, string>>(new Map());
 
-  // Fetch seller codes via tracking_links when orders change
+  // Fetch seller usernames (display_name) from sellers table when orders change
   useEffect(() => {
-    async function fetchSellerCodes() {
+    async function fetchSellerUsernames() {
       const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))] as string[];
       if (sellerIds.length === 0) return;
+
+      // 1. Fetch display_name from sellers
+      const { data: sellerRows } = await (supabase.from('sellers') as any)
+        .select('id, display_name')
+        .in('id', sellerIds);
+
+      // 2. Fetch tracking_links seller_code as fallback
       const { data: links } = await supabase
         .from('tracking_links')
         .select('seller_id, seller_code')
         .in('seller_id', sellerIds);
+
       const map = new Map<string, string>();
-      ((links as { seller_id: string; seller_code: string }[] | null) ?? []).forEach((l) => {
-        if (!map.has(l.seller_id)) map.set(l.seller_id, l.seller_code);
+      ((sellerRows as { id: string; display_name: string }[] | null) ?? []).forEach((s) => {
+        if (s.display_name) map.set(s.id, s.display_name);
       });
-      setSellerCodes(map);
+      ((links as { seller_id: string; seller_code: string }[] | null) ?? []).forEach((l) => {
+        if (!map.has(l.seller_id) && l.seller_code) map.set(l.seller_id, l.seller_code);
+      });
+
+      setSellerUsernames(map);
     }
-    fetchSellerCodes();
+    fetchSellerUsernames();
   }, [orders]);
 
-  // Enrich orders with seller codes
-  const ordersWithCodes = orders.map((o) => ({
+  // Enrich orders with seller usernames
+  const ordersWithUsernames = orders.map((o) => ({
     ...o,
-    seller_code: o.seller_id ? (sellerCodes.get(o.seller_id) ?? null) : null,
+    seller_username: o.seller_id ? (sellerUsernames.get(o.seller_id) ?? null) : null,
   }));
-  const filtered = ordersWithCodes.filter((o) => {
+  const filtered = ordersWithUsernames.filter((o) => {
     const matchesFilter = filter === 'Tous' || o.status === filter;
     const q = query.trim().toLowerCase();
-    const matchesQuery = q === '' || o.id.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q) || (o.seller_code?.toLowerCase().includes(q) ?? false);
+    const matchesQuery = q === '' || o.id.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q) || (o.seller_username?.toLowerCase().includes(q) ?? false);
     return matchesFilter && matchesQuery;
   });
 
   const statusCounts = statusKeys.reduce<Record<string, number>>((acc, s) => {
-    acc[s] = ordersWithCodes.filter((o) => o.status === s).length;
+    acc[s] = ordersWithUsernames.filter((o) => o.status === s).length;
     return acc;
   }, {});
 
@@ -155,7 +167,13 @@ export function Orders() {
                     <div className="min-w-0"><p className="truncate font-bold text-[#292541]">{shortId}</p><p className="text-xs text-[#9290a2]">{new Date(o.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div>
                   </div>
                   <span className="truncate text-sm font-medium text-[#292541]">{o.customer_name}</span>
-                  <span className="truncate text-xs font-bold text-[#5b49e8]">{o.seller_code ?? '—'}</span>
+                  {o.seller_id ? (
+                    <Link href={`/merchant/sellers/${o.seller_id}`} className="truncate text-xs font-bold text-[#5b49e8] hover:underline">
+                      {o.seller_username ?? '—'}
+                    </Link>
+                  ) : (
+                    <span className="truncate text-xs text-[#9290a2]">—</span>
+                  )}
                   <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(o.total_amount)}</span>
                   <Badge tone={cfg.tone}>{cfg.label}</Badge>
                   <div className="text-right">

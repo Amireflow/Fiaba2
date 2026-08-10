@@ -28,6 +28,7 @@ type OrderDetail = {
   created_at: string;
   seller_id: string | null;
   seller_code: string | null;
+  seller_username?: string | null;
   product_name: string | null;
   quantity: number | null;
 };
@@ -72,11 +73,22 @@ export function OrderDetail() {
         return;
       }
 
-      const o = rawOrder as Omit<OrderDetail, 'seller_code' | 'product_name' | 'quantity'>;
+      const o = rawOrder as Omit<OrderDetail, 'seller_code' | 'seller_username' | 'product_name' | 'quantity'>;
 
-      // Fetch seller code from tracking_links
+      // Fetch seller username (display_name) from sellers table
+      let sellerUsername: string | null = null;
       let sellerCode: string | null = null;
+
       if (o.seller_id) {
+        const { data: sRow } = await (supabase.from('sellers') as any)
+          .select('display_name')
+          .eq('id', o.seller_id)
+          .maybeSingle();
+
+        if (sRow?.display_name) {
+          sellerUsername = sRow.display_name;
+        }
+
         const { data: tl } = await supabase
           .from('tracking_links')
           .select('seller_code')
@@ -95,6 +107,7 @@ export function OrderDetail() {
       setOrder({
         ...o,
         seller_code: sellerCode,
+        seller_username: sellerUsername || sellerCode,
         product_name: firstItem?.product_name ?? null,
         quantity: firstItem?.quantity ?? null,
       });
@@ -200,13 +213,19 @@ export function OrderDetail() {
         </Card>
 
         {/* Seller attribution */}
-        {order.seller_code && (
+        {order.seller_username && (
           <Card>
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={UserGroupIcon} size={20} /></span>
               <div className="flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Vendeur référent</p>
-                <p className="mt-1 text-sm font-bold text-[#292541]">{order.seller_code}</p>
+                {order.seller_id ? (
+                  <Link href={`/merchant/sellers/${order.seller_id}`} className="mt-1 inline-block text-sm font-bold text-[#5b49e8] hover:underline">
+                    {order.seller_username}
+                  </Link>
+                ) : (
+                  <p className="mt-1 text-sm font-bold text-[#292541]">{order.seller_username}</p>
+                )}
               </div>
               {order.commission_amount > 0 && (
                 <div className="text-right">

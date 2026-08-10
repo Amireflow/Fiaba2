@@ -33,7 +33,7 @@ begin
       new.id,
       jsonb_build_object('order_id', new.id, 'status', new.status_v2, 'total', new.total_amount)
     );
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -58,7 +58,7 @@ begin
       new.id,
       jsonb_build_object('amount', new.amount, 'seller_id', new.seller_id)
     );
-  end if
+  end if;
   return new;
 end;
 $$;

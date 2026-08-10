@@ -169,8 +169,8 @@ export function Sales() {
   }, {});
 
   const totalCommission = orders
-    .filter((o) => commissionStatuses[o.id] === 'paid')
-    .reduce((s, o) => s + o.commission_amount, 0);
+    .filter((o) => o.status !== 'annulee' && commissionStatuses[o.id] !== 'reversed')
+    .reduce((s, o) => s + (o.commission_amount ?? 0), 0);
 
   return (
     <Page

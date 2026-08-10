@@ -67,7 +67,7 @@ begin
   if v_campaign.model = 'marge' and p_seller_price is not null then
     if p_seller_price < v_campaign.price then
       raise exception 'Seller price cannot be lower than merchant price (model marge)';
-    end if
+    end if;
     v_effective_price := p_seller_price;
   end if;
 
@@ -80,7 +80,7 @@ begin
     where dz.id = p_zone_id and dz.merchant_id = v_campaign.merchant_id and dz.is_active = true;
     if not found then
       v_zone_fee := 0;
-    end if
+    end if;
   end if;
 
   -- Determine platform fee rate from merchant's subscription plan
@@ -98,7 +98,7 @@ begin
     order by pfr.effective_from desc limit 1;
     if not found then
       v_platform_fee_rate := 5.00;
-    end if
+    end if;
   end if;
 
   v_platform_fee := round(v_subtotal * v_platform_fee_rate / 100);
@@ -111,20 +111,20 @@ begin
       v_commission := (p_seller_price - v_campaign.price) * p_quantity;
       if v_commission < 0 then
         v_commission := 0;
-      end if
+      end if;
     elsif v_campaign.commission_type = 'fixed' then
       v_commission := v_campaign.commission * p_quantity;
     else
       -- Percentage
       v_commission := round(v_subtotal * v_campaign.commission / 100);
-    end if
+    end if;
   end if;
 
   v_total := v_subtotal + v_zone_fee;
   v_merchant_amount := v_subtotal - v_commission - v_platform_fee;
   if v_merchant_amount < 0 then
     v_merchant_amount := 0;
-  end if
+  end if;
 
   return query select
     v_campaign.price,
@@ -172,8 +172,8 @@ begin
         coalesce(new.commission_model, 'commission'),
         v_available_at
       );
-    end if
-  end if
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -212,7 +212,7 @@ begin
         coalesce(new.platform_fee_amount, new.platform_fee, 0),
         'Commission plateforme — commande #' || new.id
       );
-    end if
+    end if;
 
     -- Annulation → écriture compensatoire
     if new.status_v2 in ('cancelled', 'refused', 'returned') then
@@ -224,8 +224,8 @@ begin
         -abs(new.commission_amount),
         'Annulation commission — commande #' || new.id
       );
-    end if
-  end if
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -256,7 +256,7 @@ begin
         new.fee_amount,
         'Frais de retrait — payout #' || new.id
       );
-    end if
+    end if;
     -- Écriture retrait
     insert into public.ledger_entries (seller_id, payout_id, entry_type, amount, description)
     values (
@@ -266,7 +266,7 @@ begin
       coalesce(new.net_amount, new.amount),
       'Retrait vendeur — payout #' || new.id
     );
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -333,14 +333,14 @@ begin
     if v_merchant_owner is not null then
       insert into public.notifications (user_id, type, title, body, link)
       values (v_merchant_owner, v_notif_type, v_title, v_body, '/merchant/orders');
-    end if
+    end if;
 
     -- Notify seller (if attributed and different from merchant)
     if v_seller_profile is not null and v_seller_profile is distinct from v_merchant_owner then
       insert into public.notifications (user_id, type, title, body, link)
       values (v_seller_profile, v_notif_type, v_title, v_body, '/seller/sales');
-    end if
-  end if
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -366,7 +366,7 @@ begin
   if v_merchant_owner is not null then
     insert into public.notifications (user_id, type, title, body, link)
     values (v_merchant_owner, 'commande', 'Nouvelle commande', 'Commande #' || new.id || ' — ' || new.customer_name, '/merchant/orders');
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -408,8 +408,8 @@ begin
     if v_seller_profile is not null then
       insert into public.notifications (user_id, type, title, body, link)
       values (v_seller_profile, 'paiement', v_title, v_body, '/seller/earnings');
-    end if
-  end if
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -438,7 +438,7 @@ begin
       new.id,
       jsonb_build_object('old_status', old.status_v2, 'new_status', new.status_v2, 'order_id', new.id)
     );
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -467,7 +467,7 @@ begin
       new.id,
       jsonb_build_object('old_status', old.status, 'new_status', new.status, 'amount', new.amount)
     );
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -496,7 +496,7 @@ begin
       new.id,
       jsonb_build_object('old_status', old.verification_status, 'new_status', new.verification_status, 'user_id', new.id)
     );
-  end if
+  end if;
   return new;
 end;
 $$;
@@ -536,8 +536,8 @@ begin
         'high',
         'new'
       );
-    end if
-  end if
+    end if;
+  end if;
 
   -- Check: volume anormal (plus de 10 commandes en 1h pour même marchand)
   select count(*) into v_count_1h
@@ -555,7 +555,7 @@ begin
       'medium',
       'new'
     );
-  end if
+  end if;
 
   return new;
 end;

@@ -75,6 +75,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      // If profile record was deleted but session is active, auto-provision a fresh profile record
+      if (!prof) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userObj = sessionData.session?.user;
+        if (userObj) {
+          const userRole = (userObj.user_metadata?.role as any) || 'vendeur';
+          const fullName = userObj.user_metadata?.full_name || userObj.email?.split('@')[0] || 'Utilisateur';
+
+          await (supabase.from('profiles') as any).upsert({
+            id: userId,
+            email: userObj.email,
+            full_name: fullName,
+            role: userRole,
+            city: 'Dakar',
+            verification_status: 'verified',
+            trust_score: 80,
+          });
+
+          const { data: freshProf } = await (supabase.from('profiles') as any)
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+
+          prof = freshProf as Profile;
+        }
+      }
+
       if (!prof) {
         setProfile(null);
         setMerchant(null);

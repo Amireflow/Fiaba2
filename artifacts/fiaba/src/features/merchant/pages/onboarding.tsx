@@ -37,7 +37,7 @@ const CHANNELS = [
 ];
 
 export function Onboarding() {
-  const { profile, merchant, seller, refetchProfile } = useAuth();
+  const { user, profile, merchant, seller, refetchProfile } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -61,8 +61,11 @@ export function Onboarding() {
       if (profile.full_name) setFullName(profile.full_name);
       if (profile.phone) setPhone(profile.phone);
       if (profile.city) setCity(profile.city);
+    } else if (user) {
+      if (user.user_metadata?.full_name) setFullName(user.user_metadata.full_name);
+      if (user.user_metadata?.role) setRole(user.user_metadata.role);
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const toggleChannel = (ch: string) => {
     haptic('light');
@@ -83,20 +86,24 @@ export function Onboarding() {
     haptic('medium');
 
     try {
-      if (profile?.id) {
-        // 1. Update Profile Location & Role
-        await (supabase.from('profiles') as any)
-          .update({
-            full_name: fullName || profile.full_name,
-            phone: phone || profile.phone,
-            city: city || 'Dakar',
-            role: role,
-          })
-          .eq('id', profile.id);
+      const activeUserId = profile?.id || user?.id;
+      const activeEmail = profile?.email || user?.email || null;
+
+      if (activeUserId) {
+        // 1. Upsert Profile Location & Role
+        await (supabase.from('profiles') as any).upsert({
+          id: activeUserId,
+          email: activeEmail,
+          full_name: fullName || profile?.full_name || 'Utilisateur Fiaba',
+          phone: phone || profile?.phone || null,
+          city: city || 'Dakar',
+          role: role,
+          verification_status: 'verified',
+        });
 
         // 2. If Merchant, ensure merchant record exists
         if (role === 'marchand') {
-          let cleanStoreName = (storeName || fullName || profile.full_name || 'Ma Boutique').trim();
+          let cleanStoreName = (storeName || fullName || profile?.full_name || 'Ma Boutique').trim();
           if (cleanStoreName.includes('(') && cleanStoreName.includes(')')) {
             const match = cleanStoreName.match(/\(([^)]+)\)/);
             if (match && match[1]) cleanStoreName = match[1].trim();
@@ -105,37 +112,38 @@ export function Onboarding() {
           if (!cleanStoreName) cleanStoreName = 'Ma Boutique';
 
           const slugName = cleanStoreName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          await (supabase.from('merchants') as any)
-            .upsert({
-              owner_id: profile.id,
-              name: cleanStoreName,
-              slug: `${slugName}-${profile.id.slice(0, 6)}`,
-              phone: phone || profile.phone || null,
-              email: profile.email || null,
-              city: city || 'Dakar',
-            });
+          const uniqueSlug = `${slugName}-${activeUserId.slice(0, 6)}-${Date.now().toString(36).slice(-4)}`;
+
+          await (supabase.from('merchants') as any).upsert({
+            owner_id: activeUserId,
+            name: cleanStoreName,
+            slug: uniqueSlug,
+            phone: phone || profile?.phone || null,
+            email: activeEmail,
+            city: city || 'Dakar',
+            is_active: true,
+          });
         }
 
         // 3. If Seller, ensure seller record exists
         if (role === 'vendeur') {
           const { data: sellRecord } = await (supabase.from('sellers') as any)
             .upsert({
-              profile_id: profile.id,
-              display_name: fullName || profile.full_name || 'Vendeur Fiaba',
-              phone: phone || profile.phone || null,
+              profile_id: activeUserId,
+              display_name: fullName || profile?.full_name || 'Vendeur Fiaba',
+              phone: phone || profile?.phone || null,
               status: 'actif',
             })
             .select()
-            .single();
+            .maybeSingle();
 
           const sellerId = sellRecord?.id;
           if (sellerId) {
-            await (supabase.from('seller_profiles') as any)
-              .upsert({
-                profile_id: profile.id,
-                city: city || 'Dakar',
-                audience_type: selectedChannels.join(', '),
-              });
+            await (supabase.from('seller_profiles') as any).upsert({
+              profile_id: activeUserId,
+              city: city || 'Dakar',
+              audience_type: selectedChannels.join(', '),
+            });
           }
         }
         await refetchProfile();

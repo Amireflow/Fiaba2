@@ -14,7 +14,7 @@ import {
   ViewOffIcon
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
-import { haptic } from '@/lib/utils';
+import { haptic, friendlyErrorMessage } from '@/lib/utils';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -42,7 +42,7 @@ function translateAuthError(msg: string): string {
   if (lower.includes('rate limit')) {
     return 'Trop de tentatives effectuées. Veuillez patienter un instant avant de réessayer.';
   }
-  return msg;
+  return friendlyErrorMessage(msg);
 }
 
 function AlertModal({

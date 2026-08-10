@@ -17,9 +17,10 @@ import {
 } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { money, haptic } from '@/lib/utils';
+import { money, haptic, friendlyErrorMessage } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
+import { parseImageUrls } from '@/lib/storage-upload';
 
 /* ── Types ── */
 
@@ -98,6 +99,7 @@ export function Checkout() {
   const { toast } = useToast();
 
   const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [zones, setZones] = useState<ZoneInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>('product');
@@ -184,63 +186,99 @@ export function Checkout() {
   // Parse and validate the tracking link token from URL on mount
   useEffect(() => {
     const token = extractTokenFromUrl(window.location.href);
-    if (!token) {
+    const params = new URLSearchParams(window.location.search);
+    const sellerParam = params.get('seller') || params.get('ref');
+
+    if (!token && !sellerParam) {
       setLinkStatus('none');
       return;
     }
     setLinkStatus('validating');
 
-    async function validateToken() {
-      // Look up tracking link by token
-      const { data: link } = await supabase
-        .from('tracking_links')
-        .select('id, seller_id, seller_code, campaign_id, is_active, expires_at, clicks')
-        .eq('token', token || '')
-        .single();
+    async function validateSellerAttribution() {
+      if (token) {
+        // Look up tracking link by token
+        const { data: link } = await supabase
+          .from('tracking_links')
+          .select('id, seller_id, seller_code, campaign_id, is_active, expires_at, clicks')
+          .eq('token', token || '')
+          .single();
 
-      const tl = link as { id: string; seller_id: string; seller_code: string; campaign_id: string; is_active: boolean; expires_at: string | null; clicks: number } | null;
+        const tl = link as { id: string; seller_id: string; seller_code: string; campaign_id: string; is_active: boolean; expires_at: string | null; clicks: number } | null;
 
-      if (!tl || !tl.is_active) {
-        setLinkStatus('invalid');
-        setLinkError('Lien non trouvé ou désactivé');
-        return;
+        if (!tl || !tl.is_active) {
+          setLinkStatus('invalid');
+          setLinkError('Lien non trouvé ou désactivé');
+          return;
+        }
+
+        // Check expiry
+        if (tl.expires_at && new Date(tl.expires_at) < new Date()) {
+          setLinkStatus('invalid');
+          setLinkError('Lien expiré');
+          return;
+        }
+
+        // Fetch seller display_name / username
+        let sellerUsername = tl.seller_code;
+        if (tl.seller_id) {
+          const { data: sRow } = await (supabase.from('sellers') as any)
+            .select('display_name')
+            .eq('id', tl.seller_id)
+            .maybeSingle();
+
+          if (sRow?.display_name) {
+            sellerUsername = sRow.display_name;
+          }
+        }
+
+        setSellerInfo({
+          sellerId: tl.seller_id,
+          sellerCode: sellerUsername,
+          campaignId: tl.campaign_id,
+          trackingLinkId: tl.id,
+        });
+        setForm((prev) => ({ ...prev, sellerCode: sellerUsername }));
+        setLinkStatus('valid');
+
+        // Track click
+        await supabase.from('clicks').insert({
+          tracking_link_id: tl.id,
+          user_agent: navigator.userAgent,
+          referrer: document.referrer || null,
+        } as never);
+
+        await (supabase.from('tracking_links') as any)
+          .update({ clicks: tl.clicks + 1 })
+          .eq('id', tl.id);
+      } else if (sellerParam) {
+        // Look up seller directly by ID or display_name
+        const { data: sRow } = await (supabase.from('sellers') as any)
+          .select('id, display_name')
+          .or(`id.eq.${sellerParam},display_name.ilike.${sellerParam}`)
+          .maybeSingle();
+
+        if (sRow) {
+          const username = sRow.display_name || sellerParam;
+          setSellerInfo({
+            sellerId: sRow.id,
+            sellerCode: username,
+            campaignId: id || '',
+            trackingLinkId: '',
+          });
+          setForm((prev) => ({ ...prev, sellerCode: username }));
+          setLinkStatus('valid');
+        } else {
+          setLinkStatus('none');
+        }
       }
-
-      // Check expiry
-      if (tl.expires_at && new Date(tl.expires_at) < new Date()) {
-        setLinkStatus('invalid');
-        setLinkError('Lien expiré');
-        return;
-      }
-
-      // Valid! Set seller info
-      setSellerInfo({
-        sellerId: tl.seller_id,
-        sellerCode: tl.seller_code,
-        campaignId: tl.campaign_id,
-        trackingLinkId: tl.id,
-      });
-      setForm((prev) => ({ ...prev, sellerCode: tl.seller_code }));
-      setLinkStatus('valid');
-
-      // Track the click: insert into clicks + increment tracking_links.clicks
-      await supabase.from('clicks').insert({
-        tracking_link_id: tl.id,
-        user_agent: navigator.userAgent,
-        referrer: document.referrer || null,
-      } as never);
-
-      await (supabase
-        .from('tracking_links') as any)
-        .update({ clicks: tl.clicks + 1 })
-        .eq('id', tl.id);
     }
 
-    validateToken().catch(() => {
+    validateSellerAttribution().catch(() => {
       setLinkStatus('invalid');
-      setLinkError('Erreur de validation du lien');
+      setLinkError('Erreur de validation de l\'ambassadeur');
     });
-  }, [location]);
+  }, [location, id]);
 
   if (loading) {
     return (
@@ -381,7 +419,7 @@ export function Checkout() {
     if (orderErr) {
       setSubmitting(false);
       haptic('error');
-      toast({ title: 'Erreur', description: orderErr.message });
+      toast({ title: 'Erreur de commande', description: friendlyErrorMessage(orderErr) });
       return;
     }
 
@@ -478,16 +516,45 @@ export function Checkout() {
               <h1 className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.03em] text-[#292541]">{campaign.product_name}</h1>
               <p className="text-sm text-[#77738a]">par <strong className="text-[#292541]">{campaign.merchant_name}</strong></p>
 
-              {/* Product image */}
-              <div className="overflow-hidden rounded-3xl bg-white">
-                {campaign.product_image_url ? (
-                  <img src={campaign.product_image_url} alt={campaign.product_name} className="h-64 w-full object-cover" />
-                ) : (
-                  <div className="grid h-64 w-full place-items-center bg-[#f8f7fc]">
-                    <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={36} /></span>
+              {/* Product image gallery */}
+              {(() => {
+                const images = parseImageUrls(campaign.product_image_url);
+                return (
+                  <div className="overflow-hidden rounded-3xl bg-white p-2 border border-[#f1effa]">
+                    {images.length > 0 ? (
+                      <div className="space-y-2">
+                        <img
+                          src={images[activeImageIndex] || images[0]}
+                          alt={campaign.product_name}
+                          className="h-64 w-full rounded-2xl object-cover"
+                        />
+                        {images.length > 1 && (
+                          <div className="flex gap-2 overflow-x-auto px-1 py-1 scrollbar-none">
+                            {images.map((img, idx) => (
+                              <button
+                                key={img + idx}
+                                type="button"
+                                onClick={() => { haptic('light'); setActiveImageIndex(idx); }}
+                                className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 transition ${
+                                  idx === activeImageIndex ? 'border-[#5b49e8]' : 'border-transparent opacity-70 hover:opacity-100'
+                                }`}
+                              >
+                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid h-64 w-full place-items-center bg-[#f8f7fc] rounded-2xl">
+                        <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                          <Icon glyph={Store01Icon} size={36} />
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Product description */}
               {campaign.product_description && (
@@ -535,13 +602,19 @@ export function Checkout() {
 
               {/* Seller attribution badge */}
               {linkStatus === 'valid' && sellerInfo && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4" data-testid="seller-attribution-badge">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#5b49e8] text-white"><Icon glyph={UserGroupIcon} size={20} /></span>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-[#292541]">Recommandé par {sellerInfo.sellerCode}</p>
-                    <p className="text-[10px] text-[#77738a]">Offre partagée par un ambassadeur partenaire vérifié.</p>
+                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4 border border-[#dfdbff]" data-testid="seller-attribution-badge">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-sm">
+                    {sellerInfo.sellerCode.replace(/^@/, '').slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-[#292541] truncate">
+                      Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode.startsWith('@') ? sellerInfo.sellerCode : `@${sellerInfo.sellerCode}`}</span>
+                    </p>
+                    <p className="text-[10px] text-[#77738a] truncate">Offre certifiée proposée par votre ambassadeur Fiaba.</p>
                   </div>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-[#278e69]"><Icon glyph={LockKeyIcon} size={12} /> Lien vérifié</span>
+                  <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#278e69]">
+                    <Icon glyph={LockKeyIcon} size={12} /> Partenaire certifié
+                  </span>
                 </div>
               )}
               {linkStatus === 'invalid' && (

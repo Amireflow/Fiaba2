@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ImageUploadIcon, Delete01Icon, StarIcon, Add01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useMerchantId, supabaseInsert, supabaseUpdate, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
-import { uploadImageToSupabase } from '@/lib/storage-upload';
+import { uploadMultipleImagesToSupabase, parseImageUrls } from '@/lib/storage-upload';
 import {
   Field,
   MerchantButton as Button,
@@ -25,7 +25,7 @@ type FormState = {
   price: string;
   stock: string;
   description: string;
-  image_url: string;
+  images: string[];
 };
 
 const emptyForm: FormState = {
@@ -34,7 +34,7 @@ const emptyForm: FormState = {
   price: '',
   stock: '',
   description: '',
-  image_url: '',
+  images: [],
 };
 
 export function ProductForm() {
@@ -67,7 +67,7 @@ export function ProductForm() {
             price: String(p.price),
             stock: String(p.stock),
             description: p.description ?? '',
-            image_url: p.image_url ?? '',
+            images: parseImageUrls(p.image_url),
           });
         }
         setLoading(false);
@@ -81,21 +81,41 @@ export function ProductForm() {
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files[0];
     setUploadingImage(true);
     haptic('medium');
 
-    const { url, error: uploadErr } = await uploadImageToSupabase(file, 'products');
+    const { urls, errors } = await uploadMultipleImagesToSupabase(files, 'products');
     setUploadingImage(false);
 
-    if (uploadErr || !url) {
-      haptic('error');
-      toast({ title: 'Erreur d\'envoi', description: uploadErr || 'Impossible de télécharger l\'image.' });
-    } else {
+    if (urls.length > 0) {
       haptic('success');
-      setField('image_url', url);
-      toast({ title: 'Image ajoutée !', description: 'L\'image a été téléchargée vers Supabase Storage.' });
+      setForm((prev) => ({ ...prev, images: [...prev.images, ...urls] }));
+      toast({
+        title: `${urls.length} photo${urls.length > 1 ? 's' : ''} ajoutée${urls.length > 1 ? 's' : ''} !`,
+        description: 'Vos photos ont été importées avec succès.',
+      });
     }
+    if (errors.length > 0 && urls.length === 0) {
+      haptic('error');
+      toast({ title: 'Erreur d\'envoi', description: errors[0] || 'Impossible de télécharger les photos.' });
+    }
+  }
+
+  function setPrimaryImage(index: number) {
+    haptic('light');
+    setForm((prev) => {
+      const newImages = [...prev.images];
+      const [selected] = newImages.splice(index, 1);
+      return { ...prev, images: [selected, ...newImages] };
+    });
+  }
+
+  function removeImage(index: number) {
+    haptic('light');
+    setForm((prev) => {
+      const newImages = prev.images.filter((_, i) => i !== index);
+      return { ...prev, images: newImages };
+    });
   }
 
   async function save(e: React.FormEvent) {
@@ -117,6 +137,14 @@ export function ProductForm() {
     setSaving(true);
     haptic('medium');
 
+    // Encode images: single string if 1, JSON array if multiple, null if 0
+    let imageUrlPayload: string | null = null;
+    if (form.images.length === 1) {
+      imageUrlPayload = form.images[0];
+    } else if (form.images.length > 1) {
+      imageUrlPayload = JSON.stringify(form.images);
+    }
+
     const status = stock > 0 ? 'actif' : 'epuise';
     const payload = {
       merchant_id: activeMerchantId,
@@ -125,7 +153,7 @@ export function ProductForm() {
       price,
       stock,
       description: form.description.trim(),
-      image_url: form.image_url.trim() || null,
+      image_url: imageUrlPayload,
       status,
     };
 
@@ -208,57 +236,108 @@ export function ProductForm() {
           </form>
         </Card>
 
-        {/* Upload Image & Preview */}
+        {/* Multi-Image Gallery Manager */}
         <div className="space-y-5">
           <Card>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Photo du produit</p>
-            <div className="mt-3">
-              {form.image_url ? (
-                <div className="relative overflow-hidden rounded-2xl border border-[#f1effa]">
-                  <img src={form.image_url} alt={form.name} className="h-48 w-full object-cover" />
-                  <div className="absolute right-2 top-2 flex gap-1.5">
-                    <label className="cursor-pointer rounded-lg bg-white/95 px-2.5 py-1 text-[10px] font-bold text-[#5b49e8] shadow-sm hover:bg-white transition">
-                      Changer
-                      <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingImage} />
-                    </label>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Photos du produit ({form.images.length})</p>
+              {form.images.length > 0 && (
+                <label className="cursor-pointer text-xs font-bold text-[#5b49e8] hover:underline flex items-center gap-1">
+                  <Icon glyph={Add01Icon} size={14} /> Ajouter des photos
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} disabled={uploadingImage} />
+                </label>
+              )}
+            </div>
+
+            <div className="mt-3.5 space-y-3">
+              {uploadingImage && (
+                <div className="flex items-center justify-center gap-2 rounded-2xl bg-[#f6f5ff] p-4 text-xs font-bold text-[#5b49e8]">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
+                  <span>Importation de vos photos en cours…</span>
+                </div>
+              )}
+
+              {form.images.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Primary Photo */}
+                  <div className="relative overflow-hidden rounded-2xl border-2 border-[#5b49e8] bg-white">
+                    <img src={form.images[0]} alt={form.name} className="h-44 w-full object-cover" />
+                    <span className="absolute left-2 top-2 rounded-lg bg-[#5b49e8] px-2 py-0.5 text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
+                      <Icon glyph={StarIcon} size={10} /> Photo principale
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setField('image_url', '')}
-                      className="rounded-lg bg-white/95 px-2.5 py-1 text-[10px] font-bold text-[#c45667] shadow-sm hover:bg-white transition"
-                      data-testid="button-remove-image"
+                      onClick={() => removeImage(0)}
+                      className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg bg-white/95 text-[#c45667] shadow-sm hover:bg-white transition"
+                      title="Supprimer la photo"
                     >
-                      Retirer
+                      <Icon glyph={Delete01Icon} size={14} />
                     </button>
                   </div>
-                </div>
-              ) : (
-                <label className="flex h-48 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8d5e8] bg-[#f8f7fc] p-4 text-center transition hover:border-[#5b49e8] hover:bg-[#efedff]/40">
-                  {uploadingImage ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
-                      <p className="text-xs font-bold text-[#5b49e8]">Envoi vers Supabase Storage…</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-[#77738a]">
-                      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
-                        <Icon glyph={ImageUploadIcon} size={24} />
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-[#292541]">Télécharger une photo</p>
-                        <p className="text-[10px] text-[#9290a2] mt-0.5">Glissez ou cliquez pour importer</p>
-                      </div>
+
+                  {/* Secondary Photos Grid */}
+                  {form.images.length > 1 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {form.images.slice(1).map((imgUrl, idx) => {
+                        const actualIdx = idx + 1;
+                        return (
+                          <div key={imgUrl + actualIdx} className="group relative overflow-hidden rounded-xl border border-[#e9e6f1] bg-white">
+                            <img src={imgUrl} alt={`${form.name} ${actualIdx}`} className="h-20 w-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setPrimaryImage(actualIdx)}
+                                className="grid h-6 w-6 place-items-center rounded-md bg-white text-[#5b49e8] shadow"
+                                title="Définir comme principale"
+                              >
+                                <Icon glyph={StarIcon} size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeImage(actualIdx)}
+                                className="grid h-6 w-6 place-items-center rounded-md bg-white text-[#c45667] shadow"
+                                title="Supprimer"
+                              >
+                                <Icon glyph={Delete01Icon} size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} disabled={uploadingImage} data-testid="input-image-file" />
+                </div>
+              ) : (
+                <label className="flex h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8d5e8] bg-[#f8f7fc] p-4 text-center transition hover:border-[#5b49e8] hover:bg-[#efedff]/40">
+                  <div className="flex flex-col items-center gap-2 text-[#77738a]">
+                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                      <Icon glyph={ImageUploadIcon} size={24} />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-[#292541]">Télécharger des photos</p>
+                      <p className="text-[10px] text-[#9290a2] mt-0.5">Sélectionnez une ou plusieurs photos</p>
+                    </div>
+                  </div>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} disabled={uploadingImage} data-testid="input-image-file" />
                 </label>
               )}
             </div>
           </Card>
 
+          {/* Preview Card */}
           <Card>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu fiche produit</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu de la fiche produit</p>
             <div className="mt-3">
-              {form.image_url && <img src={form.image_url} alt={form.name} className="h-32 w-full rounded-xl object-cover" />}
+              {form.images.length > 0 && (
+                <div className="relative">
+                  <img src={form.images[0]} alt={form.name} className="h-36 w-full rounded-xl object-cover" />
+                  {form.images.length > 1 && (
+                    <span className="absolute bottom-2 right-2 rounded-lg bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                      +{form.images.length - 1} photo{form.images.length > 2 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              )}
               <h3 className="mt-3 font-[Space_Grotesk] text-base font-bold text-[#292541]">{form.name || 'Nom du produit'}</h3>
               <p className="mt-1 text-xs leading-4 text-[#77738a] line-clamp-2">{form.description || 'La description apparaîtra ici.'}</p>
               <div className="mt-3 flex items-center justify-between">

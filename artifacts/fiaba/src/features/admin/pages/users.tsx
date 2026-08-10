@@ -116,7 +116,7 @@ export function AdminUsers() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs font-bold text-[#8b88a0]">Chargement des profils Supabase...</div>
+          <div className="p-8 text-center text-xs font-bold text-[#8b88a0]">Chargement des utilisateurs en cours...</div>
         ) : filtered.length === 0 ? (
           <AdminEmptyState glyph={UserGroupIcon} title="Aucun utilisateur trouvé" description="Aucun profil ne correspond à vos filtres actuels." />
         ) : (

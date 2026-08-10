@@ -80,7 +80,7 @@ export function SellerProfile() {
       await refetchProfile();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      toast({ title: 'Profil mis à jour !', description: 'Vos informations sont enregistrées dans Supabase.' });
+      toast({ title: 'Profil mis à jour !', description: 'Vos informations ont été enregistrées avec succès.' });
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Impossible de sauvegarder.' });
     } finally {

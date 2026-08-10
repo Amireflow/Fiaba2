@@ -43,6 +43,51 @@ export async function uploadImageToSupabase(
 }
 
 /**
+ * Upload multiple image files concurrently to Supabase Storage.
+ */
+export async function uploadMultipleImagesToSupabase(
+  files: FileList | File[],
+  bucketName = 'products'
+): Promise<{ urls: string[]; errors: string[] }> {
+  const fileArray = Array.from(files);
+  const results = await Promise.all(
+    fileArray.map((file) => uploadImageToSupabase(file, bucketName))
+  );
+
+  const urls: string[] = [];
+  const errors: string[] = [];
+
+  results.forEach((res) => {
+    if (res.url) urls.push(res.url);
+    if (res.error) errors.push(res.error);
+  });
+
+  return { urls, errors };
+}
+
+/**
+ * Helper to parse image_url field into an array of image URLs.
+ */
+export function parseImageUrls(rawImageUrl: string | null | undefined): string[] {
+  if (!rawImageUrl) return [];
+  const trimmed = rawImageUrl.trim();
+  if (!trimmed) return [];
+
+  // Try parsing JSON array
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.filter((u): u is string => typeof u === 'string' && u.length > 0);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Comma-separated or single string
+  return trimmed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/**
  * Fallback helper to convert an image file to a data URL string.
  */
 function uploadAsBase64(file: File): Promise<{ url: string | null; error: string | null }> {

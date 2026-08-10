@@ -61,7 +61,7 @@ export function Earnings() {
     <Page
       eyebrow="Votre rémunération"
       title="Revenus"
-      description="Vos commissions et marges réelles Supabase, prêtes à être retirées."
+      description="Vos commissions et gains réels, prêts à être retirés."
       action={<Link href="/seller/earnings/withdraw"><Button testId="button-request-payout">Demander un retrait</Button></Link>}
     >
       {/* Balance cards */}
@@ -102,7 +102,7 @@ export function Earnings() {
         </div>
 
         {loadingPayouts ? (
-          <div className="p-8 text-center text-xs font-bold text-[#8b88a0]">Chargement de vos retraits Supabase...</div>
+          <div className="p-8 text-center text-xs font-bold text-[#8b88a0]">Chargement de vos retraits en cours...</div>
         ) : rawPayouts.length === 0 ? (
           <div className="p-8 text-center text-xs text-[#8b88a0]">Aucune demande de retrait effectuée pour le moment.</div>
         ) : (

@@ -71,7 +71,7 @@ export function Settings() {
       await refetchProfile();
       setSavedSection(section);
       setTimeout(() => setSavedSection(null), 2000);
-      toast({ title: 'Modifications enregistrées', description: 'Vos informations sont à jour dans Supabase.' });
+      toast({ title: 'Modifications enregistrées', description: 'Vos informations sont désormais à jour.' });
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Sauvegarde impossible.' });
     } finally {

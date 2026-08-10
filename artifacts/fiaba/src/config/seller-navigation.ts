@@ -5,6 +5,7 @@ import {
   Store01Icon,
   UserGroupIcon,
   Wallet01Icon,
+  ChartLineData01Icon,
 } from '@hugeicons/core-free-icons';
 import type { IconType } from '@/components/shared/icon';
 
@@ -18,6 +19,7 @@ export const sellerPrimaryNav: NavItem[] = [
   { href: '/seller', label: 'Découvrir', glyph: Home01Icon },
   { href: '/seller/campaigns', label: 'Mes campagnes', glyph: Chart02Icon },
   { href: '/seller/sales', label: 'Mes ventes', glyph: Store01Icon },
+  { href: '/seller/analytics', label: 'Analytique', glyph: ChartLineData01Icon },
   { href: '/seller/earnings', label: 'Revenus', glyph: Wallet01Icon },
 ];
 

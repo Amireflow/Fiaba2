@@ -9,6 +9,7 @@ const SellerCampaigns = lazy(() => import('./pages/campaigns').then((m) => ({ de
 const Share = lazy(() => import('./pages/share').then((m) => ({ default: m.Share })));
 const Sales = lazy(() => import('./pages/sales').then((m) => ({ default: m.Sales })));
 const SaleDetail = lazy(() => import('./pages/sale-detail').then((m) => ({ default: m.SaleDetail })));
+const SellerAnalytics = lazy(() => import('./pages/analytics').then((m) => ({ default: m.SellerAnalytics })));
 const Earnings = lazy(() => import('./pages/earnings').then((m) => ({ default: m.Earnings })));
 const EarningWithdraw = lazy(() => import('./pages/earning-withdraw').then((m) => ({ default: m.EarningWithdraw })));
 const SellerProfile = lazy(() => import('./pages/profile').then((m) => ({ default: m.SellerProfile })));
@@ -34,6 +35,7 @@ export function SellerRouter() {
             <Route path="/seller/share/:id" component={Share} />
             <Route path="/seller/sales" component={Sales} />
             <Route path="/seller/sales/:id" component={SaleDetail} />
+            <Route path="/seller/analytics" component={SellerAnalytics} />
             <Route path="/seller/earnings" component={Earnings} />
             <Route path="/seller/earnings/withdraw" component={EarningWithdraw} />
             <Route path="/seller/profile" component={SellerProfile} />

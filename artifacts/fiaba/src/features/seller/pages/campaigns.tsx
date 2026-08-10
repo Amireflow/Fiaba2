@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 import { ArrowUpRight01Icon, Chart02Icon, Copy01Icon, Share02Icon, Store01Icon, Target01Icon, UserGroupIcon, Wallet01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { money, haptic } from '@/lib/utils';
+import { money, haptic, formatShopName } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import {

@@ -119,10 +119,11 @@ export function ProductForm() {
     setLoading(true);
 
     async function loadProductData() {
+      const productId = id as string;
       const { data: pData } = await supabase
         .from('products')
-        .select('id, name, category, price, stock, description, image_url, type, digital_file_url, digital_access_instructions')
-        .eq('id', id)
+        .select('id, name, category, price, stock, low_stock_threshold, description, image_url, type, digital_file_url, digital_access_instructions')
+        .eq('id', productId)
         .single();
 
       if (pData) {
@@ -131,6 +132,7 @@ export function ProductForm() {
           category: string;
           price: number;
           stock: number;
+          low_stock_threshold: number | null;
           description: string | null;
           image_url: string | null;
           type: 'physique' | 'digital' | null;
@@ -142,7 +144,7 @@ export function ProductForm() {
         const { data: cData } = await supabase
           .from('campaigns')
           .select('id, commission, commission_type')
-          .eq('product_id', id)
+          .eq('product_id', productId)
           .maybeSingle();
 
         const c = cData as { commission: number; commission_type: string | null } | null;
@@ -150,7 +152,7 @@ export function ProductForm() {
         setForm({
           name: p.name,
           category: p.category,
-          sku: `SKU-${id.slice(0, 6).toUpperCase()}`,
+          sku: `SKU-${productId.slice(0, 6).toUpperCase()}`,
           price: String(p.price),
           stock: p.type === 'digital' ? '999999' : String(p.stock),
           lowStockThreshold: String(p.low_stock_threshold ?? 3),
@@ -460,8 +462,9 @@ export function ProductForm() {
         .eq('product_id', productId)
         .maybeSingle();
 
-      if (existingCamp) {
-        await supabaseUpdate('campaigns', existingCamp.id, campaignPayload);
+      const campId = (existingCamp as { id: string } | null)?.id;
+      if (campId) {
+        await supabaseUpdate('campaigns', campId, campaignPayload);
       } else {
         await (supabase.from('campaigns') as any).insert(campaignPayload);
       }

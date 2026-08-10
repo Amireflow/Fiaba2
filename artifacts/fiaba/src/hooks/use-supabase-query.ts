@@ -220,20 +220,22 @@ export async function getOrCreateSellerId(userId?: string): Promise<string | nul
 
   try {
     // 1. Vérifier si un profil vendeur existe déjà
-    const { data: existing } = await supabase
-      .from('sellers')
+    const { data: existing } = await (supabase.from('sellers') as any)
       .select('id')
       .eq('profile_id', targetId)
       .limit(1);
 
-    if (existing && existing.length > 0) return existing[0].id;
+    const existingRows = existing as { id: string }[] | null;
+    if (existingRows && existingRows.length > 0) return existingRows[0].id;
 
     // 2. Chercher les infos du profil utilisateur
-    const { data: prof } = await supabase.from('profiles').select('full_name, phone').eq('id', targetId).maybeSingle();
+    const { data: profData } = await (supabase.from('profiles') as any).select('full_name, phone').eq('id', targetId).maybeSingle();
+    const prof = profData as { full_name: string | null; phone: string | null } | null;
 
     // 3. Récupérer un merchant_id par défaut si disponible
-    const { data: merchantRows } = await supabase.from('merchants').select('id').limit(1);
-    const defaultMerchantId = merchantRows?.[0]?.id ?? null;
+    const { data: merchantRows } = await (supabase.from('merchants') as any).select('id').limit(1);
+    const mRows = merchantRows as { id: string }[] | null;
+    const defaultMerchantId = mRows?.[0]?.id ?? null;
 
     const displayName = prof?.full_name || 'Vendeur Fiaba';
 
@@ -257,8 +259,9 @@ export async function getOrCreateSellerId(userId?: string): Promise<string | nul
 
     if (newSeller?.id) return newSeller.id;
 
-    const { data: fallback } = await supabase.from('sellers').select('id').eq('profile_id', targetId).limit(1);
-    return fallback?.[0]?.id ?? null;
+    const { data: fallback } = await (supabase.from('sellers') as any).select('id').eq('profile_id', targetId).limit(1);
+    const fallbackRows = fallback as { id: string }[] | null;
+    return fallbackRows?.[0]?.id ?? null;
   } catch (err) {
     console.error('getOrCreateSellerId error:', err);
     return null;

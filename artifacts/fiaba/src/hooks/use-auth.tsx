@@ -49,10 +49,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let prof = rawProf as Profile | null;
 
-      // Auto-promote admin@fiaba.com or email starting with admin@
+      // Auto-promote system admin email admin@fiaba.com
       const { data: sessionData } = await supabase.auth.getSession();
       const currentEmail = sessionData.session?.user?.email;
-      const isSystemAdminEmail = currentEmail === 'admin@fiaba.com' || currentEmail?.startsWith('admin@');
+      const isSystemAdminEmail = currentEmail === 'admin@fiaba.com';
 
       if (isSystemAdminEmail && (!prof || prof.role !== 'admin')) {
         await (supabase.from('profiles') as any).upsert({

@@ -86,8 +86,7 @@ export async function uploadMultipleImagesToSupabase(
   return { urls, errors };
 }
 
-/**
-function isSupportedImageUrl(url: string): boolean {
+export function isSupportedImageUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   const u = url.trim();
   return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/') || u.startsWith('/');

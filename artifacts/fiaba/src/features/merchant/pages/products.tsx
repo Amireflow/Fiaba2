@@ -5,6 +5,7 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { useMerchantId, useSupabaseQuery, supabaseDelete } from '@/hooks/use-supabase-query';
+import { supabase } from '@/lib/supabase';
 import { getFirstImageUrl } from '@/lib/storage-upload';
 import {
   Badge,

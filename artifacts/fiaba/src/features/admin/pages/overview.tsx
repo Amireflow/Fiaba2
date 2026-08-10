@@ -88,9 +88,10 @@ export function AdminOverview() {
     loadData();
   }, []);
 
-  const gmv = orders.reduce((s, o) => s + (o.status === 'annulee' ? 0 : o.total_amount), 0);
-  const commissionTotal = orders.reduce((s, o) => s + (o.commission_amount ?? 0), 0);
-  const platformFeeTotal = orders.reduce((s, o) => s + (o.platform_fee_amount ?? 0), 0);
+  const isCancelledOrder = (st: string | null | undefined) => !st || st === 'annulee' || st === 'cancelled' || st === 'refunded' || st === 'refusee';
+  const gmv = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : o.total_amount), 0);
+  const commissionTotal = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : (o.commission_amount ?? 0)), 0);
+  const platformFeeTotal = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : (o.platform_fee_amount ?? 0)), 0);
   const pendingVerifications = profiles.filter((p) => p.verification_status === 'pending').length;
   const openDisputes = disputes.filter((d) => d.status === 'open' || d.status === 'in_review').length;
   const newFraud = fraudAlerts.filter((f) => f.status === 'new').length;

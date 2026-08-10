@@ -239,7 +239,7 @@ export function AdminProducts() {
                     <tr key={c.id} className="transition hover:bg-[#faf9fd]" data-testid={`row-campaign-${c.id}`}>
                       <td className="px-5 py-4">
                         <span className="font-bold text-[#292541]">{c.name}</span>
-                        <p className="mt-0.5 text-[11px] text-[#9290a2]">Créée le {new Date(c.created_at).toLocaleDateString('fr-FR')} · {c.model} {c.commission}{c.commission_type === 'fixed' ? ' F' : '%'}</p>
+                        <p className="mt-0.5 text-[11px] text-[#9290a2]">Créée le {new Date(c.created_at).toLocaleDateString('fr-FR')} · {c.model} {c.commission_type === 'fixed' || c.model === 'marge' || (!c.commission_type && c.commission >= 100) ? money(c.commission) : `${c.commission}%`}</p>
                       </td>
                       <td className="px-5 py-4 text-[#77738a]">{merchantNames.get(c.merchant_id) ?? '—'}</td>
                       <td className="px-5 py-4"><AdminBadge tone={c.model === 'marge' ? 'amber' : 'violet'}>{c.model === 'marge' ? 'Marge' : 'Commission'}</AdminBadge></td>

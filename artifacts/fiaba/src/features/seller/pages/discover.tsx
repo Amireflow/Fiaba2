@@ -35,7 +35,7 @@ type ModelFilter = 'tous' | 'commission' | 'marge';
 
 export function Discover() {
   const { profile } = useAuth();
-  const { campaigns, loading, joinCampaign } = useSellerDiscovery();
+  const { campaigns, loading, joinCampaign, refetch } = useSellerDiscovery();
 
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('Tous');
@@ -111,6 +111,7 @@ export function Discover() {
         entityId: c.campaign_id,
         metadata: { match_score: c.match_score, product: c.product_name },
       });
+      refetch();
     }
   }
 
@@ -270,7 +271,7 @@ export function Discover() {
                   const imgUrl = getFirstImageUrl(c.product_image_url);
 
                   return (
-                    <Card key={c.campaign_id} className="flex flex-col justify-between border border-[#f0edfa] transition hover:shadow-md">
+                    <Card key={c.campaign_id} className="flex flex-col justify-between transition hover:shadow-md">
                       <div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -285,7 +286,7 @@ export function Discover() {
                             <img
                               src={imgUrl}
                               alt={c.product_name ?? ''}
-                              className="h-14 w-14 shrink-0 rounded-xl object-cover border border-[#eee]"
+                              className="h-14 w-14 shrink-0 rounded-xl object-cover"
                             />
                           ) : (
                             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
@@ -300,7 +301,7 @@ export function Discover() {
                         </div>
 
                         {/* Gains Highlight Box */}
-                        <div className="mt-4 rounded-2xl bg-[#faf9fe] p-3 border border-[#f1edf8]">
+                        <div className="mt-4 rounded-2xl bg-[#faf9fe] p-3">
                           <div className="flex items-center justify-between text-xs">
                             <div>
                               <p className="text-[10px] uppercase tracking-wider text-[#9290a2]">Prix public</p>
@@ -319,7 +320,7 @@ export function Discover() {
                       </div>
 
                       {/* Card Actions */}
-                      <div className="mt-5 flex items-center gap-2 pt-2 border-t border-[#f3f0f9]">
+                      <div className="mt-5 flex items-center gap-2 pt-2">
                         <Link href={`/seller/product/${c.campaign_id}`} className="flex-1">
                           <Button variant="soft" className="w-full" testId={`view-${c.campaign_id}`}>
                             Détails <Icon glyph={ArrowUpRight01Icon} size={14} />
@@ -368,7 +369,7 @@ export function Discover() {
                   const imgUrl = getFirstImageUrl(c.product_image_url);
 
                   return (
-                    <Card key={`top-${c.campaign_id}`} className="flex flex-col justify-between border border-[#f0edfa] transition hover:shadow-md">
+                    <Card key={`top-${c.campaign_id}`} className="flex flex-col justify-between transition hover:shadow-md">
                       <div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -399,7 +400,7 @@ export function Discover() {
                           </Button>
                         </Link>
                         {c.is_joined ? (
-                          <SellerBadge tone="mint" className="py-2">Rejointe ✓</SellerBadge>
+                          <SellerBadge tone="mint" className="py-2 inline-flex items-center gap-1">Rejointe <Icon glyph={Tick01Icon} size={12} /></SellerBadge>
                         ) : (
                           <Button variant="soft" className="flex-1" onClick={() => handleJoin(c)} disabled={joining === c.campaign_id}>
                             {joining === c.campaign_id ? '…' : 'Rejoindre'}
@@ -428,7 +429,7 @@ export function Discover() {
                 const imgUrl = getFirstImageUrl(c.product_image_url);
 
                 return (
-                  <Card key={`all-${c.campaign_id}`} className="flex flex-col justify-between border border-[#f0edfa] transition hover:shadow-md">
+                  <Card key={`all-${c.campaign_id}`} className="flex flex-col justify-between transition hover:shadow-md">
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -454,7 +455,7 @@ export function Discover() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex items-center gap-2 pt-2 border-t border-[#f3f0f9]">
+                    <div className="mt-4 flex items-center gap-2 pt-2">
                       <Link href={`/seller/product/${c.campaign_id}`} className="flex-1">
                         <Button variant="ghost" className="w-full" testId={`view-all-${c.campaign_id}`}>
                           Détails

@@ -146,7 +146,7 @@ export function Campaigns() {
                   <div>
                     <p className="text-[10px] text-[#9290a2]">Commission</p>
                     <p className="mt-1 font-[Space_Grotesk] text-base font-bold text-[#292541]">
-                      {c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}
+                      {c.model === 'marge' || c.commission_type === 'fixed' || (!c.commission_type && c.commission >= 100) ? money(c.commission) : `${c.commission}%`}
                     </p>
                   </div>
                   <div>

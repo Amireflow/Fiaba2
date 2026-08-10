@@ -4,6 +4,7 @@ import {
   ArrowLeft01Icon,
   Copy01Icon,
   Facebook01Icon,
+  InformationCircleIcon,
   InstagramIcon,
   Share02Icon,
   Store01Icon,
@@ -189,9 +190,9 @@ export function Share() {
     setActivePreset(preset);
 
     if (preset === 'status') {
-      setMessage(`🔥 Nouveau coup de cœur chez ${data.merchantName} ! Retrouvez « ${data.productName} » au meilleur prix.\nUtilisez mon code promo exclusif : ${data.sellerCode} 👇`);
+      setMessage(`Nouveau coup de cœur chez ${data.merchantName} ! Retrouvez « ${data.productName} » au meilleur prix.\nUtilisez mon code promo exclusif : ${data.sellerCode}`);
     } else if (preset === 'story') {
-      setMessage(`Je vous recommande vivement ${data.productName} ! Commandez directement via mon lien ou utilisez le code ${data.sellerCode} à la commande 👇`);
+      setMessage(`Je vous recommande vivement ${data.productName} ! Commandez directement via mon lien ou utilisez le code ${data.sellerCode} à la commande.`);
     } else {
       setMessage(`Salut ! Je te partage ce super produit de ${data.merchantName} : ${data.productName}. Tu peux commander via mon lien ci-dessous (code ${data.sellerCode}) :`);
     }
@@ -246,32 +247,6 @@ export function Share() {
     toast({ title: 'Message copié !', description: 'Collez-le directement dans votre application préférée.' });
   }
 
-  // Native Mobile Share API with fallback
-  async function triggerNativeShare() {
-    haptic('medium');
-    trackEvent('share_clicked', {
-      entityType: 'campaign',
-      entityId: campaign?.campaignId ?? '',
-      metadata: { channel: 'native_share' },
-    });
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: campaign?.productName ?? 'Produit',
-          text: message,
-          url: fullLink,
-        });
-        toast({ title: 'Partage initié !', description: 'Merci de partager avec votre communauté.' });
-        return;
-      } catch (err) {
-        // User cancelled or non-critical abort
-      }
-    }
-    // Fallback to WhatsApp
-    shareTo(shareChannels[0]);
-  }
-
   function shareTo(channel: (typeof shareChannels)[number]) {
     haptic('light');
     const url = channel.url(fullLink, message);
@@ -290,7 +265,7 @@ export function Share() {
       description={`Partagez ${campaign.productName} et gagnez +${money(netGain)} à chaque commande confirmée.`}
     >
       {/* Top Navigation */}
-      <div className="flex items-center justify-between">
+      <div>
         <Link
           href="/seller/campaigns"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-[#5b49e8] hover:underline"
@@ -298,19 +273,16 @@ export function Share() {
         >
           <Icon glyph={ArrowLeft01Icon} size={15} /> Mes campagnes
         </Link>
-        <SellerBadge tone="mint">
-          <Icon glyph={Wallet01Icon} size={12} /> Gain : +{money(netGain)} / vente
-        </SellerBadge>
       </div>
 
       {/* Compact Mobile Product Preview Header */}
-      <Card className="mt-4 p-4 border border-[#f0edfa]">
+      <Card className="mt-4 p-4">
         <div className="flex items-center gap-3">
           {getFirstImageUrl(campaign.productImage) ? (
             <img
               src={getFirstImageUrl(campaign.productImage)!}
               alt={campaign.productName}
-              className="h-16 w-16 shrink-0 rounded-2xl object-cover border border-[#eee]"
+              className="h-16 w-16 shrink-0 rounded-2xl object-cover"
             />
           ) : (
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
@@ -331,24 +303,12 @@ export function Share() {
         </div>
       </Card>
 
-      {/* Quick WhatsApp One-Tap Hero Button (Desktop & Mobile) */}
-      <div className="mt-4">
-        <button
-          onClick={triggerNativeShare}
-          className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#25d366] px-5 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#20ba5a] active:scale-[0.99]"
-          data-testid="button-hero-whatsapp"
-        >
-          <Icon glyph={WhatsappIcon} size={20} />
-          <span>Partager sur WhatsApp (1-Tap)</span>
-        </button>
-      </div>
-
       {/* Share Links & Code Touch Card */}
       <Card className="mt-4 p-4 sm:p-5">
         <p className="text-xs font-bold uppercase tracking-wider text-[#9290a2]">Lien et code vendeur</p>
 
         {/* Link Input */}
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#f8f7fc] p-2 sm:p-2.5 border border-[#ede9f5]">
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#f8f7fc] p-2 sm:p-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-[#5b49e8] shadow-xs">
             <Icon glyph={Store01Icon} size={16} />
           </span>
@@ -368,7 +328,7 @@ export function Share() {
         </div>
 
         {/* Seller Code Input */}
-        <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[#f8f7fc] p-2 sm:p-2.5 border border-[#ede9f5]">
+        <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[#f8f7fc] p-2 sm:p-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-[#ac741e] shadow-xs text-[10px] font-bold">
             CODE
           </span>
@@ -384,8 +344,8 @@ export function Share() {
           </button>
         </div>
 
-        <p className="mt-2.5 text-[11px] text-[#9290a2] leading-4">
-          💡 Toute commande passée via votre lien ou votre code sera instantanément créditée sur votre compte.
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-[#9290a2] leading-4">
+          <Icon glyph={InformationCircleIcon} size={14} className="shrink-0 text-[#5b49e8]" /> Toute commande passée via votre lien ou votre code sera instantanément créditée sur votre compte.
         </p>
       </Card>
 
@@ -402,46 +362,46 @@ export function Share() {
           </button>
         </div>
 
-        {/* Preset Selector Chips */}
+        {/* Preset Selector Chips with Icons */}
         <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 merchant-scrollbar">
           <button
             onClick={() => {
               haptic('light');
               applyPreset('status');
             }}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
               activePreset === 'status'
                 ? 'bg-[#5b49e8] text-white shadow-xs'
                 : 'bg-[#f0eff5] text-[#6b6680] hover:bg-[#e4e1ff]'
             }`}
           >
-            📱 Statut WhatsApp
+            <Icon glyph={WhatsappIcon} size={14} /> Statut WhatsApp
           </button>
           <button
             onClick={() => {
               haptic('light');
               applyPreset('story');
             }}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
               activePreset === 'story'
                 ? 'bg-[#5b49e8] text-white shadow-xs'
                 : 'bg-[#f0eff5] text-[#6b6680] hover:bg-[#e4e1ff]'
             }`}
           >
-            📸 Story / TikTok
+            <Icon glyph={InstagramIcon} size={14} /> Story / TikTok
           </button>
           <button
             onClick={() => {
               haptic('light');
               applyPreset('direct');
             }}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
               activePreset === 'direct'
                 ? 'bg-[#5b49e8] text-white shadow-xs'
                 : 'bg-[#f0eff5] text-[#6b6680] hover:bg-[#e4e1ff]'
             }`}
           >
-            💬 Message Direct
+            <Icon glyph={Share02Icon} size={14} /> Message Direct
           </button>
         </div>
 
@@ -513,7 +473,7 @@ export function Share() {
       </Card>
 
       {/* Security & Client Page Preview Link */}
-      <div className="mt-6 mb-20 sm:mb-6 flex flex-col items-center gap-2.5 text-center">
+      <div className="mt-6 mb-6 flex flex-col items-center gap-2.5 text-center">
         <Link
           href={checkoutPath}
           className="inline-flex items-center gap-1 text-xs font-bold text-[#5b49e8] hover:underline"
@@ -524,26 +484,6 @@ export function Share() {
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#858198]">
           <Icon glyph={LockKeyIcon} size={12} /> Attribution sécurisée & token unique de vente
         </span>
-      </div>
-
-      {/* Floating Mobile Sticky Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e8e5f0] bg-white/95 p-3 backdrop-blur-md sm:hidden">
-        <div className="mx-auto flex items-center gap-2">
-          <button
-            onClick={triggerNativeShare}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#25d366] px-4 py-3 text-xs font-bold text-white shadow-sm"
-          >
-            <Icon glyph={WhatsappIcon} size={18} />
-            <span>Partager (WhatsApp)</span>
-          </button>
-          <button
-            onClick={copyLink}
-            className="flex items-center justify-center gap-1.5 rounded-full bg-[#5b49e8] px-4 py-3 text-xs font-bold text-white shadow-sm"
-          >
-            <Icon glyph={Copy01Icon} size={16} />
-            <span>Copier</span>
-          </button>
-        </div>
       </div>
     </Page>
   );

@@ -281,11 +281,15 @@ export function SellerCampaigns() {
                   <SellerBadge tone={toneFor(c.status)}>{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
                 </div>
 
-                {/* Stats inline */}
                 <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-3 text-center sm:grid-cols-4">
                   <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.clicks}</p></div>
                   <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.sales}</p></div>
-                  <div><p className="text-[10px] text-[#9290a2]">Commission</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">{c.commission_type === 'fixed' ? money(c.commission) : `${c.commission}%`}</p></div>
+                  <div>
+                    <p className="text-[10px] text-[#9290a2]">{c.model === 'marge' ? 'Marge' : 'Commission'}</p>
+                    <p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">
+                      {c.model === 'marge' || c.commission_type === 'fixed' || (!c.commission_type && c.commission >= 100) ? money(c.commission) : `${c.commission}%`}
+                    </p>
+                  </div>
                   <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{money(c.earnings)}</p></div>
                 </div>
 

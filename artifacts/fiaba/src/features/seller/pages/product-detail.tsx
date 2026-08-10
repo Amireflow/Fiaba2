@@ -163,7 +163,7 @@ export function ProductDetail() {
     );
   }
 
-  const isFixedCommission = campaign.commission_type === 'fixed';
+  const isFixedCommission = campaign.model === 'marge' || campaign.commission_type === 'fixed' || (!campaign.commission_type && campaign.commission >= 100);
   const commissionAmount = isFixedCommission
     ? campaign.commission
     : Math.round(((campaign.product_price ?? 0) * campaign.commission) / 100);

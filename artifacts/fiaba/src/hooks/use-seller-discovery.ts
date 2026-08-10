@@ -78,22 +78,36 @@ export function useSellerDiscovery() {
       // 2. Exécution simultanée des niches, campagnes rejointes, zones de livraison, et historique ventes
       let sellerNicheIds: string[] = [];
       let joinedIds: string[] = [];
+      let joinedProductIds = new Set<string>();
       let merchantZoneMap: Record<string, string[]> = {}; // merchant_id → zone names
       let sellerSalesCount = 0;
 
       if (sId) {
         const merchantIds = ((campRes.data as any[]) ?? []).map((c) => c.merchant_id);
-        const [nicheRes, joinedRes, zonesRes, salesRes] = await Promise.all([
+        const [nicheRes, joinedRes, trackingRes, zonesRes, salesRes] = await Promise.all([
           supabase.from('seller_niches').select('niche_id').eq('seller_id', sId),
           supabase.from('campaign_sellers').select('campaign_id').eq('seller_id', sId),
+          supabase.from('tracking_links').select('campaign_id').eq('seller_id', sId),
           merchantIds.length > 0
             ? supabase.from('delivery_zones').select('merchant_id, name').in('merchant_id', merchantIds).eq('is_active', true)
             : Promise.resolve({ data: [] as any[] }),
           supabase.from('orders').select('id', { count: 'exact', head: true }).eq('seller_id', sId),
         ]);
         sellerNicheIds = ((nicheRes.data as { niche_id: string }[] | null) ?? []).map((x) => x.niche_id);
-        joinedIds = ((joinedRes.data as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
+        const csIds = ((joinedRes.data as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
+        const tlIds = ((trackingRes.data as { campaign_id: string }[] | null) ?? []).map((x) => x.campaign_id);
+        joinedIds = Array.from(new Set([...csIds, ...tlIds]));
         sellerSalesCount = salesRes.count ?? 0;
+
+        if (joinedIds.length > 0) {
+          const { data: joinedCamps } = await supabase
+            .from('campaigns')
+            .select('product_id')
+            .in('id', joinedIds);
+          (joinedCamps as { product_id: string | null }[] | null)?.forEach((jc) => {
+            if (jc.product_id) joinedProductIds.add(jc.product_id);
+          });
+        }
 
         // Build merchant → zone names map
         (zonesRes.data as { merchant_id: string; name: string }[] | null)?.forEach((z) => {
@@ -143,7 +157,8 @@ export function useSellerDiscovery() {
         else if (sellerSalesCount > 0) matchScore += 5;
 
         // Factor 4: Commission level (15 points max) — higher commission = more attractive
-        const commissionPct = c.commission_type === 'fixed' && c.products?.price
+        const isFixed = c.commission_type === 'fixed' || c.model === 'marge' || (!c.commission_type && c.commission >= 100);
+        const commissionPct = isFixed && c.products?.price
           ? (c.commission / c.products.price) * 100
           : c.commission;
         if (commissionPct >= 15) matchScore += 15;
@@ -171,7 +186,7 @@ export function useSellerDiscovery() {
           niche_id: c.niche_id,
           niche_name: c.niches?.name ?? null,
           match_score: matchScore,
-          is_joined: joinedIds.includes(c.id),
+          is_joined: joinedIds.includes(c.id) || (c.product_id ? joinedProductIds.has(c.product_id) : false),
         };
       });
 
@@ -226,7 +241,7 @@ export function useSellerDiscovery() {
             niche_id: null,
             niche_name: p.category ?? 'Général',
             match_score: synthScore,
-            is_joined: joinedIds.includes(compId),
+            is_joined: joinedIds.includes(compId) || (p.id ? joinedProductIds.has(p.id) : false),
           };
         });
 
@@ -316,6 +331,7 @@ export function useSellerDiscovery() {
     } as never);
 
     haptic('success');
+    fetchDiscovery();
     return { error: null };
   }, [sellerId]);
 

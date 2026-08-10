@@ -323,7 +323,7 @@ export function Discover() {
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-3">
                   {gridCampaigns.map((c) => (
                     <CampaignListRow key={c.campaign_id} c={c} joining={joining} onJoin={handleJoin} />
                   ))}
@@ -505,60 +505,74 @@ function CampaignListRow({
   const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
 
   return (
-    <Card className="flex flex-col gap-2.5 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-3.5">
-      <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
+    <Card className="flex flex-col overflow-hidden p-0 transition duration-200 hover:shadow-md sm:flex-row">
+      {/* Image avec badges */}
+      <Link href={`/seller/product/${c.campaign_id}`} className="relative block aspect-[16/10] shrink-0 bg-[#f4f3f8] sm:h-auto sm:w-[200px] sm:aspect-auto">
         <SafeImage
           src={imgUrl}
           alt={c.product_name ?? c.campaign_name}
-          className="h-14 w-14 rounded-lg object-cover sm:h-16 sm:w-16"
-          iconSize={20}
+          className="h-full w-full object-cover"
+          iconSize={24}
         />
-      </Link>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
-            {c.product_name ?? c.campaign_name}
-          </p>
+        <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
           {isTopMatch && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#efedff] px-2 py-0.5 text-[9px] font-bold text-[#5b49e8]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-bold text-[#5b49e8] shadow-sm">
               <Icon glyph={SparklesIcon} size={10} /> Top
             </span>
           )}
           {c.product_type === 'digital' && (
-            <span className="inline-flex shrink-0 rounded-full bg-[#292541] px-2 py-0.5 text-[9px] font-bold text-white">
+            <span className="inline-flex items-center rounded-full bg-[#292541]/85 px-2 py-0.5 text-[9px] font-bold text-white">
               Digital
             </span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-xs text-[#9290a2]">
-          {c.merchant_name} · {c.product_category ?? 'Divers'}
-        </p>
-        <div className="mt-1 flex items-center gap-3">
-          <span className="text-xs font-bold text-[#292541]">{c.product_price ? money(c.product_price) : '—'}</span>
-          <span className="text-xs font-bold text-[#278e69]">+{money(netGain)} / vente</span>
-        </div>
-      </div>
+      </Link>
 
-      <div className="flex items-center gap-2 sm:shrink-0">
-        {c.is_joined ? (
-          <Link href={`/seller/share/${c.campaign_id}`}>
-            <Button variant="success" testId={`share-list-${c.campaign_id}`}>
-              Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
+      {/* Contenu */}
+      <div className="flex flex-1 flex-col p-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+              {c.product_name ?? c.campaign_name}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-[#9290a2]">
+              {c.merchant_name} · {c.product_category ?? 'Divers'}
+            </p>
+          </div>
+        </div>
+
+        {/* Prix + gain */}
+        <div className="mt-2.5 flex items-center gap-3">
+          <span className="font-[Space_Grotesk] text-sm font-bold text-[#292541]">
+            {c.product_price ? money(c.product_price) : '—'}
+          </span>
+          <span className="rounded-lg bg-[#e7faf2] px-2.5 py-1 text-xs font-bold text-[#278e69]">
+            +{money(netGain)} / vente
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-3 flex items-center gap-2 sm:mt-auto">
+          {c.is_joined ? (
+            <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 sm:flex-none">
+              <Button variant="success" className="w-full sm:w-auto" testId={`share-list-${c.campaign_id}`}>
+                Partager <Icon glyph={ArrowUpRight01Icon} size={13} />
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              className="flex-1 sm:flex-none"
+              onClick={() => onJoin(c)}
+              disabled={joining === c.campaign_id}
+              testId={`join-list-${c.campaign_id}`}
+            >
+              {joining === c.campaign_id ? '…' : 'Rejoindre'}
             </Button>
+          )}
+          <Link href={`/seller/product/${c.campaign_id}`} className="flex-1 sm:flex-none">
+            <Button variant="soft" className="w-full sm:w-auto" testId={`view-list-${c.campaign_id}`}>Détails</Button>
           </Link>
-        ) : (
-          <Button
-            onClick={() => onJoin(c)}
-            disabled={joining === c.campaign_id}
-            testId={`join-list-${c.campaign_id}`}
-          >
-            {joining === c.campaign_id ? '…' : 'Rejoindre'}
-          </Button>
-        )}
-        <Link href={`/seller/product/${c.campaign_id}`}>
-          <Button variant="soft" testId={`view-list-${c.campaign_id}`}>Détails</Button>
-        </Link>
+        </div>
       </div>
     </Card>
   );

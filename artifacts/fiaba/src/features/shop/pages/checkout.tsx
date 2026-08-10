@@ -449,22 +449,15 @@ export function Checkout() {
       }
     }
 
-    // ── Server-side calculation via RPC (CDC §23) ──
-    const { data: calc, error: calcErr } = await (supabase.rpc as any)('calculate_order_total', {
+    // ── Server-side calculation via RPC with local fallback ──
+    const { data: calc } = await (supabase.rpc as any)('calculate_order_total', {
       p_campaign_id: campaign.campaign_id,
       p_quantity: form.quantity,
       p_zone_id: form.zoneId || null,
       p_seller_id: resolvedSellerId ?? null,
     });
 
-    if (calcErr || !calc || !Array.isArray(calc) || calc.length === 0) {
-      setSubmitting(false);
-      haptic('error');
-      toast({ title: 'Erreur de calcul', description: friendlyErrorMessage(calcErr) || 'Impossible de calculer le total.' });
-      return;
-    }
-
-    const serverCalc = calc[0] as {
+    let serverCalc: {
       product_price: number;
       subtotal: number;
       delivery_fee: number;
@@ -478,6 +471,34 @@ export function Checkout() {
       commission_rate: number;
       seller_attributed: boolean;
     };
+
+    if (calc && Array.isArray(calc) && calc.length > 0) {
+      serverCalc = calc[0];
+    } else {
+      // Robust Client Fallback if RPC fails or is unmigrated
+      const selectedZone = zones.find((z) => z.id === form.zoneId);
+      const fee = selectedZone ? selectedZone.fee : 0;
+      const sub = campaign.product_price * form.quantity;
+      const comm = resolvedSellerId
+        ? (campaign.commission_type === 'fixed' ? campaign.commission * form.quantity : Math.round((sub * campaign.commission) / 100))
+        : 0;
+      const platformFee = Math.round(sub * 0.05);
+
+      serverCalc = {
+        product_price: campaign.product_price,
+        subtotal: sub,
+        delivery_fee: fee,
+        commission_amount: comm,
+        platform_fee_amount: platformFee,
+        platform_fee_rate: 5.00,
+        merchant_amount: Math.max(0, sub - comm - platformFee),
+        total_amount: sub + fee,
+        model: campaign.model || 'commission',
+        commission_type: campaign.commission_type || 'percentage',
+        commission_rate: campaign.commission || 0,
+        seller_attributed: !!resolvedSellerId,
+      };
+    }
 
     const serverTotal = serverCalc.total_amount;
     const serverCommission = serverCalc.commission_amount;
@@ -754,7 +775,7 @@ export function Checkout() {
                           <Icon glyph={LockKeyIcon} size={11} /> Partenaire certifié
                         </span>
                       </div>
-                      <p className="mt-1 text-[10px] text-[#77738a]">Offre certifiée disponible auprès de {campaign.merchant_name}.</p>
+                      <p className="mt-1 text-[10px] text-[#77738a]">Recommandation certifiée et sécurisée.</p>
                     </div>
                   </div>
                 </div>

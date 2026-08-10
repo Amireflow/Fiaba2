@@ -54,8 +54,8 @@ export function trackEvent(
         entity_id: options?.entityId ?? null,
         metadata: options?.metadata ?? null,
       });
-    } catch {
-      // Silently fail — analytics should never break the app
+    } catch (err) {
+      console.error('[analytics] trackEvent failed:', err);
     }
   })();
 }
@@ -85,8 +85,8 @@ export function useAnalytics() {
             entity_id: options?.entityId ?? null,
             metadata: options?.metadata ?? null,
           });
-        } catch {
-          // Silently fail
+        } catch (err) {
+          console.error('[analytics] track failed:', err);
         }
       })();
     },

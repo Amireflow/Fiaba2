@@ -114,6 +114,16 @@ export function AdminOverview() {
 
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
+  if (loadError) {
+    return (
+      <AdminPage eyebrow={today} title="Vue d'ensemble" description="">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {loadError}
+        </div>
+      </AdminPage>
+    );
+  }
+
   return (
     <AdminPage
       eyebrow={today}

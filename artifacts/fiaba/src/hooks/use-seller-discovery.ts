@@ -90,7 +90,9 @@ export function useSellerDiscovery() {
       let sellerSalesCount = 0;
 
       if (sId) {
-        const merchantIds = ((campRes.data as any[]) ?? []).map((c) => c.merchant_id);
+        const merchantIds = Array.from(
+          new Set(((campRes.data as any[]) ?? []).map((c) => c?.merchant_id).filter(Boolean))
+        );
         const [nicheRes, joinedRes, trackingRes, zonesRes, salesRes] = await Promise.all([
           supabase.from('seller_niches').select('niche_id').eq('seller_id', sId),
           supabase.from('campaign_sellers').select('campaign_id').eq('seller_id', sId),

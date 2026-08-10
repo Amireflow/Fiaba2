@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { Chart02Icon, Delete02Icon, Edit02Icon, PauseIcon, PlayIcon, Store01Icon, UserGroupIcon, Target01Icon, Add01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
-import { useMerchantId, useSupabaseQuery, supabaseDelete, supabaseUpdate } from '@/hooks/use-supabase-query';
+import { useMerchantId, useSupabaseQuery, supabaseDelete, supabaseUpdate, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
 import {
   Badge,
   ConfirmDialog,
@@ -38,12 +38,26 @@ const statusMap: Record<string, { label: string; tone: 'mint' | 'amber' | 'slate
 
 export function Campaigns() {
   const { toast } = useToast();
-  const { merchantId } = useMerchantId();
+  const { merchantId: authMerchantId, loading: authLoading } = useMerchantId();
+  const [resolvedMerchantId, setResolvedMerchantId] = useState<string | null>(authMerchantId);
+
+  useEffect(() => {
+    if (authMerchantId) {
+      setResolvedMerchantId(authMerchantId);
+      return;
+    }
+    if (!authLoading) {
+      getOrCreateMerchantId().then((id) => {
+        if (id) setResolvedMerchantId(id);
+      });
+    }
+  }, [authMerchantId, authLoading]);
+
   const { data: campaigns, loading, refetch } = useSupabaseQuery<CampaignRow>('campaigns', {
     select: 'id, name, description, commission, commission_type, model, status, goal, product_id, products:product_id (name, image_url)',
-    filter: { merchant_id: merchantId },
+    filter: resolvedMerchantId ? { merchant_id: resolvedMerchantId } : undefined,
     order: { column: 'created_at', ascending: false },
-    enabled: !!merchantId,
+    enabled: !!resolvedMerchantId,
   });
   const [toDelete, setToDelete] = useState<CampaignRow | null>(null);
 

@@ -41,18 +41,15 @@ export function useSellerDiscovery() {
   const [sellerId, setSellerId] = useState<string | null>(null);
 
   const fetchDiscovery = useCallback(async (isSilent = false) => {
-    if (!profile) {
-      setLoading(false);
-      return;
-    }
-
     if (!isSilent) setLoading(true);
     setError(null);
 
     try {
       // 1. Exécution simultanée des requêtes initiales (Vendeur, Campagnes, Produits, Profil)
       const [sellerRes, campRes, prodRes, profileRes] = await Promise.all([
-        supabase.from('sellers').select('id, city').eq('profile_id', profile.id).maybeSingle(),
+        profile?.id
+          ? supabase.from('sellers').select('id, city').eq('profile_id', profile.id).maybeSingle()
+          : Promise.resolve({ data: null }),
         supabase
           .from('campaigns')
           .select(`
@@ -70,7 +67,9 @@ export function useSellerDiscovery() {
             merchants:merchant_id (id, name, slug)
           `)
           .eq('status', 'actif'),
-        supabase.from('profiles').select('city').eq('id', profile.id).maybeSingle(),
+        profile?.id
+          ? supabase.from('profiles').select('city').eq('id', profile.id).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
       let sId = (sellerRes.data as { id: string; city: string | null } | null)?.id ?? null;

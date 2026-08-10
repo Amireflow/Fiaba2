@@ -505,7 +505,7 @@ function CampaignListRow({
   const isTopMatch = potentialFromScore(c.match_score) === 'Fort';
 
   return (
-    <Card className="flex flex-col gap-3 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-4">
+    <Card className="flex flex-col gap-3 p-3 transition hover:shadow-md sm:flex-row sm:items-center sm:gap-3 sm:p-4">
       <Link href={`/seller/product/${c.campaign_id}`} className="shrink-0">
         <SafeImage
           src={imgUrl}
@@ -515,7 +515,7 @@ function CampaignListRow({
         />
       </Link>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-auto sm:flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate font-[Space_Grotesk] text-sm font-bold text-[#292541]">
             {c.product_name ?? c.campaign_name}

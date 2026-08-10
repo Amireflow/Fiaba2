@@ -11,10 +11,11 @@ declare
   v_campaign_name text;
   v_merchant_name text;
   v_seller_name   text;
+  v_merchant_owner uuid;
 begin
-  -- Récupérer le nom de la campagne et du commerçant
-  select c.name, m.name
-  into v_campaign_name, v_merchant_name
+  -- Récupérer le nom de la campagne et du commerçant + owner
+  select c.name, m.name, m.owner_id
+  into v_campaign_name, v_merchant_name, v_merchant_owner
   from public.campaigns c
   left join public.merchants m on m.id = c.merchant_id
   where c.id = NEW.campaign_id;
@@ -28,11 +29,13 @@ begin
 
   -- Insérer un signalement antifraude haute priorité pour l'admin
   insert into public.fraud_signals (
+    target_user,
     signal_type,
     detail,
     severity,
     status
   ) values (
+    v_merchant_owner,
     'Signalement Checkout',
     'Boutique: ' || coalesce(v_merchant_name, 'Boutique') || ' | Campagne: ' || coalesce(v_campaign_name, 'Campagne') || ' | Vendeur: ' || coalesce(v_seller_name, NEW.seller_code, 'Direct (Sans Vendeur)') || ' | Motif: ' || NEW.reason || ' | Client: ' || coalesce(NEW.reporter_name, 'Anonyme') || ' (' || coalesce(NEW.reporter_phone, 'Non renseigné') || ') | Détails: ' || coalesce(NEW.details, 'Aucun'),
     'high',

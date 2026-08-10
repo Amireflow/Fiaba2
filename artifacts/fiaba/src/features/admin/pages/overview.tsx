@@ -58,6 +58,7 @@ export function AdminOverview() {
   const [disputes, setDisputes] = useState<DisputeRow[]>([]);
   const [fraudAlerts, setFraudAlerts] = useState<FraudRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -69,6 +70,12 @@ export function AdminOverview() {
         supabase.from('disputes').select('id, status'),
         supabase.from('fraud_signals').select('id, signal_type, target_user, detail, severity, status, created_at').order('created_at', { ascending: false }).limit(5),
       ]);
+
+      const anyError = ordersRes.error || profilesRes.error || merchantsRes.error || sellersRes.error || disputesRes.error || fraudRes.error;
+      if (anyError) {
+        console.error('[admin/overview] load error:', anyError);
+        setLoadError('Erreur lors du chargement des données. Vérifiez vos permissions.');
+      }
 
       setOrders((ordersRes.data as OrderRow[] | null) ?? []);
       setProfiles((profilesRes.data as ProfileRow[] | null) ?? []);

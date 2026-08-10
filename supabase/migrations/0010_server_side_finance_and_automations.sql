@@ -209,7 +209,7 @@ begin
         new.merchant_id,
         new.id,
         'PLATFORM_FEE',
-        coalesce(new.platform_fee, 0),
+        coalesce(new.platform_fee_amount, new.platform_fee, 0),
         'Commission plateforme — commande #' || new.id
       );
     end if
@@ -518,19 +518,22 @@ language plpgsql
 security definer
 as $$
 declare
-  v_seller_profile text;
+  v_seller_phone text;
+  v_seller_profile_id uuid;
+  v_merchant_owner_id uuid;
   v_count_1h integer;
 begin
   -- Check: auto-commande (client phone matches seller phone)
   if new.seller_id is not null and new.customer_phone is not null then
-    select s.phone into v_seller_profile from public.sellers s where s.id = new.seller_id;
-    if v_seller_profile = new.customer_phone then
-      insert into public.fraud_signals (target_user, signal_type, severity, description, status)
+    select s.phone, s.profile_id into v_seller_phone, v_seller_profile_id
+    from public.sellers s where s.id = new.seller_id;
+    if v_seller_phone = new.customer_phone then
+      insert into public.fraud_signals (target_user, signal_type, detail, severity, status)
       values (
-        new.seller_id::text,
+        v_seller_profile_id,
         'auto_order',
-        'high',
         'Auto-commande détectée: le téléphone client correspond au téléphone du vendeur',
+        'high',
         'new'
       );
     end if
@@ -543,12 +546,13 @@ begin
     and created_at > now() - interval '1 hour';
 
   if v_count_1h > 10 then
-    insert into public.fraud_signals (target_user, signal_type, severity, description, status)
+    select m.owner_id into v_merchant_owner_id from public.merchants m where m.id = new.merchant_id;
+    insert into public.fraud_signals (target_user, signal_type, detail, severity, status)
     values (
-      new.merchant_id::text,
+      v_merchant_owner_id,
       'abnormal_volume',
-      'medium',
       'Volume anormal: ' || v_count_1h || ' commandes en 1h pour le marchand',
+      'medium',
       'new'
     );
   end if

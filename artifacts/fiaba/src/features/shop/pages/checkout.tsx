@@ -174,7 +174,7 @@ export function Checkout() {
       setLoading(true);
 
       // Fetch campaign with product + merchant
-      const { data: raw } = await supabase
+      const { data: raw, error: campErr } = await supabase
         .from('campaigns')
         .select(`
           id, name, commission, commission_type, model,
@@ -185,7 +185,7 @@ export function Checkout() {
         .eq('id', id)
         .single();
 
-      if (!raw) {
+      if (campErr || !raw) {
         setLoading(false);
         return;
       }
@@ -240,11 +240,16 @@ export function Checkout() {
     async function validateSellerAttribution() {
       if (token) {
         // Look up tracking link by token
-        const { data: link } = await supabase
+        const { data: link, error: linkErr } = await supabase
           .from('tracking_links')
           .select('id, seller_id, seller_code, campaign_id, is_active, expires_at, clicks')
           .eq('token', token || '')
-          .single();
+          .maybeSingle();
+
+        if (linkErr) {
+          setLinkStatus('none');
+          return;
+        }
 
         const tl = link as { id: string; seller_id: string; seller_code: string; campaign_id: string; is_active: boolean; expires_at: string | null; clicks: number } | null;
 
@@ -452,7 +457,7 @@ export function Checkout() {
       p_seller_id: resolvedSellerId ?? null,
     });
 
-    if (calcErr || !calc) {
+    if (calcErr || !calc || !Array.isArray(calc) || calc.length === 0) {
       setSubmitting(false);
       haptic('error');
       toast({ title: 'Erreur de calcul', description: friendlyErrorMessage(calcErr) || 'Impossible de calculer le total.' });
@@ -657,22 +662,22 @@ export function Checkout() {
                           )}
                         </div>
 
-                        {/* Thumbnails list with clean border-radius */}
+                        {/* Thumbnails list with thin border and reduced border-radius */}
                         {images.length > 1 && (
-                          <div className="flex gap-2.5 overflow-x-auto px-1 py-1 scrollbar-none">
+                          <div className="flex gap-2 overflow-x-auto px-0.5 py-1 scrollbar-none">
                             {images.map((img, idx) => (
                               <button
                                 key={img + idx}
                                 type="button"
                                 onClick={() => { haptic('light'); setActiveImageIndex(idx); }}
-                                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 p-0.5 transition-all ${
+                                className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border transition-all p-0.5 ${
                                   idx === activeImageIndex
                                     ? 'border-[#5b49e8] ring-2 ring-[#5b49e8]/20 scale-105'
-                                    : 'border-[#e9e6f1] opacity-70 hover:opacity-100 hover:border-[#b8b4c8]'
+                                    : 'border-[#e0dceb] opacity-75 hover:opacity-100 hover:border-[#b8b4c8]'
                                 }`}
                                 data-testid={`thumbnail-${idx}`}
                               >
-                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full rounded-lg object-cover" />
+                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full rounded-md object-cover" />
                               </button>
                             ))}
                           </div>
@@ -735,17 +740,17 @@ export function Checkout() {
 
               {/* Seller attribution badge */}
               {linkStatus === 'valid' && sellerInfo && (
-                <div className="rounded-2xl bg-[#efedff] p-4 border border-[#dfdbff]" data-testid="seller-attribution-badge">
+                <div className="rounded-2xl bg-[#efedff] p-4" data-testid="seller-attribution-badge">
                   <div className="flex items-start sm:items-center gap-3">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-sm">
-                      {campaign.merchant_name.slice(0, 2).toUpperCase()}
+                      {(sellerInfo.sellerCode || 'V').slice(0, 2).toUpperCase()}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                         <p className="text-xs font-bold text-[#292541]">
-                          Par <span className="text-[#5b49e8]">{campaign.merchant_name}</span>
+                          Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode}</span>
                         </p>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#278e69] shrink-0 bg-[#e7faf2] px-2 py-0.5 rounded-md border border-[#c5f4e0]">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#278e69] shrink-0 bg-[#e7faf2] px-2 py-0.5 rounded-md">
                           <Icon glyph={LockKeyIcon} size={11} /> Partenaire certifié
                         </span>
                       </div>

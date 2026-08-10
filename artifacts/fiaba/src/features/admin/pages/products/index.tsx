@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Store01Icon } from '@hugeicons/core-free-icons';
-import { AdminBadge, AdminButton as Button, AdminCard as Card, AdminConfirmDialog, AdminEmptyState, AdminPage, AdminScrollTable } from '../../components/admin-ui';
+import { AdminCard as Card, AdminConfirmDialog, AdminEmptyState, AdminPage, AdminScrollTable } from '../../components/admin-ui';
 import { useAdminProducts } from './use-admin-products';
 import { AdminProductRow } from './admin-product-row';
 import { AdminCampaignRow } from './admin-campaign-row';
@@ -69,24 +69,15 @@ export function AdminProducts() {
             <AdminEmptyState glyph={Store01Icon} title="Aucune campagne" description="Aucune campagne à afficher." />
           ) : (
             <AdminScrollTable minWidth={760} testId="scroll-admin-campaigns">
-              <table className="w-full text-left text-sm">
-                <thead className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">
-                  <tr className="border-b border-[#f1eef7]">
-                    <th className="px-5 py-3">Campagne</th><th className="px-5 py-3">Marchand</th>
-                    <th className="px-5 py-3">Modèle</th><th className="px-5 py-3 text-right">Vendeurs</th>
-                    <th className="px-5 py-3">Statut</th><th className="px-5 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f1eef7]">
-                  {ctx.campaigns.map((c) => (
-                    <AdminCampaignRow key={c.id} c={c}
-                      merchantName={ctx.merchantNames.get(c.merchant_id) ?? '—'}
-                      sellerCount={ctx.campaignSellerCounts.get(c.id) ?? 0}
-                      onSuspend={(id, name) => ctx.setToSuspend({ id, name, kind: 'campaign' })}
-                    />
-                  ))}
-                </tbody>
-              </table>
+              <div className="divide-y divide-[#f1eef7]">
+                {ctx.campaigns.map((c) => (
+                  <AdminCampaignRow key={c.id} c={c}
+                    merchantName={ctx.merchantNames.get(c.merchant_id) ?? '—'}
+                    sellerCount={ctx.campaignSellerCounts.get(c.id) ?? 0}
+                    onSuspend={(id, name) => ctx.setToSuspend({ id, name, kind: 'campaign' })}
+                  />
+                ))}
+              </div>
             </AdminScrollTable>
           )}
         </Card>

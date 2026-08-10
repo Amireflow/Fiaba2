@@ -6,6 +6,7 @@ import { AdminShell } from './components/admin-shell';
 const AdminOverview = lazy(() => import('./pages/overview').then((m) => ({ default: m.AdminOverview })));
 const AdminUsers = lazy(() => import('./pages/users').then((m) => ({ default: m.AdminUsers })));
 const AdminProducts = lazy(() => import('./pages/products').then((m) => ({ default: m.AdminProducts })));
+const AdminCampaigns = lazy(() => import('./pages/campaigns').then((m) => ({ default: m.AdminCampaigns })));
 const AdminOrders = lazy(() => import('./pages/orders').then((m) => ({ default: m.AdminOrders })));
 const AdminCommissions = lazy(() => import('./pages/commissions').then((m) => ({ default: m.AdminCommissions })));
 const AdminPayouts = lazy(() => import('./pages/payouts').then((m) => ({ default: m.AdminPayouts })));
@@ -37,6 +38,7 @@ export function AdminRouter() {
             <Route path="/admin/finances" component={FinancialReportingPage} />
             <Route path="/admin/users" component={AdminUsers} />
             <Route path="/admin/products" component={AdminProducts} />
+            <Route path="/admin/campaigns" component={AdminCampaigns} />
             <Route path="/admin/orders" component={AdminOrders} />
             <Route path="/admin/commissions" component={AdminCommissions} />
             <Route path="/admin/payouts" component={AdminPayouts} />

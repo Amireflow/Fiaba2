@@ -7,6 +7,7 @@ import {
   Shield01Icon,
   Store01Icon,
   Tag01Icon,
+  Target01Icon,
   UserGroupIcon,
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
@@ -22,7 +23,8 @@ export const adminPrimaryNav: NavItem[] = [
   { href: '/admin', label: "Vue d'ensemble", glyph: DashboardSquare01Icon },
   { href: '/admin/finances', label: 'Finances & Modèle Éco', glyph: Wallet01Icon },
   { href: '/admin/users', label: 'Utilisateurs', glyph: UserGroupIcon },
-  { href: '/admin/products', label: 'Produits & campagnes', glyph: Store01Icon },
+  { href: '/admin/products', label: 'Produits', glyph: Store01Icon },
+  { href: '/admin/campaigns', label: 'Campagnes', glyph: Target01Icon },
   { href: '/admin/orders', label: 'Commandes', glyph: CheckmarkCircle02Icon },
   { href: '/admin/commissions', label: 'Commissions', glyph: Wallet01Icon },
   { href: '/admin/payouts', label: 'Retraits', glyph: Wallet01Icon },

@@ -22,7 +22,6 @@ export function useAdminProducts() {
         supabase.from('products').select('id, name, merchant_id, niche_id, price, status, created_at, ai_headline, ai_generated_at, ai_generation_count').order('created_at', { ascending: false }).limit(100),
         supabase.from('campaigns').select('id, name, merchant_id, model, commission, commission_type, status, created_at').order('created_at', { ascending: false }).limit(100),
       ]);
-
       const prodRows = (prodRes.data as ProductRow[] | null) ?? [];
       const campRows = (campRes.data as CampaignRow[] | null) ?? [];
       setProducts(prodRows);

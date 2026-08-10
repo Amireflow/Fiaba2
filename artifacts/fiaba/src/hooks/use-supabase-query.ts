@@ -219,25 +219,39 @@ export async function getOrCreateSellerId(userId?: string): Promise<string | nul
   if (!targetId) return null;
 
   try {
+    // 1. Vérifier si un profil vendeur existe déjà
     const { data: existing } = await supabase
       .from('sellers')
       .select('id')
       .eq('profile_id', targetId)
-      .maybeSingle();
+      .limit(1);
 
-    if (existing?.id) return existing.id;
+    if (existing && existing.length > 0) return existing[0].id;
 
-    // Création automatique du profil vendeur
+    // 2. Chercher les infos du profil utilisateur
     const { data: prof } = await supabase.from('profiles').select('full_name, phone').eq('id', targetId).maybeSingle();
-    const cleanName = prof?.full_name ? prof.full_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'vendeur';
-    const handle = `${cleanName}-${targetId.slice(0, 4)}-${Date.now().toString(36).slice(-3)}`;
+
+    // 3. Récupérer un merchant_id par défaut si disponible
+    const { data: merchantRows } = await supabase.from('merchants').select('id').limit(1);
+    const defaultMerchantId = merchantRows?.[0]?.id ?? null;
+
+    const displayName = prof?.full_name || 'Vendeur Fiaba';
+
+    // 4. Insérer proprement avec les colonnes valides
+    const insertPayload: Record<string, unknown> = {
+      profile_id: targetId,
+      display_name: displayName,
+      phone: prof?.phone || null,
+      status: 'actif',
+      joined_at: new Date().toISOString(),
+    };
+
+    if (defaultMerchantId) {
+      insertPayload.merchant_id = defaultMerchantId;
+    }
 
     const { data: newSeller } = await (supabase.from('sellers') as any)
-      .insert({
-        profile_id: targetId,
-        handle,
-        bio: 'Créateur & Vendeur affilié',
-      })
+      .insert(insertPayload)
       .select('id')
       .maybeSingle();
 

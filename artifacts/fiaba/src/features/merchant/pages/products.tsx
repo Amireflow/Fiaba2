@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
-import { Delete02Icon, Edit02Icon, Store01Icon } from '@hugeicons/core-free-icons';
+import { Delete02Icon, Edit02Icon, Store01Icon, SparklesIcon, Add01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
@@ -13,7 +13,6 @@ import {
   MerchantButton as Button,
   MerchantCard as Card,
   Page,
-  ScrollTable,
 } from '../components/merchant-ui';
 
 type ProductRow = {
@@ -25,6 +24,7 @@ type ProductRow = {
   status: string;
   description: string | null;
   image_url: string | null;
+  type?: string;
 };
 
 const statusMap: Record<string, 'Actif' | 'Brouillon' | 'Épuisé'> = {
@@ -38,7 +38,7 @@ const filters = ['Tous', 'Actif', 'Brouillon', 'Épuisé'] as const;
 export function Products() {
   const { toast } = useToast();
   const { merchantId } = useMerchantId();
-  const { data: products, loading, refetch } = useSupabaseQuery<ProductRow & { type?: string }>('products', {
+  const { data: products, loading, refetch } = useSupabaseQuery<ProductRow>('products', {
     select: 'id, name, category, price, stock, status, description, image_url, type',
     filter: { merchant_id: merchantId },
     order: { column: 'created_at', ascending: false },
@@ -64,76 +64,192 @@ export function Products() {
 
   return (
     <Page
-      eyebrow="Votre offre"
-      title="Catalogue"
-      description="Tout votre assortiment, au même endroit. Les vendeurs voient toujours les bonnes informations."
-      action={<Link href="/merchant/products/new"><Button testId="button-add-product">Ajouter un produit +</Button></Link>}
+      eyebrow="Catalogue"
+      title="Vos produits"
+      description="Assortiment de votre boutique et paramétrage des offres."
+      action={
+        <Link href="/merchant/products/new">
+          <Button testId="button-add-product">
+            <Icon glyph={Add01Icon} size={15} /> Nouveau produit
+          </Button>
+        </Link>
+      }
     >
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+      {/* Category Filter Pills */}
+      <div className="mt-4 sm:mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {filters.map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${filter === f ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'}`}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                filter === f ? 'bg-[#5b49e8] text-white' : 'bg-[#f0eff5] text-[#67627b] hover:bg-[#e4e1ff]'
+              }`}
               data-testid={`filter-${f}`}
             >
               {f}
             </button>
           ))}
         </div>
-        <p className="text-xs font-bold text-[#9290a2]">{list.length} produit{list.length > 1 ? 's' : ''}</p>
+        <p className="text-xs font-bold text-[#9290a2]">{list.length} article{list.length > 1 ? 's' : ''}</p>
       </div>
 
-      <Card className="mt-5 p-0">
+      <div className="mt-4 sm:mt-5 space-y-3">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <Card className="flex items-center justify-center py-12">
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
-          </div>
+          </Card>
         ) : list.length === 0 ? (
-          <EmptyState
-            glyph={Store01Icon}
-            title="Aucun produit dans ce filtre"
-            description="Ajoutez un produit pour commencer à vendre."
-            action={<Link href="/merchant/products/new"><Button>Ajouter un produit +</Button></Link>}
-          />
+          <Card className="p-0">
+            <EmptyState
+              glyph={Store01Icon}
+              title="Aucun produit trouvé"
+              description="Ajoutez un premier produit à votre catalogue."
+              action={
+                <Link href="/merchant/products/new">
+                  <Button>Nouveau produit +</Button>
+                </Link>
+              }
+            />
+          </Card>
         ) : (
-          <ScrollTable minWidth={680} testId="scroll-products">
-            <div className="grid grid-cols-[2fr_1fr_1fr_.8fr_1fr] gap-4 px-5 py-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">
-              <span>Produit</span><span>Catégorie</span><span>Prix</span><span>Stock</span><span className="text-right">Actions</span>
-            </div>
-            {list.map((p) => {
-              const statusLabel = statusMap[p.status] ?? 'Brouillon';
-              return (
-                <div key={p.id} className="grid grid-cols-[2fr_1fr_1fr_.8fr_1fr] items-center gap-4 border-b border-[#f1eef7] px-5 py-4 last:border-b-0 transition hover:bg-[#faf9fd]">
-                  <div className="flex items-center gap-3">
-                    {getFirstImageUrl(p.image_url) ? (
-                      <img src={getFirstImageUrl(p.image_url)!} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
-                    ) : (
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Store01Icon} size={20} /></span>
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-[#292541]">{p.name}</p>
-                      <div className="mt-0.5 flex items-center gap-1.5">
-                        <Badge tone={statusLabel === 'Actif' ? 'mint' : statusLabel === 'Épuisé' ? 'rose' : 'slate'}>{statusLabel}</Badge>
-                        {p.type === 'digital' && <Badge tone="violet">⚡ Digital</Badge>}
+          <>
+            {/* MOBILE VIEW: Responsive Product Cards */}
+            <div className="space-y-3 md:hidden">
+              {list.map((p) => {
+                const statusLabel = statusMap[p.status] ?? 'Brouillon';
+                const imageUrl = getFirstImageUrl(p.image_url);
+                return (
+                  <Card key={p.id} className="p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={p.name} className="h-14 w-14 shrink-0 rounded-2xl object-cover" />
+                      ) : (
+                        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
+                          <Icon glyph={Store01Icon} size={22} />
+                        </span>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-[#292541] text-sm truncate">{p.name}</p>
+                        <p className="text-[11px] text-[#9290a2]">{p.category}</p>
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <Badge tone={statusLabel === 'Actif' ? 'mint' : statusLabel === 'Épuisé' ? 'rose' : 'slate'}>
+                            {statusLabel}
+                          </Badge>
+                          {p.type === 'digital' && (
+                            <Badge tone="violet" className="flex items-center gap-1">
+                              <Icon glyph={SparklesIcon} size={11} /> Digital
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <span className="text-sm font-medium text-[#292541]">{p.category}</span>
-                  <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(p.price)}</span>
-                  <span className="text-sm font-medium text-[#292541]">{p.type === 'digital' ? '∞ Illimité' : p.stock}</span>
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Link href="/merchant/campaigns/new"><Button variant="soft" testId={`campaign-${p.id}`}>Campagne +</Button></Link>
-                    <Link href={`/merchant/products/${p.id}/edit`}><Button variant="ghost" testId={`edit-${p.id}`}><Icon glyph={Edit02Icon} size={15} /></Button></Link>
-                    <Button variant="ghost" onClick={() => { haptic('light'); setToDelete(p); }} testId={`delete-${p.id}`}><Icon glyph={Delete02Icon} size={15} /></Button>
-                  </div>
-                </div>
-              );
-            })}
-          </ScrollTable>
+
+                    <div className="flex items-center justify-between rounded-xl bg-[#f8f7fc] p-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-[#9290a2] block">Prix public</span>
+                        <strong className="font-[Space_Grotesk] font-bold text-[#292541]">{money(p.price)}</strong>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-[#9290a2] block">Stock</span>
+                        <span className="font-bold text-[#292541]">{p.type === 'digital' ? 'Illimité' : `${p.stock} unité${p.stock > 1 ? 's' : ''}`}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <Link href="/merchant/campaigns/new">
+                        <Button variant="soft" className="px-3 py-1.5 text-[11px]" testId={`campaign-${p.id}`}>
+                          + Campagne
+                        </Button>
+                      </Link>
+
+                      <div className="flex items-center gap-1">
+                        <Link href={`/merchant/products/${p.id}/edit`}>
+                          <Button variant="ghost" className="p-2" testId={`edit-${p.id}`}>
+                            <Icon glyph={Edit02Icon} size={16} />
+                          </Button>
+                        </Link>
+                        <Button variant="ghost" className="p-2 text-[#c45667]" onClick={() => { haptic('light'); setToDelete(p); }} testId={`delete-${p.id}`}>
+                          <Icon glyph={Delete02Icon} size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* DESKTOP VIEW: Spacious Table */}
+            <Card className="hidden md:block p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#f1eef7] text-[10px] font-bold uppercase tracking-[.14em] text-[#9290a2]">
+                      <th className="px-6 py-4">Produit</th>
+                      <th className="px-4 py-4">Catégorie</th>
+                      <th className="px-4 py-4">Prix</th>
+                      <th className="px-4 py-4">Stock</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f1eef7]">
+                    {list.map((p) => {
+                      const statusLabel = statusMap[p.status] ?? 'Brouillon';
+                      const imageUrl = getFirstImageUrl(p.image_url);
+                      return (
+                        <tr key={p.id} className="transition hover:bg-[#faf9fd]">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {imageUrl ? (
+                                <img src={imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+                              ) : (
+                                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+                                  <Icon glyph={Store01Icon} size={18} />
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-[#292541] truncate max-w-[220px]">{p.name}</p>
+                                <div className="mt-1 flex items-center gap-1.5">
+                                  <Badge tone={statusLabel === 'Actif' ? 'mint' : statusLabel === 'Épuisé' ? 'rose' : 'slate'}>
+                                    {statusLabel}
+                                  </Badge>
+                                  {p.type === 'digital' && (
+                                    <Badge tone="violet" className="flex items-center gap-1">
+                                      <Icon glyph={SparklesIcon} size={10} /> Digital
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 font-medium text-[#292541]">{p.category}</td>
+                          <td className="px-4 py-4 font-[Space_Grotesk] font-bold text-[#292541]">{money(p.price)}</td>
+                          <td className="px-4 py-4 font-medium text-[#292541]">{p.type === 'digital' ? 'Illimité' : p.stock}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Link href="/merchant/campaigns/new">
+                                <Button variant="soft" testId={`campaign-${p.id}`}>Campagne +</Button>
+                              </Link>
+                              <Link href={`/merchant/products/${p.id}/edit`}>
+                                <Button variant="ghost" testId={`edit-${p.id}`}><Icon glyph={Edit02Icon} size={15} /></Button>
+                              </Link>
+                              <Button variant="ghost" onClick={() => { haptic('light'); setToDelete(p); }} testId={`delete-${p.id}`}>
+                                <Icon glyph={Delete02Icon} size={15} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </>
         )}
-      </Card>
+      </div>
 
       <ConfirmDialog
         open={toDelete !== null}

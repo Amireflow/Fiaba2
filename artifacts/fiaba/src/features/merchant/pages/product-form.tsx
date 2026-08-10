@@ -34,7 +34,27 @@ import {
   textareaClass,
 } from '../components/merchant-ui';
 
-const categories = ['Beauté', 'Mode', 'Maison', 'Épicerie', 'Tech', 'Sport', 'Food', 'Gaming'] as const;
+export const physicalCategories = [
+  'Beauté & Cosmétiques',
+  'Mode & Vêtements',
+  'Maison & Déco',
+  'Épicerie & Terroir',
+  'High-Tech & Accessoires',
+  'Sport & Fitness',
+  'Bijoux & Accessoires',
+  'Enfants & Bébé',
+] as const;
+
+export const digitalCategories = [
+  'Ebooks & Guides',
+  'Formations & Cours',
+  'Templates & Modèles',
+  'Logiciels & Apps',
+  'Musique & Audio',
+  'Art & Design',
+  'Accès VIP & Communauté',
+  'Coaching & Consulting',
+] as const;
 
 type WizardStep = 1 | 2 | 3;
 
@@ -58,7 +78,7 @@ type FormState = {
 
 const emptyForm: FormState = {
   name: '',
-  category: 'Beauté',
+  category: physicalCategories[0],
   sku: '',
   price: '',
   stock: '10',
@@ -101,7 +121,7 @@ export function ProductForm() {
     async function loadProductData() {
       const { data: pData } = await supabase
         .from('products')
-        .select('id, name, category, price, stock, description, image_url, type, digital_file_url, digital_access_instructions, weight, low_stock_threshold')
+        .select('id, name, category, price, stock, description, image_url, type, digital_file_url, digital_access_instructions')
         .eq('id', id)
         .single();
 
@@ -116,8 +136,6 @@ export function ProductForm() {
           type: 'physique' | 'digital' | null;
           digital_file_url: string | null;
           digital_access_instructions: string | null;
-          weight: number | null;
-          low_stock_threshold: number | null;
         };
 
         // Check if there is a linked active campaign
@@ -155,8 +173,17 @@ export function ProductForm() {
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === 'type' && value === 'digital') {
-        next.stock = '999999';
+      if (key === 'type') {
+        if (value === 'digital') {
+          next.stock = '999999';
+          if (!digitalCategories.includes(next.category as any)) {
+            next.category = digitalCategories[0];
+          }
+        } else {
+          if (!physicalCategories.includes(next.category as any)) {
+            next.category = physicalCategories[0];
+          }
+        }
       }
       return next;
     });
@@ -379,7 +406,6 @@ export function ProductForm() {
       category: form.category,
       price,
       stock,
-      low_stock_threshold: Number(form.lowStockThreshold) || 3,
       description: form.description.trim(),
       image_url: imageUrlPayload,
       type: form.type,
@@ -469,12 +495,12 @@ export function ProductForm() {
 
   return (
     <Page
-      eyebrow={isEdit ? 'Édition Catalogue' : 'Fiche Produit'}
-      title={isEdit ? 'Modifier le produit' : 'Ajouter un nouveau produit'}
-      description="Configurez votre produit, vos visuels et définissez vos commissions d'affiliation vendeurs."
+      eyebrow="Produits"
+      title={isEdit ? 'Modifier le produit' : 'Nouveau produit'}
+      description="Définissez les caractéristiques et commissions."
       action={
         <Link href="/merchant/products">
-          <Button variant="ghost"><Icon glyph={ArrowLeft01Icon} size={15} /> Retour au catalogue</Button>
+          <Button variant="ghost"><Icon glyph={ArrowLeft01Icon} size={15} /> Retour</Button>
         </Link>
       }
     >
@@ -482,9 +508,9 @@ export function ProductForm() {
       <div className="mt-4 sm:mt-6 rounded-2xl bg-white p-1.5 sm:p-2">
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {[
-            { step: 1 as WizardStep, label: '1. Informations & Format', icon: PackageIcon },
-            { step: 2 as WizardStep, label: '2. Prix & Affiliation', icon: Tag01Icon },
-            { step: 3 as WizardStep, label: '3. Médias & Fichiers', icon: ImageUploadIcon },
+            { step: 1 as WizardStep, label: '1. Infos', icon: PackageIcon },
+            { step: 2 as WizardStep, label: '2. Prix & Marge', icon: Tag01Icon },
+            { step: 3 as WizardStep, label: '3. Visuels', icon: ImageUploadIcon },
           ].map((s) => {
             const isActive = activeStep === s.step;
             const isDone = activeStep > s.step;
@@ -503,8 +529,7 @@ export function ProductForm() {
                 data-testid={`step-tab-${s.step}`}
               >
                 <Icon glyph={isDone ? CheckmarkCircle02Icon : s.icon} size={15} />
-                <span className="hidden md:inline">{s.label}</span>
-                <span className="md:hidden">Étape {s.step}</span>
+                <span>{s.label}</span>
               </button>
             );
           })}
@@ -519,8 +544,7 @@ export function ProductForm() {
             {activeStep === 1 && (
               <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Type & Format de Produit</h3>
-                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Choisissez la nature du produit pour adapter la livraison.</p>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Produit & Format</h3>
                 </div>
 
                 <Field label="Format de vente">
@@ -539,8 +563,8 @@ export function ProductForm() {
                         <Icon glyph={PackageIcon} size={18} />
                       </span>
                       <div>
-                        <p className="text-xs font-bold text-[#292541]">Produit Physique</p>
-                        <p className="text-[10px] text-[#807b98] hidden sm:block">Livraison physique, colis & zones</p>
+                        <p className="text-xs font-bold text-[#292541]">Physique</p>
+                        <p className="text-[10px] text-[#807b98]">Colis & livraison</p>
                       </div>
                     </button>
 
@@ -558,18 +582,18 @@ export function ProductForm() {
                         <Icon glyph={SparklesIcon} size={18} />
                       </span>
                       <div>
-                        <p className="text-xs font-bold text-[#292541]">Produit Digital</p>
-                        <p className="text-[10px] text-[#807b98] hidden sm:block">Ebook, Formation (Téléchargement)</p>
+                        <p className="text-xs font-bold text-[#292541]">Digital</p>
+                        <p className="text-[10px] text-[#807b98]">Accès instantané</p>
                       </div>
                     </button>
                   </div>
                 </Field>
 
-                <Field label="Nom du produit *" hint="Nom visible par vos affiliés et acheteurs final.">
+                <Field label="Nom du produit *">
                   <input
                     value={form.name}
                     onChange={(e) => setField('name', e.target.value)}
-                    placeholder={form.type === 'digital' ? 'Ex. Guide E-Commerce Sénégal (PDF)' : 'Ex. Coffret Soin Karité & Miel'}
+                    placeholder={form.type === 'digital' ? 'Ex. Guide E-Commerce (PDF)' : 'Ex. Coffret Soin Karité'}
                     className={`${inputClass} ${errors.name ? 'ring-1 ring-[#ef6d78]' : ''}`}
                     data-testid="input-name"
                   />
@@ -579,11 +603,13 @@ export function ProductForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Field label="Catégorie *">
                     <select value={form.category} onChange={(e) => setField('category', e.target.value)} className={selectClass} data-testid="input-category">
-                      {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {(form.type === 'digital' ? digitalCategories : physicalCategories).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
                   </Field>
 
-                  <Field label="Code SKU / Référence (Optionnel)">
+                  <Field label="Code SKU">
                     <input
                       value={form.sku}
                       onChange={(e) => setField('sku', e.target.value)}
@@ -593,11 +619,11 @@ export function ProductForm() {
                   </Field>
                 </div>
 
-                <Field label="Description *" hint="Détaillez les caractéristiques, les avantages et le contenu.">
+                <Field label="Description *">
                   <textarea
                     value={form.description}
                     onChange={(e) => setField('description', e.target.value)}
-                    placeholder="Présentez clairement votre produit pour convaincre vos vendeurs et vos clients…"
+                    placeholder="Avantages et détails du produit…"
                     className={`${textareaClass} min-h-24 sm:min-h-32`}
                     data-testid="input-description"
                   />
@@ -605,7 +631,7 @@ export function ProductForm() {
 
                 <div className="flex justify-end pt-2 sm:pt-3">
                   <Button type="button" onClick={() => goToStep(2)} testId="button-next-step-2">
-                    Suivant : Prix & Affiliation <Icon glyph={ArrowRight01Icon} size={15} />
+                    Suivant <Icon glyph={ArrowRight01Icon} size={15} />
                   </Button>
                 </div>
               </div>
@@ -615,12 +641,11 @@ export function ProductForm() {
             {activeStep === 2 && (
               <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Tarification & Stocks</h3>
-                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Définissez le prix public et réglez les commissions créateurs.</p>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Prix & Marge</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <Field label="Prix public de vente (FCFA) *">
+                  <Field label="Prix public (FCFA) *">
                     <input
                       type="number"
                       min="0"
@@ -633,7 +658,7 @@ export function ProductForm() {
                     {errors.price && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.price}</p>}
                   </Field>
 
-                  <Field label="Gestion du stock" hint={form.type === 'digital' ? 'Accès illimité automatique' : 'Quantité disponible en réserve'}>
+                  <Field label="Stock" hint={form.type === 'digital' ? 'Illimité' : undefined}>
                     <input
                       type="number"
                       min="0"
@@ -649,7 +674,7 @@ export function ProductForm() {
                 </div>
 
                 {form.type === 'physique' && (
-                  <Field label="Seuil d'alerte stock bas" hint="Vous serez notifié lorsque le stock passe en-dessous de ce niveau.">
+                  <Field label="Alerte stock bas">
                     <input
                       type="number"
                       min="1"
@@ -668,8 +693,8 @@ export function ProductForm() {
                         <Icon glyph={SparklesIcon} size={16} />
                       </span>
                       <div>
-                        <h4 className="text-xs font-bold text-[#292541]">Programme Affiliation</h4>
-                        <p className="text-[10px] text-[#77738a] hidden sm:block">Permettre aux affiliés de promouvoir ce produit immédiatement.</p>
+                        <h4 className="text-xs font-bold text-[#292541]">Affiliation créateurs</h4>
+                        <p className="text-[10px] text-[#77738a]">Activer la recommandation vendeur.</p>
                       </div>
                     </div>
 
@@ -695,12 +720,12 @@ export function ProductForm() {
                             className={selectClass}
                             data-testid="select-commission-type"
                           >
-                            <option value="percentage">Pourcentage sur vente (%)</option>
-                            <option value="fixed">Marge fixe par vente (FCFA)</option>
+                            <option value="percentage">Pourcentage (%)</option>
+                            <option value="fixed">Marge fixe (FCFA)</option>
                           </select>
                         </Field>
 
-                        <Field label={form.commissionType === 'percentage' ? 'Taux commission (%)' : 'Marge fixée (FCFA)'}>
+                        <Field label={form.commissionType === 'percentage' ? 'Taux (%)' : 'Marge (FCFA)'}>
                           <input
                             type="number"
                             min="1"
@@ -716,21 +741,21 @@ export function ProductForm() {
 
                       {/* Live Revenue Breakdown Card */}
                       <div className="rounded-xl bg-white p-3.5 sm:p-4 space-y-2 text-xs">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Simulateur de revenus par vente</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Revenus par vente</p>
                         <div className="flex justify-between text-[#77738a]">
-                          <span>Prix de vente public</span>
+                          <span>Prix public</span>
                           <span className="font-bold text-[#292541]">{money(revenueCalculations.price)}</span>
                         </div>
                         <div className="flex justify-between text-[#c45667]">
-                          <span>Commission vendeur</span>
+                          <span>Commission créateur</span>
                           <span className="font-bold">− {money(revenueCalculations.sellerGain)}</span>
                         </div>
                         <div className="flex justify-between text-[#77738a]">
-                          <span>Frais plateforme Fiaba (5%)</span>
+                          <span>Frais Fiaba (5%)</span>
                           <span className="font-bold">− {money(revenueCalculations.platformFee)}</span>
                         </div>
                         <div className="flex justify-between pt-1.5 text-xs sm:text-sm font-bold text-[#278e69]">
-                          <span>Votre revenu net garanti</span>
+                          <span>Revenu net marchand</span>
                           <span className="font-[Space_Grotesk] text-sm sm:text-base">{money(revenueCalculations.netMerchantRevenue)}</span>
                         </div>
                       </div>
@@ -743,7 +768,7 @@ export function ProductForm() {
                     <Icon glyph={ArrowLeft01Icon} size={15} /> Précédent
                   </Button>
                   <Button type="button" onClick={() => goToStep(3)} testId="button-next-step-3">
-                    Suivant : Médias <Icon glyph={ArrowRight01Icon} size={15} />
+                    Suivant <Icon glyph={ArrowRight01Icon} size={15} />
                   </Button>
                 </div>
               </div>
@@ -753,17 +778,16 @@ export function ProductForm() {
             {activeStep === 3 && (
               <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Galerie Photos & Fichiers</h3>
-                  <p className="text-[11px] sm:text-xs text-[#807b98] mt-0.5">Importez vos visuels et joignez vos documents digitaux téléchargeables.</p>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Photos & Fichiers</h3>
                 </div>
 
                 {/* Multi-photo uploader with percentage % bar */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-[#292541]">Photos du produit ({form.images.length})</p>
+                    <p className="text-xs font-bold text-[#292541]">Photos ({form.images.length})</p>
                     {form.images.length > 0 && (
                       <label className="cursor-pointer text-xs font-bold text-[#5b49e8] hover:underline flex items-center gap-1">
-                        <Icon glyph={Add01Icon} size={14} /> Ajouter des photos
+                        <Icon glyph={Add01Icon} size={14} /> Ajouter
                         <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} disabled={imageUploadProgress !== null} />
                       </label>
                     )}
@@ -775,7 +799,7 @@ export function ProductForm() {
                       <div className="flex items-center justify-between text-xs font-bold text-[#5b49e8]">
                         <span className="flex items-center gap-2">
                           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
-                          Importation des visuels…
+                          Importation…
                         </span>
                         <span>{imageUploadProgress}%</span>
                       </div>
@@ -794,7 +818,7 @@ export function ProductForm() {
                       <div className="relative overflow-hidden rounded-2xl bg-[#f4f3f8]">
                         <img src={form.images[0]} alt={form.name} className="h-40 sm:h-48 w-full object-cover" />
                         <span className="absolute left-3 top-3 rounded-xl bg-[#5b49e8] px-2.5 py-1 text-[10px] font-bold text-white flex items-center gap-1">
-                          <Icon glyph={StarIcon} size={12} /> Photo principale
+                          <Icon glyph={StarIcon} size={12} /> Principale
                         </span>
                         <button
                           type="button"
@@ -819,7 +843,7 @@ export function ProductForm() {
                                     type="button"
                                     onClick={() => setPrimaryImage(actualIdx)}
                                     className="grid h-6 w-6 sm:h-7 sm:w-7 place-items-center rounded-lg bg-white text-[#5b49e8]"
-                                    title="Mettre en principale"
+                                    title="Principale"
                                   >
                                     <Icon glyph={StarIcon} size={12} />
                                   </button>
@@ -845,8 +869,8 @@ export function ProductForm() {
                           <Icon glyph={ImageUploadIcon} size={22} />
                         </span>
                         <div>
-                          <p className="text-xs font-bold text-[#292541]">Sélectionner vos photos</p>
-                          <p className="text-[10px] text-[#9290a2] mt-0.5">Formats PNG, JPG, WebP jusqu'à 5 MB</p>
+                          <p className="text-xs font-bold text-[#292541]">Ajouter des photos</p>
+                          <p className="text-[10px] text-[#9290a2] mt-0.5">PNG, JPG, WebP</p>
                         </div>
                       </div>
                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} disabled={imageUploadProgress !== null} data-testid="input-image-file" />
@@ -858,7 +882,7 @@ export function ProductForm() {
                 {form.type === 'digital' && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-[#292541]">Fichier & Ressource Digital (PDF, ZIP, MP4)</p>
+                      <p className="text-xs font-bold text-[#292541]">Fichier digital (PDF, ZIP, MP4)</p>
                       {form.digital_file_url && (
                         <button
                           type="button"
@@ -876,7 +900,7 @@ export function ProductForm() {
                         <div className="flex items-center justify-between text-xs font-bold text-[#5b49e8]">
                           <span className="flex items-center gap-2">
                             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#5b49e8] border-t-transparent" />
-                            Téléversement du fichier…
+                            Téléversement…
                           </span>
                           <span>{digitalUploadProgress}%</span>
                         </div>
@@ -899,7 +923,7 @@ export function ProductForm() {
                             <p className="text-xs font-bold text-[#292541] truncate max-w-[200px] sm:max-w-[280px]" title={getCleanFileName(form.digital_file_url)}>
                               {getCleanFileName(form.digital_file_url)}
                             </p>
-                            <p className="text-[10px] text-[#278e69] font-bold">Fichier numériquement prêt pour livraison</p>
+                            <p className="text-[10px] text-[#278e69] font-bold">Fichier prêt pour livraison</p>
                           </div>
                         </div>
                         <button
@@ -919,7 +943,7 @@ export function ProductForm() {
                           </span>
                           <div>
                             <p className="text-xs font-bold text-[#292541]">Sélectionner un fichier digital</p>
-                            <p className="text-[10px] text-[#9290a2] mt-0.5">PDF, EPUB, ZIP, MP3, MP4 ou lien direct</p>
+                            <p className="text-[10px] text-[#9290a2] mt-0.5">PDF, EPUB, ZIP, MP3, MP4</p>
                           </div>
                         </div>
                         <input
@@ -932,19 +956,21 @@ export function ProductForm() {
                       </label>
                     )}
 
-                    <input
-                      type="text"
-                      value={form.digital_file_url}
-                      onChange={(e) => setField('digital_file_url', e.target.value)}
-                      placeholder="Ou entrez un lien direct (Drive, Telegram, Notion)…"
-                      className={inputClass}
-                    />
+                    {!form.digital_file_url && (
+                      <input
+                        type="text"
+                        value={form.digital_file_url}
+                        onChange={(e) => setField('digital_file_url', e.target.value)}
+                        placeholder="Ou lien direct (Drive, Telegram, Notion)…"
+                        className={inputClass}
+                      />
+                    )}
 
-                    <Field label="Instructions d'accès optionnelles" hint="Renseignez ici tout code VIP ou lien vers un groupe privé.">
+                    <Field label="Instructions d'accès">
                       <textarea
                         value={form.digital_access_instructions}
                         onChange={(e) => setField('digital_access_instructions', e.target.value)}
-                        placeholder="Informations transmises au client après paiement…"
+                        placeholder="Informations transmises après paiement…"
                         className={`${textareaClass} min-h-20`}
                       />
                     </Field>
@@ -968,21 +994,21 @@ export function ProductForm() {
         <div className="space-y-4 sm:space-y-5">
           <Card className="p-4 sm:p-5">
             <div className="flex items-center justify-between pb-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu en direct</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Aperçu</p>
               <div className="flex rounded-xl bg-[#f4f3f8] p-1">
                 <button
                   type="button"
                   onClick={() => setPreviewMode('seller')}
                   className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'seller' ? 'bg-white text-[#5b49e8]' : 'text-[#807b98]'}`}
                 >
-                  Vue Vendeur
+                  Vendeur
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewMode('customer')}
                   className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${previewMode === 'customer' ? 'bg-white text-[#5b49e8]' : 'text-[#807b98]'}`}
                 >
-                  Vue Client
+                  Client
                 </button>
               </div>
             </div>
@@ -1014,7 +1040,7 @@ export function ProductForm() {
                         <span className="font-bold text-[#292541]">{form.price ? money(Number(form.price)) : '0 F'}</span>
                       </div>
                       <div className="flex justify-between text-[11px] text-[#278e69]">
-                        <span>Gain créateur / vente</span>
+                        <span>Gain créateur</span>
                         <span className="font-bold">{money(revenueCalculations.sellerGain)}</span>
                       </div>
                     </div>
@@ -1046,9 +1072,9 @@ export function ProductForm() {
                 <Icon glyph={HelpCircleIcon} size={15} />
               </span>
               <div className="text-xs space-y-1">
-                <p className="font-bold text-[#292541]">Conseil de publication Fiaba</p>
+                <p className="font-bold text-[#292541]">Conseil</p>
                 <p className="text-[#686380] leading-relaxed">
-                  Offrez au moins 10% à 15% de commission pour motiver les créateurs à ajouter votre produit dans leur sélection d'opportunités.
+                  Offrez 10% à 15% de commission pour motiver les vendeurs.
                 </p>
               </div>
             </div>

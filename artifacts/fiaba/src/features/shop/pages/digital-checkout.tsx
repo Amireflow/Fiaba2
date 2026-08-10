@@ -126,6 +126,32 @@ export function DigitalCheckout() {
         .single();
 
       if (campErr || !raw) {
+        let productId = id.startsWith('prod-camp-') ? id.replace('prod-camp-', '') : id;
+        const { data: prodRaw } = await supabase
+          .from('products')
+          .select('id, name, price, image_url, description, type, digital_file_url, digital_access_instructions, merchant_id, merchants:merchant_id(id, name)')
+          .eq('id', productId)
+          .maybeSingle();
+
+        if (prodRaw) {
+          const p = prodRaw as any;
+          setCampaign({
+            campaign_id: id,
+            campaign_name: `Offre ${p.name}`,
+            commission: 0,
+            commission_type: 'percentage',
+            model: 'commission',
+            product_id: p.id,
+            product_name: p.name,
+            product_price: p.price,
+            product_image_url: p.image_url,
+            product_description: p.description,
+            digital_file_url: p.digital_file_url ?? null,
+            digital_access_instructions: p.digital_access_instructions ?? null,
+            merchant_id: p.merchant_id,
+            merchant_name: formatShopName(p.merchants?.name),
+          });
+        }
         setLoading(false);
         return;
       }

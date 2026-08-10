@@ -16,6 +16,24 @@ export function CheckoutDispatcher() {
         return;
       }
 
+      let productIdToLookup: string | null = null;
+      if (id.startsWith('prod-camp-')) {
+        productIdToLookup = id.replace('prod-camp-', '');
+      }
+
+      if (productIdToLookup) {
+        const { data: prod } = await supabase
+          .from('products')
+          .select('type')
+          .eq('id', productIdToLookup)
+          .maybeSingle();
+        const p = prod as { type?: 'physique' | 'digital' | null } | null;
+        setProductType(p?.type === 'digital' ? 'digital' : 'physique');
+        setLoading(false);
+        return;
+      }
+
+      // Check campaign first
       const { data: raw } = await supabase
         .from('campaigns')
         .select(`
@@ -25,11 +43,21 @@ export function CheckoutDispatcher() {
         .eq('id', id)
         .maybeSingle();
 
-      const c = raw as { products: { type?: 'physique' | 'digital' | null } | null } | null;
+      const c = raw as { product_id: string | null; products: { type?: 'physique' | 'digital' | null } | null } | null;
+
       if (c?.products?.type === 'digital') {
         setProductType('digital');
-      } else {
+      } else if (c?.products?.type) {
         setProductType('physique');
+      } else {
+        // Fallback: check if id is a direct product_id
+        const { data: directProd } = await supabase
+          .from('products')
+          .select('type')
+          .eq('id', id)
+          .maybeSingle();
+        const dp = directProd as { type?: 'physique' | 'digital' | null } | null;
+        setProductType(dp?.type === 'digital' ? 'digital' : 'physique');
       }
       setLoading(false);
     }

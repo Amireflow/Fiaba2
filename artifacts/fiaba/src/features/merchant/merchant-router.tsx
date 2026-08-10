@@ -3,23 +3,34 @@ import { Route, Switch } from 'wouter';
 import { ProtectedRoute } from '@/components/protected-route';
 import { MerchantShell } from './components/merchant-shell';
 
-const Overview = lazy(() => import('./pages/overview').then((m) => ({ default: m.Overview })));
-const Products = lazy(() => import('./pages/products').then((m) => ({ default: m.Products })));
-const ProductForm = lazy(() => import('./pages/product-form').then((m) => ({ default: m.ProductForm })));
-const Campaigns = lazy(() => import('./pages/campaigns').then((m) => ({ default: m.Campaigns })));
-const CampaignForm = lazy(() => import('./pages/campaign-form').then((m) => ({ default: m.CampaignForm })));
-const Sellers = lazy(() => import('./pages/sellers').then((m) => ({ default: m.Sellers })));
-const SellerDetail = lazy(() => import('./pages/seller-detail').then((m) => ({ default: m.SellerDetail })));
-const Orders = lazy(() => import('./pages/orders').then((m) => ({ default: m.Orders })));
-const OrderDetail = lazy(() => import('./pages/order-detail').then((m) => ({ default: m.OrderDetail })));
-const Analytics = lazy(() => import('./pages/analytics').then((m) => ({ default: m.Analytics })));
-const Payments = lazy(() => import('./pages/payments').then((m) => ({ default: m.Payments })));
-const PaymentWithdraw = lazy(() => import('./pages/payment-withdraw').then((m) => ({ default: m.PaymentWithdraw })));
-const DeliveryZones = lazy(() => import('./pages/delivery-zones').then((m) => ({ default: m.DeliveryZones })));
-const DeliveryZoneNew = lazy(() => import('./pages/delivery-zone-new').then((m) => ({ default: m.DeliveryZoneNew })));
-const Settings = lazy(() => import('./pages/settings').then((m) => ({ default: m.Settings })));
-const Notifications = lazy(() => import('./pages/notifications').then((m) => ({ default: m.Notifications })));
-const MerchantSubscriptionPage = lazy(() => import('./pages/merchant-subscription').then((m) => ({ default: m.MerchantSubscriptionPage })));
+function lazyNamed<T extends Record<string, any>>(
+  factory: () => Promise<T>,
+  name: keyof T
+) {
+  return lazy(() =>
+    factory().then((m) => ({
+      default: m[name] || m.default || m,
+    }))
+  );
+}
+
+const Overview = lazyNamed(() => import('./pages/overview'), 'Overview');
+const Products = lazyNamed(() => import('./pages/products'), 'Products');
+const ProductForm = lazyNamed(() => import('./pages/product-form'), 'ProductForm');
+const Campaigns = lazyNamed(() => import('./pages/campaigns'), 'Campaigns');
+const CampaignForm = lazyNamed(() => import('./pages/campaign-form'), 'CampaignForm');
+const Sellers = lazyNamed(() => import('./pages/sellers'), 'Sellers');
+const SellerDetail = lazyNamed(() => import('./pages/seller-detail'), 'SellerDetail');
+const Orders = lazyNamed(() => import('./pages/orders'), 'Orders');
+const OrderDetail = lazyNamed(() => import('./pages/order-detail'), 'OrderDetail');
+const Analytics = lazyNamed(() => import('./pages/analytics'), 'Analytics');
+const Payments = lazyNamed(() => import('./pages/payments'), 'Payments');
+const PaymentWithdraw = lazyNamed(() => import('./pages/payment-withdraw'), 'PaymentWithdraw');
+const DeliveryZones = lazyNamed(() => import('./pages/delivery-zones'), 'DeliveryZones');
+const DeliveryZoneNew = lazyNamed(() => import('./pages/delivery-zone-new'), 'DeliveryZoneNew');
+const Settings = lazyNamed(() => import('./pages/settings'), 'Settings');
+const Notifications = lazyNamed(() => import('./pages/notifications'), 'Notifications');
+const MerchantSubscriptionPage = lazyNamed(() => import('./pages/merchant-subscription'), 'MerchantSubscriptionPage');
 
 function RouteFallback() {
   return (

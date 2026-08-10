@@ -3,21 +3,32 @@ import { Route, Switch } from 'wouter';
 import { ProtectedRoute } from '@/components/protected-route';
 import { AdminShell } from './components/admin-shell';
 
-const AdminOverview = lazy(() => import('./pages/overview').then((m) => ({ default: m.AdminOverview })));
-const AdminUsers = lazy(() => import('./pages/users').then((m) => ({ default: m.AdminUsers })));
-const AdminProducts = lazy(() => import('./pages/products').then((m) => ({ default: m.AdminProducts })));
-const AdminOrders = lazy(() => import('./pages/orders').then((m) => ({ default: m.AdminOrders })));
-const AdminCommissions = lazy(() => import('./pages/commissions').then((m) => ({ default: m.AdminCommissions })));
-const AdminPayouts = lazy(() => import('./pages/payouts').then((m) => ({ default: m.AdminPayouts })));
-const AdminDisputes = lazy(() => import('./pages/disputes').then((m) => ({ default: m.AdminDisputes })));
-const AdminFraud = lazy(() => import('./pages/fraud').then((m) => ({ default: m.AdminFraud })));
-const AdminZones = lazy(() => import('./pages/zones').then((m) => ({ default: m.AdminZones })));
-const AdminZoneNew = lazy(() => import('./pages/zone-new').then((m) => ({ default: m.AdminZoneNew })));
-const AdminNiches = lazy(() => import('./pages/niches').then((m) => ({ default: m.AdminNiches })));
-const AdminNicheNew = lazy(() => import('./pages/niche-new').then((m) => ({ default: m.AdminNicheNew })));
-const AdminSettings = lazy(() => import('./pages/settings').then((m) => ({ default: m.AdminSettings })));
-const AdminNotifications = lazy(() => import('./pages/notifications').then((m) => ({ default: m.AdminNotifications })));
-const FinancialReportingPage = lazy(() => import('./pages/financial-reporting').then((m) => ({ default: m.FinancialReportingPage })));
+function lazyNamed<T extends Record<string, any>>(
+  factory: () => Promise<T>,
+  name: keyof T
+) {
+  return lazy(() =>
+    factory().then((m) => ({
+      default: m[name] || m.default || m,
+    }))
+  );
+}
+
+const AdminOverview = lazyNamed(() => import('./pages/overview'), 'AdminOverview');
+const AdminUsers = lazyNamed(() => import('./pages/users'), 'AdminUsers');
+const AdminProducts = lazyNamed(() => import('./pages/products'), 'AdminProducts');
+const AdminOrders = lazyNamed(() => import('./pages/orders'), 'AdminOrders');
+const AdminCommissions = lazyNamed(() => import('./pages/commissions'), 'AdminCommissions');
+const AdminPayouts = lazyNamed(() => import('./pages/payouts'), 'AdminPayouts');
+const AdminDisputes = lazyNamed(() => import('./pages/disputes'), 'AdminDisputes');
+const AdminFraud = lazyNamed(() => import('./pages/fraud'), 'AdminFraud');
+const AdminZones = lazyNamed(() => import('./pages/zones'), 'AdminZones');
+const AdminZoneNew = lazyNamed(() => import('./pages/zone-new'), 'AdminZoneNew');
+const AdminNiches = lazyNamed(() => import('./pages/niches'), 'AdminNiches');
+const AdminNicheNew = lazyNamed(() => import('./pages/niche-new'), 'AdminNicheNew');
+const AdminSettings = lazyNamed(() => import('./pages/settings'), 'AdminSettings');
+const AdminNotifications = lazyNamed(() => import('./pages/notifications'), 'AdminNotifications');
+const FinancialReportingPage = lazyNamed(() => import('./pages/financial-reporting'), 'FinancialReportingPage');
 
 function RouteFallback() {
   return (

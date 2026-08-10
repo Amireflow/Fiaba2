@@ -45,15 +45,26 @@ import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { Route, Switch, useLocation, Router as WouterRouter } from "wouter";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
-const AdminRouter = lazy(() => import("@/features/admin/admin-router").then((m) => ({ default: m.AdminRouter })));
-const MerchantRouter = lazy(() => import("@/features/merchant/merchant-router").then((m) => ({ default: m.MerchantRouter })));
-const SellerRouter = lazy(() => import("@/features/seller/seller-router").then((m) => ({ default: m.SellerRouter })));
-const CheckoutDispatcher = lazy(() => import("@/features/shop/pages/checkout-dispatcher").then((m) => ({ default: m.CheckoutDispatcher })));
-const ProductLinkRedirect = lazy(() => import("@/features/shop/pages/product-link-redirect").then((m) => ({ default: m.ProductLinkRedirect })));
-const Onboarding = lazy(() => import("@/features/merchant/pages/onboarding").then((m) => ({ default: m.Onboarding })));
-const SellerOnboarding = lazy(() => import("@/features/seller/pages/onboarding").then((m) => ({ default: m.SellerOnboarding })));
-const SignInPage = lazy(() => import("@/pages/auth").then((m) => ({ default: m.SignInPage })));
-const SignUpPage = lazy(() => import("@/pages/auth").then((m) => ({ default: m.SignUpPage })));
+function lazyNamed<T extends Record<string, any>>(
+  factory: () => Promise<T>,
+  name: keyof T
+) {
+  return lazy(() =>
+    factory().then((m) => ({
+      default: m[name] || m.default || m,
+    }))
+  );
+}
+
+const AdminRouter = lazyNamed(() => import("@/features/admin/admin-router"), "AdminRouter");
+const MerchantRouter = lazyNamed(() => import("@/features/merchant/merchant-router"), "MerchantRouter");
+const SellerRouter = lazyNamed(() => import("@/features/seller/seller-router"), "SellerRouter");
+const CheckoutDispatcher = lazyNamed(() => import("@/features/shop/pages/checkout-dispatcher"), "CheckoutDispatcher");
+const ProductLinkRedirect = lazyNamed(() => import("@/features/shop/pages/product-link-redirect"), "ProductLinkRedirect");
+const Onboarding = lazyNamed(() => import("@/features/merchant/pages/onboarding"), "Onboarding");
+const SellerOnboarding = lazyNamed(() => import("@/features/seller/pages/onboarding"), "SellerOnboarding");
+const SignInPage = lazyNamed(() => import("@/pages/auth"), "SignInPage");
+const SignUpPage = lazyNamed(() => import("@/pages/auth"), "SignUpPage");
 
 const queryClient = new QueryClient({
   defaultOptions: {

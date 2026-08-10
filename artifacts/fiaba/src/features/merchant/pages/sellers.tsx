@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { Copy01Icon, Search01Icon, UserGroupIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
@@ -137,9 +137,35 @@ export function Sellers() {
 
   function copyInviteLink() {
     haptic('light');
-    const link = `https://fiaba.sn/rejoindre/${merchantId ?? ''}`;
-    navigator.clipboard?.writeText(link).catch(() => {});
-    toast({ title: "Lien d'invitation copié", description: 'Partagez-le avec vos vendeurs sur WhatsApp.' });
+    const origin = window.location.origin;
+    const pathPrefix = import.meta.env.BASE_URL ? import.meta.env.BASE_URL.replace(/\/$/, '') : '';
+    const link = `${origin}${pathPrefix}/sign-up?ref=${merchantId ?? ''}`;
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link).catch(() => fallbackCopy(link));
+    } else {
+      fallbackCopy(link);
+    }
+
+    toast({
+      title: "Lien d'invitation copié !",
+      description: 'Ce lien sécurisé permet aux vendeurs de s\'inscrire et de rejoindre directement votre réseau.',
+    });
+  }
+
+  function fallbackCopy(text: string) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (e) {
+      console.error('Fallback copy error:', e);
+    }
+    document.body.removeChild(textArea);
   }
 
   const activeCount = sellers.filter((s) => s.status === 'actif').length;
@@ -153,11 +179,20 @@ export function Sellers() {
       description="Les bonnes personnes ne sont pas toujours les plus visibles. Retrouvez ici celles qui savent créer de la confiance."
       action={<Button onClick={copyInviteLink} testId="button-invite-link">Inviter un vendeur <Icon glyph={Copy01Icon} size={15} /></Button>}
     >
-      {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Card className="p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Vendeurs actifs</p><p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{activeCount}</p></Card>
-        <Card className="p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes générées</p><p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{totalSales}</p></Card>
-        <Card className="p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">CA réseau</p><p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(totalRevenue)}</p></Card>
+      {/* Stats (2 par ligne sur mobile) */}
+      <div className="mt-6 grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <Card className="p-3.5 sm:p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Vendeurs actifs</p>
+          <p className="mt-1.5 sm:mt-2 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{activeCount}</p>
+        </Card>
+        <Card className="p-3.5 sm:p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes générées</p>
+          <p className="mt-1.5 sm:mt-2 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{totalSales}</p>
+        </Card>
+        <Card className="p-3.5 sm:p-4 col-span-2 lg:col-span-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">CA réseau</p>
+          <p className="mt-1.5 sm:mt-2 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{money(totalRevenue)}</p>
+        </Card>
       </div>
 
       {/* Search + filter */}

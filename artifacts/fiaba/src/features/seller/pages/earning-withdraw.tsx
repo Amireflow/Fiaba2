@@ -84,7 +84,7 @@ export function EarningWithdraw() {
       return;
     }
 
-    const feeCalc = calculatePayoutFee(amt);
+    const feeCalc = calculatePayoutFee(amt, payoutRule);
     setSubmitting(true);
 
     const { error } = await (supabase.from('payouts') as any).insert({
@@ -156,7 +156,7 @@ export function EarningWithdraw() {
           </SellerField>
 
           {amount && Number(amount) > 0 && (() => {
-            const payoutCalc = calculatePayoutFee(Number(amount));
+            const payoutCalc = calculatePayoutFee(Number(amount), payoutRule);
             return (
               <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs space-y-1.5 border border-[#e8e5f2]">
                 <div className="flex justify-between">

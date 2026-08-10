@@ -121,6 +121,53 @@ export function useMerchantId() {
 }
 
 /**
+ * Résolution automatique et sécurisée du merchantId pour l'utilisateur actuellement connecté.
+ */
+export async function getOrCreateMerchantId(cachedMerchantId?: string | null): Promise<string | null> {
+  if (cachedMerchantId) return cachedMerchantId;
+
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+
+    // 1. Chercher la boutique existante
+    const { data: merch } = await (supabase.from('merchants') as any)
+      .select('id')
+      .eq('owner_id', userId)
+      .maybeSingle();
+
+    if (merch?.id) return merch.id;
+
+    // 2. Chercher les infos de profil
+    const { data: prof } = await (supabase.from('profiles') as any)
+      .select('full_name, phone, email')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const nameToUse = prof?.full_name ? `Boutique ${prof.full_name}` : 'Ma Boutique Fiaba';
+    const slugName = nameToUse.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    // 3. Créer automatiquement la boutique
+    const { data: newMerch } = await (supabase.from('merchants') as any)
+      .insert({
+        owner_id: userId,
+        name: nameToUse,
+        slug: `${slugName}-${userId.slice(0, 6)}`,
+        phone: prof?.phone || null,
+        email: prof?.email || null,
+      })
+      .select('id')
+      .single();
+
+    return newMerch?.id ?? null;
+  } catch (err) {
+    console.error('getOrCreateMerchantId error:', err);
+    return null;
+  }
+}
+
+/**
  * Inserer une ligne dans une table Supabase.
  */
 export async function supabaseInsert<T = Record<string, unknown>>(

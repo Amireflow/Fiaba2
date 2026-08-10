@@ -5,7 +5,7 @@ import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { useMerchantId, useSupabaseQuery, supabaseInsert, supabaseUpdate } from '@/hooks/use-supabase-query';
+import { useMerchantId, useSupabaseQuery, supabaseInsert, supabaseUpdate, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
 import {
   Field,
   MerchantButton as Button,
@@ -106,34 +106,7 @@ export function CampaignForm() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    let activeMerchantId = merchantId;
-
-    if (!activeMerchantId) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user?.id;
-      if (userId) {
-        const { data: merch } = await (supabase.from('merchants') as any)
-          .select('id')
-          .eq('owner_id', userId)
-          .maybeSingle();
-
-        if (merch?.id) {
-          activeMerchantId = merch.id;
-        } else {
-          const { data: newMerch } = await (supabase.from('merchants') as any)
-            .insert({
-              owner_id: userId,
-              name: 'Ma Boutique Fiaba',
-              slug: `boutique-${userId.slice(0, 6)}`,
-            })
-            .select('id')
-            .single();
-          if (newMerch?.id) {
-            activeMerchantId = newMerch.id;
-          }
-        }
-      }
-    }
+    const activeMerchantId = await getOrCreateMerchantId(merchantId);
 
     if (!activeMerchantId) {
       toast({ title: 'Erreur', description: 'Impossible de trouver votre boutique.' });

@@ -4,7 +4,7 @@ import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { haptic } from '@/lib/utils';
-import { useMerchantId, useSupabaseQuery, supabaseInsert } from '@/hooks/use-supabase-query';
+import { useMerchantId, useSupabaseQuery, supabaseInsert, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
 import {
   Field,
   MerchantButton as Button,
@@ -44,7 +44,8 @@ export function DeliveryZoneNew() {
 
   async function addZone(e: React.FormEvent) {
     e.preventDefault();
-    if (!merchantId) {
+    const activeMerchantId = await getOrCreateMerchantId(merchantId);
+    if (!activeMerchantId) {
       toast({ title: 'Erreur', description: 'Impossible de trouver votre boutique.' });
       return;
     }
@@ -59,7 +60,7 @@ export function DeliveryZoneNew() {
     setSaving(true);
     haptic('medium');
     const { error } = await supabaseInsert('delivery_zones', {
-      merchant_id: merchantId,
+      merchant_id: activeMerchantId,
       name: trimmedName,
       fee: feeNum,
       is_active: true,

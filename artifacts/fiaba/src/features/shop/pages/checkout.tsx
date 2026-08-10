@@ -435,9 +435,7 @@ export function Checkout() {
     setStep('confirmation');
     toast({
       title: 'Commande confirmée !',
-      description: sellerAttributed
-        ? `${orderShortId} · ${money(total)} · Vendeur ${resolvedSellerCode} crédité de ${money(commissionAmount)}`
-        : `${orderShortId} · ${money(total)}`,
+      description: `${orderShortId} · ${money(total)} · Votre commande a bien été enregistrée.`,
     });
   }
 
@@ -491,6 +489,14 @@ export function Checkout() {
                 )}
               </div>
 
+              {/* Product description */}
+              {campaign.product_description && (
+                <div className="rounded-2xl bg-white p-5 space-y-1.5 border border-[#f1effa]" data-testid="product-description-card">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Description du produit</p>
+                  <p className="text-sm leading-relaxed text-[#514b71] whitespace-pre-line">{campaign.product_description}</p>
+                </div>
+              )}
+
               {/* Price + quantity */}
               <div className="rounded-2xl bg-white p-5">
                 <div className="flex items-center justify-between">
@@ -533,7 +539,7 @@ export function Checkout() {
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#5b49e8] text-white"><Icon glyph={UserGroupIcon} size={20} /></span>
                   <div className="flex-1">
                     <p className="text-xs font-bold text-[#292541]">Recommandé par {sellerInfo.sellerCode}</p>
-                    <p className="text-[10px] text-[#77738a]">Ce vendeur sera crédité de sa commission sur votre commande.</p>
+                    <p className="text-[10px] text-[#77738a]">Offre partagée par un ambassadeur partenaire vérifié.</p>
                   </div>
                   <span className="flex items-center gap-1 text-[10px] font-bold text-[#278e69]"><Icon glyph={LockKeyIcon} size={12} /> Lien vérifié</span>
                 </div>

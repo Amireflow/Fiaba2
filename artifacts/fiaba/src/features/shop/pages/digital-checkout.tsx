@@ -370,7 +370,7 @@ export function DigitalCheckout() {
   return (
     <div className="min-h-[100dvh] bg-[#f8f7fc] text-[#292541]">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-white/90 px-5 backdrop-blur-xl border-b border-[#f0edfa]">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-white/90 px-5 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2 text-sm font-bold text-[#292541]">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#5b49e8] text-white">
             <Icon glyph={Store01Icon} size={18} />
@@ -387,7 +387,7 @@ export function DigitalCheckout() {
           <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
             {/* Left Column: Product Showcase */}
             <div className="space-y-5">
-              <div className="overflow-hidden rounded-3xl bg-white border border-[#eceaf5] shadow-sm">
+              <div className="overflow-hidden rounded-3xl bg-white">
                 {primaryImage ? (
                   <img src={primaryImage} alt={campaign.product_name} className="h-64 w-full object-cover" />
                 ) : (
@@ -415,7 +415,7 @@ export function DigitalCheckout() {
                     </p>
                   )}
 
-                  <div className="mt-6 flex items-center justify-between border-t border-[#f0edf9] pt-4">
+                  <div className="mt-6 flex items-center justify-between pt-4">
                     <span className="text-xs font-bold uppercase tracking-wider text-[#9290a2]">Prix de la ressource</span>
                     <strong className="font-[Space_Grotesk] text-2xl font-bold text-[#5b49e8]">
                       {money(campaign.product_price)}
@@ -426,7 +426,7 @@ export function DigitalCheckout() {
 
               {/* Attribution info */}
               {sellerInfo && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4 border border-[#d8cdff]">
+                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-xs">
                     {(sellerInfo.sellerCode || 'V').slice(0, 2).toUpperCase()}
                   </span>
@@ -441,7 +441,7 @@ export function DigitalCheckout() {
 
               {/* Trust Badges */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5 border border-[#eceaf5]">
+                <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5">
                   <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]">
                     <Icon glyph={ShieldKeyIcon} size={16} />
                   </span>
@@ -450,7 +450,7 @@ export function DigitalCheckout() {
                     <p className="text-[#9290a2]">Wave & OM</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5 border border-[#eceaf5]">
+                <div className="flex items-center gap-2.5 rounded-2xl bg-white p-3.5">
                   <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
                     <Icon glyph={SparklesIcon} size={16} />
                   </span>
@@ -464,7 +464,7 @@ export function DigitalCheckout() {
 
             {/* Right Column: Instant Checkout Form */}
             <div>
-              <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#eceaf5]">
+              <div className="rounded-3xl bg-white p-6">
                 <h2 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">
                   Obtenir votre accès en 1 clic
                 </h2>
@@ -515,12 +515,12 @@ export function DigitalCheckout() {
                       <button
                         type="button"
                         onClick={() => { haptic('light'); setField('paymentMethod', 'wave'); }}
-                        className={`flex items-center gap-2.5 rounded-xl border-2 p-3 text-left transition ${
-                          form.paymentMethod === 'wave' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'
+                        className={`flex items-center gap-2.5 rounded-xl p-3 text-left transition ${
+                          form.paymentMethod === 'wave' ? 'bg-[#f6f5ff]' : 'bg-[#f4f3f8] hover:bg-[#eae8f5]'
                         }`}
                         data-testid="button-select-wave"
                       >
-                        <span className={`grid h-4 w-4 place-items-center rounded-full border-2 ${form.paymentMethod === 'wave' ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
+                        <span className={`grid h-4 w-4 place-items-center rounded-full ${form.paymentMethod === 'wave' ? 'bg-[#5b49e8]' : 'bg-[#c4c0d6]'}`}>
                           {form.paymentMethod === 'wave' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </span>
                         <span className="text-xs font-bold text-[#292541]">Wave</span>
@@ -529,12 +529,12 @@ export function DigitalCheckout() {
                       <button
                         type="button"
                         onClick={() => { haptic('light'); setField('paymentMethod', 'orange'); }}
-                        className={`flex items-center gap-2.5 rounded-xl border-2 p-3 text-left transition ${
-                          form.paymentMethod === 'orange' ? 'border-[#5b49e8] bg-[#f6f5ff]' : 'border-[#e9e6f1] bg-white hover:border-[#d4ceff]'
+                        className={`flex items-center gap-2.5 rounded-xl p-3 text-left transition ${
+                          form.paymentMethod === 'orange' ? 'bg-[#f6f5ff]' : 'bg-[#f4f3f8] hover:bg-[#eae8f5]'
                         }`}
                         data-testid="button-select-orange"
                       >
-                        <span className={`grid h-4 w-4 place-items-center rounded-full border-2 ${form.paymentMethod === 'orange' ? 'border-[#5b49e8] bg-[#5b49e8]' : 'border-[#c4c0d6]'}`}>
+                        <span className={`grid h-4 w-4 place-items-center rounded-full ${form.paymentMethod === 'orange' ? 'bg-[#5b49e8]' : 'bg-[#c4c0d6]'}`}>
                           {form.paymentMethod === 'orange' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                         </span>
                         <span className="text-xs font-bold text-[#292541]">Orange Money</span>
@@ -562,10 +562,10 @@ export function DigitalCheckout() {
                   </div>
 
                   {/* Pricing Summary */}
-                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs space-y-1.5 border border-[#eceaf5]">
+                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs space-y-1.5">
                     <div className="flex justify-between"><span className="text-[#77738a]">Montant du fichier</span><span className="font-bold">{money(campaign.product_price)}</span></div>
                     <div className="flex justify-between"><span className="text-[#77738a]">Frais de livraison</span><span className="font-bold text-[#278e69]">0 FCFA (Offerts)</span></div>
-                    <div className="flex justify-between border-t border-[#e4e1ff] pt-2 font-bold text-sm">
+                    <div className="flex justify-between pt-2 font-bold text-sm">
                       <span>Total à régler</span>
                       <span className="text-[#5b49e8] font-[Space_Grotesk]">{money(campaign.product_price)}</span>
                     </div>
@@ -574,7 +574,7 @@ export function DigitalCheckout() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white shadow-md hover:bg-[#4a3bc7] transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white hover:bg-[#4a3bc7] transition disabled:opacity-60 flex items-center justify-center gap-2"
                     data-testid="button-submit-digital-payment"
                   >
                     ⚡ Payer {money(campaign.product_price)} & Télécharger
@@ -604,7 +604,7 @@ export function DigitalCheckout() {
               </div>
 
               {/* Prominent Digital Access Box */}
-              <div className="rounded-3xl bg-white p-6 shadow-md border border-[#eceaf5] text-left space-y-4">
+              <div className="rounded-3xl bg-white p-6 text-left space-y-4">
                 <div className="flex items-center gap-2.5 text-[#5b49e8]">
                   <Icon glyph={SparklesIcon} size={22} />
                   <h2 className="font-[Space_Grotesk] text-lg font-bold">Votre Téléchargement</h2>
@@ -616,7 +616,7 @@ export function DigitalCheckout() {
                     target="_blank"
                     rel="noopener noreferrer"
                     download
-                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] py-4 px-5 text-sm font-bold text-white shadow-lg hover:bg-[#4a3bc7] transition"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#5b49e8] py-4 px-5 text-sm font-bold text-white hover:bg-[#4a3bc7] transition"
                     data-testid="button-download-now"
                   >
                     <Icon glyph={Download01Icon} size={20} />
@@ -629,7 +629,7 @@ export function DigitalCheckout() {
                 )}
 
                 {confirmedOrder.digitalAccessInstructions && (
-                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs text-[#292541] border border-[#eceaf5] space-y-1">
+                  <div className="rounded-2xl bg-[#f8f7fc] p-4 text-xs text-[#292541] space-y-1">
                     <p className="font-bold text-[#5b49e8]">Instructions complémentaires :</p>
                     <p className="whitespace-pre-line text-[#514b71]">{confirmedOrder.digitalAccessInstructions}</p>
                   </div>
@@ -648,13 +648,13 @@ export function DigitalCheckout() {
               </div>
 
               {/* Order Details Card */}
-              <div className="rounded-2xl bg-white p-5 text-left border border-[#eceaf5]">
+              <div className="rounded-2xl bg-white p-5 text-left">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Reçu de paiement</p>
                 <div className="mt-3 space-y-2 text-xs">
                   <div className="flex justify-between"><span className="text-[#77738a]">Ressource</span><span className="font-bold text-[#292541]">{confirmedOrder.productName}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Boutique</span><span className="font-bold text-[#292541]">{confirmedOrder.merchantName}</span></div>
                   <div className="flex justify-between"><span className="text-[#77738a]">Mode de paiement</span><span className="font-bold text-[#292541]">{confirmedOrder.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'}</span></div>
-                  <div className="flex justify-between border-t border-[#f0eff5] pt-2 font-bold text-sm"><span>Total Payé</span><strong className="text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
+                  <div className="flex justify-between pt-2 font-bold text-sm"><span>Total Payé</span><strong className="text-[#5b49e8]">{money(confirmedOrder.total)}</strong></div>
                 </div>
               </div>
 
@@ -669,7 +669,7 @@ export function DigitalCheckout() {
       {/* Mobile Money Simulation Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl border border-[#eceaf5]">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6">
             <div className="text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#efedff] text-[#5b49e8] mb-4">
                 <Icon glyph={Wallet01Icon} size={28} />
@@ -690,7 +690,7 @@ export function DigitalCheckout() {
                   <span className="text-[#9290a2]">Produit</span>
                   <span className="font-bold text-[#292541]">{campaign.product_name}</span>
                 </div>
-                <div className="flex justify-between text-sm border-t border-[#e9e6f1] pt-2 mt-2 font-bold">
+                <div className="flex justify-between text-sm pt-2 mt-2 font-bold">
                   <span>Montant total</span>
                   <span className="text-[#278e69]">{money(campaign.product_price)}</span>
                 </div>
@@ -701,7 +701,7 @@ export function DigitalCheckout() {
                   type="button"
                   disabled={submitting}
                   onClick={() => handleSimulatedPayment('success')}
-                  className="w-full rounded-2xl bg-[#278e69] py-3.5 text-sm font-bold text-white shadow-md hover:bg-[#207556] transition flex items-center justify-center gap-2"
+                  className="w-full rounded-2xl bg-[#278e69] py-3.5 text-sm font-bold text-white hover:bg-[#207556] transition flex items-center justify-center gap-2"
                   data-testid="button-simulate-digital-success"
                 >
                   {submitting ? (
@@ -718,7 +718,7 @@ export function DigitalCheckout() {
                   type="button"
                   disabled={submitting}
                   onClick={() => handleSimulatedPayment('failure')}
-                  className="w-full rounded-2xl bg-[#fff0f1] border border-[#fbd4d8] py-3.5 text-sm font-bold text-[#c45667] hover:bg-[#ffe3e6] transition flex items-center justify-center gap-2"
+                  className="w-full rounded-2xl bg-[#fff0f1] py-3.5 text-sm font-bold text-[#c45667] hover:bg-[#ffe3e6] transition flex items-center justify-center gap-2"
                   data-testid="button-simulate-digital-failure"
                 >
                   <Icon glyph={Cancel01Icon} size={18} />

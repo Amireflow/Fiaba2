@@ -425,9 +425,15 @@ export function SignUpPage() {
       setAlert({
         tone: 'success',
         title: 'Compte créé !',
-        message: 'Votre compte a été créé avec succès. Complétons maintenant votre profil.',
+        message: 'Votre compte a été créé avec succès.',
       });
-      setLocation('/onboarding');
+      if (finalRole === 'marchand') {
+        setLocation('/merchant');
+      } else if (finalRole === 'admin') {
+        setLocation('/admin');
+      } else {
+        setLocation('/seller');
+      }
     }
   };
 

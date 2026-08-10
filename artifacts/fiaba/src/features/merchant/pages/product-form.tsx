@@ -202,29 +202,18 @@ export function ProductForm() {
         navigate('/merchant/products');
       }
     } else {
-      const { data: newProd, error } = await (supabase.from('products') as any)
-        .insert(payload)
-        .select('id')
-        .single();
+      const { error } = await (supabase.from('products') as any)
+        .insert(payload);
       setSaving(false);
       if (error) {
         haptic('error');
         toast({ title: 'Erreur', description: error.message });
       } else {
-        if (newProd?.id) {
-          await (supabase.from('campaigns') as any).insert({
-            merchant_id: activeMerchantId,
-            product_id: newProd.id,
-            name: `Offre ${payload.name}`,
-            description: payload.description || `Recommandez ${payload.name}`,
-            commission: 10,
-            commission_type: 'percentage',
-            model: 'commission',
-            status: 'active',
-          });
-        }
         haptic('success');
-        toast({ title: 'Produit & Campagne lancés', description: `${payload.name} est désormais disponible dans le réseau de vendeurs !` });
+        toast({
+          title: 'Produit enregistré !',
+          description: `${payload.name} a été ajouté avec succès à votre catalogue.`,
+        });
         navigate('/merchant/products');
       }
     }

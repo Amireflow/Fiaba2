@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import {
   ArrowLeft01Icon,
+  ArrowRight01Icon,
   CheckmarkCircle02Icon,
   Store01Icon,
   Wallet01Icon,
@@ -108,6 +109,45 @@ export function Checkout() {
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // Report state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('Produit non conforme ou trompeur');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  async function handleSendReport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!campaign || reportSubmitting) return;
+    setReportSubmitting(true);
+    haptic('light');
+
+    const { error } = await supabase.from('campaign_reports').insert({
+      campaign_id: campaign.campaign_id,
+      merchant_id: campaign.merchant_id,
+      seller_id: sellerInfo?.sellerId || null,
+      seller_code: sellerInfo?.sellerCode || form.sellerCode.trim() || null,
+      reason: reportReason,
+      details: reportDetails.trim() || null,
+      reporter_name: form.customerName.trim() || null,
+      reporter_phone: form.phone.trim() || null,
+    } as never);
+
+    setReportSubmitting(false);
+    setShowReportModal(false);
+
+    if (error) {
+      haptic('error');
+      toast({ title: 'Erreur', description: 'Impossible d\'envoyer le signalement. Veuillez réessayer.' });
+    } else {
+      haptic('success');
+      toast({
+        title: 'Signalement transmis',
+        description: 'Merci de votre vigilance. Notre équipe va examiner ce contenu.',
+      });
+      setReportDetails('');
+    }
+  }
 
   // Seller attribution state
   const [sellerInfo, setSellerInfo] = useState<{ sellerId: string; sellerCode: string; campaignId: string; trackingLinkId: string } | null>(null);
@@ -563,34 +603,83 @@ export function Checkout() {
               {/* Product image gallery */}
               {(() => {
                 const images = parseImageUrls(campaign.product_image_url);
+                const currentImg = images[activeImageIndex] || images[0];
+
+                const handlePrevImage = () => {
+                  haptic('light');
+                  setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+                };
+
+                const handleNextImage = () => {
+                  haptic('light');
+                  setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+                };
+
                 return (
-                  <div className="overflow-hidden rounded-3xl bg-white p-2 border border-[#f1effa]">
+                  <div className="overflow-hidden rounded-3xl bg-white p-3 border border-[#f1effa] shadow-sm">
                     {images.length > 0 ? (
-                      <div className="space-y-2">
-                        <img
-                          src={images[activeImageIndex] || images[0]}
-                          alt={campaign.product_name}
-                          className="h-64 w-full rounded-2xl object-cover"
-                        />
+                      <div className="space-y-3">
+                        {/* Main Square Aspect-Ratio Image Container */}
+                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#f8f7fc] group">
+                          <img
+                            src={currentImg}
+                            alt={campaign.product_name}
+                            className="h-full w-full object-cover transition-all duration-300"
+                          />
+
+                          {/* Navigation Arrows */}
+                          {images.length > 1 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handlePrevImage}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white hover:scale-105 active:scale-95"
+                                aria-label="Image précédente"
+                                data-testid="button-gallery-prev"
+                              >
+                                <Icon glyph={ArrowLeft01Icon} size={20} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleNextImage}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#292541] shadow-md backdrop-blur-md transition hover:bg-white hover:scale-105 active:scale-95"
+                                aria-label="Image suivante"
+                                data-testid="button-gallery-next"
+                              >
+                                <Icon glyph={ArrowRight01Icon} size={20} />
+                              </button>
+
+                              {/* Index badge */}
+                              <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md">
+                                {activeImageIndex + 1} / {images.length}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Thumbnails list with clean border-radius */}
                         {images.length > 1 && (
-                          <div className="flex gap-2 overflow-x-auto px-1 py-1 scrollbar-none">
+                          <div className="flex gap-2.5 overflow-x-auto px-1 py-1 scrollbar-none">
                             {images.map((img, idx) => (
                               <button
                                 key={img + idx}
                                 type="button"
                                 onClick={() => { haptic('light'); setActiveImageIndex(idx); }}
-                                className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 transition ${
-                                  idx === activeImageIndex ? 'border-[#5b49e8]' : 'border-transparent opacity-70 hover:opacity-100'
+                                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 p-0.5 transition-all ${
+                                  idx === activeImageIndex
+                                    ? 'border-[#5b49e8] ring-2 ring-[#5b49e8]/20 scale-105'
+                                    : 'border-[#e9e6f1] opacity-70 hover:opacity-100 hover:border-[#b8b4c8]'
                                 }`}
+                                data-testid={`thumbnail-${idx}`}
                               >
-                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full object-cover" />
+                                <img src={img} alt={`Vignette ${idx + 1}`} className="h-full w-full rounded-lg object-cover" />
                               </button>
                             ))}
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="grid h-64 w-full place-items-center bg-[#f8f7fc] rounded-2xl">
+                      <div className="grid aspect-square w-full place-items-center bg-[#f8f7fc] rounded-2xl">
                         <span className="grid h-20 w-20 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
                           <Icon glyph={Store01Icon} size={36} />
                         </span>
@@ -646,19 +735,23 @@ export function Checkout() {
 
               {/* Seller attribution badge */}
               {linkStatus === 'valid' && sellerInfo && (
-                <div className="flex items-center gap-3 rounded-2xl bg-[#efedff] p-4 border border-[#dfdbff]" data-testid="seller-attribution-badge">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-sm">
-                    {sellerInfo.sellerCode.replace(/^@/, '').slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-[#292541] truncate">
-                      Recommandé par <span className="text-[#5b49e8]">{sellerInfo.sellerCode.startsWith('@') ? sellerInfo.sellerCode : `@${sellerInfo.sellerCode}`}</span>
-                    </p>
-                    <p className="text-[10px] text-[#77738a] truncate">Offre certifiée proposée par votre ambassadeur Fiaba.</p>
+                <div className="rounded-2xl bg-[#efedff] p-4 border border-[#dfdbff]" data-testid="seller-attribution-badge">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5b49e8] text-white font-[Space_Grotesk] font-bold text-sm">
+                      {campaign.merchant_name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                        <p className="text-xs font-bold text-[#292541]">
+                          Par <span className="text-[#5b49e8]">{campaign.merchant_name}</span>
+                        </p>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#278e69] shrink-0 bg-[#e7faf2] px-2 py-0.5 rounded-md border border-[#c5f4e0]">
+                          <Icon glyph={LockKeyIcon} size={11} /> Partenaire certifié
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-[#77738a]">Offre certifiée disponible auprès de {campaign.merchant_name}.</p>
+                    </div>
                   </div>
-                  <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#278e69]">
-                    <Icon glyph={LockKeyIcon} size={12} /> Partenaire certifié
-                  </span>
                 </div>
               )}
               {linkStatus === 'invalid' && (
@@ -687,6 +780,17 @@ export function Checkout() {
               <button onClick={() => { haptic('medium'); nextStep(); }} className="w-full rounded-2xl bg-[#5b49e8] py-4 text-sm font-bold text-white transition hover:bg-[#4a3bc7]" data-testid="button-next-delivery">
                 Continuer vers la livraison
               </button>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => { haptic('light'); setShowReportModal(true); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#9290a2] hover:text-[#c45667] transition"
+                  data-testid="button-open-report"
+                >
+                  <Icon glyph={Alert01Icon} size={14} /> Signaler ce produit ou cette offre
+                </button>
+              </div>
             </div>
           )}
 
@@ -805,9 +909,9 @@ export function Checkout() {
               {form.paymentMethod !== 'cod' && (
                 <div className="rounded-2xl bg-white p-5">
                   <label className="text-xs font-bold text-[#292541]">Numéro {form.paymentMethod === 'wave' ? 'Wave' : 'Orange Money'} *</label>
-                  <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-4">
+                  <div className={`mt-1.5 flex items-center gap-2 rounded-xl bg-[#f4f3f8] px-4 transition focus-within:bg-white focus-within:ring-1 ${errors.paymentNumber ? 'ring-1 ring-[#ef6d78]' : 'focus-within:ring-[#5b49e8]'}`}>
                     <Icon glyph={SmartPhone01Icon} size={16} />
-                    <input value={form.paymentNumber} onChange={(e) => setField('paymentNumber', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm outline-none" data-testid="input-payment-number" />
+                    <input value={form.paymentNumber} onChange={(e) => setField('paymentNumber', e.target.value)} placeholder="77 123 45 67" className="w-full bg-transparent py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8]" data-testid="input-payment-number" />
                   </div>
                   {errors.paymentNumber && <p className="mt-1 text-[10px] font-bold text-[#ef6d78]">{errors.paymentNumber}</p>}
                   <p className="mt-2 flex items-center gap-1 text-[10px] text-[#9290a2]"><Icon glyph={LockKeyIcon} size={12} /> Vos informations sont chiffrées et sécurisées.</p>
@@ -949,6 +1053,87 @@ export function Checkout() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Signalement */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl border border-[#eceaf5] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#f0eff5] pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff0f1] text-[#c45667]">
+                  <Icon glyph={Alert01Icon} size={20} />
+                </span>
+                <div>
+                  <h3 className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Signaler un problème</h3>
+                  <p className="text-[10px] text-[#77738a]">Fiaba · Espace de confiance certifié</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="grid h-8 w-8 place-items-center rounded-lg bg-[#f4f3f8] text-[#77738a] hover:text-[#292541]"
+                data-testid="button-close-report-modal"
+              >
+                <Icon glyph={Cancel01Icon} size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendReport} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-[#292541]">Motif du signalement *</label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] font-bold outline-none focus:bg-white focus:ring-1 focus:ring-[#5b49e8]"
+                  data-testid="select-report-reason"
+                >
+                  <option value="Produit non conforme ou trompeur">Produit non conforme ou trompeur</option>
+                  <option value="Prix abusif ou escroquerie suspectée">Prix abusif ou escroquerie suspectée</option>
+                  <option value="Photos ou description volées">Photos ou description volées</option>
+                  <option value="Marchand ou boutique suspecte">Marchand ou boutique suspecte</option>
+                  <option value="Autre raison">Autre motif de signalement</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#292541]">Détails complémentaires (optionnel)</label>
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Décrivez brièvement le problème constaté pour aider notre équipe d'audit..."
+                  className="mt-1.5 w-full min-h-24 resize-none rounded-xl bg-[#f4f3f8] px-4 py-3 text-sm text-[#292541] outline-none placeholder:text-[#b8b4c8] focus:bg-white focus:ring-1 focus:ring-[#5b49e8]"
+                  data-testid="textarea-report-details"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="w-1/3 rounded-2xl bg-[#f4f3f8] py-3 text-xs font-bold text-[#77738a] hover:text-[#292541] transition"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={reportSubmitting}
+                  className="w-2/3 rounded-2xl bg-[#c45667] py-3 text-xs font-bold text-white shadow-md hover:bg-[#b04858] transition flex items-center justify-center gap-1.5 disabled:opacity-60"
+                  data-testid="button-submit-report"
+                >
+                  {reportSubmitting ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      <Icon glyph={Alert01Icon} size={15} />
+                      Transmettre le signalement
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

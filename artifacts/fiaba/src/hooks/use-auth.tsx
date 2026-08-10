@@ -229,10 +229,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchUserData]);
 
   const signInWithOtp = useCallback(async (phone: string) => {
+    // Rate limit: max 3 OTP requests per 60 seconds (CDC §22 — brute force protection)
+    const key = `otp_send_${phone}`;
+    const now = Date.now();
+    const raw = sessionStorage.getItem(key);
+    const attempts = raw ? JSON.parse(raw) as number[] : [];
+    const recent = attempts.filter((t) => now - t < 60_000);
+    if (recent.length >= 3) {
+      return { data: null, error: { message: 'Trop de demandes OTP. Patientez 1 minute.' } };
+    }
+    sessionStorage.setItem(key, JSON.stringify([...recent, now]));
     return supabase.auth.signInWithOtp({ phone });
   }, []);
 
   const verifyOtp = useCallback(async (phone: string, token: string) => {
+    // Rate limit: max 5 verification attempts per 5 minutes (CDC §22 — brute force protection)
+    const key = `otp_verify_${phone}`;
+    const now = Date.now();
+    const raw = sessionStorage.getItem(key);
+    const attempts = raw ? JSON.parse(raw) as number[] : [];
+    const recent = attempts.filter((t) => now - t < 300_000);
+    if (recent.length >= 5) {
+      return { data: null, error: { message: 'Trop de tentatives. Patientez 5 minutes.' } };
+    }
+    sessionStorage.setItem(key, JSON.stringify([...recent, now]));
     return supabase.auth.verifyOtp({ phone, token, type: 'sms' });
   }, []);
 

@@ -121,6 +121,7 @@ export function Products() {
                   <span className="font-[Space_Grotesk] font-bold text-[#292541]">{money(p.price)}</span>
                   <span className="text-sm font-medium text-[#292541]">{p.stock}</span>
                   <div className="flex items-center justify-end gap-1.5">
+                    <Link href="/merchant/campaigns/new"><Button variant="soft" testId={`campaign-${p.id}`}>Campagne +</Button></Link>
                     <Link href={`/merchant/products/${p.id}/edit`}><Button variant="ghost" testId={`edit-${p.id}`}><Icon glyph={Edit02Icon} size={15} /></Button></Link>
                     <Button variant="ghost" onClick={() => { haptic('light'); setToDelete(p); }} testId={`delete-${p.id}`}><Icon glyph={Delete02Icon} size={15} /></Button>
                   </div>

@@ -16,7 +16,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { money, haptic, friendlyErrorMessage } from '@/lib/utils';
+import { money, haptic, friendlyErrorMessage, formatShopName } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { extractTokenFromUrl } from '@/lib/link';
 import { parseImageUrls } from '@/lib/storage-upload';
@@ -151,7 +151,7 @@ export function DigitalCheckout() {
         digital_file_url: c.products?.digital_file_url ?? null,
         digital_access_instructions: c.products?.digital_access_instructions ?? null,
         merchant_id: c.merchant_id,
-        merchant_name: c.merchants?.name ?? 'Boutique Digital',
+        merchant_name: formatShopName(c.merchants?.name),
       });
 
       setLoading(false);

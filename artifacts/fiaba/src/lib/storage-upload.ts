@@ -87,6 +87,13 @@ export async function uploadMultipleImagesToSupabase(
 }
 
 /**
+function isSupportedImageUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim();
+  return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/') || u.startsWith('/');
+}
+
+/**
  * Helper to parse image_url field into an array of image URLs.
  */
 export function parseImageUrls(rawImageUrl: string | null | undefined): string[] {
@@ -94,16 +101,23 @@ export function parseImageUrls(rawImageUrl: string | null | undefined): string[]
   const trimmed = rawImageUrl.trim();
   if (!trimmed) return [];
 
+  let list: string[] = [];
   if (trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) return parsed.filter((u): u is string => typeof u === 'string' && u.length > 0);
+      if (Array.isArray(parsed)) {
+        list = parsed.filter((u): u is string => typeof u === 'string' && u.length > 0);
+      }
     } catch (e) {
       // ignore
     }
   }
 
-  return trimmed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  if (list.length === 0) {
+    list = trimmed.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  }
+
+  return list.filter(isSupportedImageUrl);
 }
 
 /**

@@ -182,3 +182,23 @@ export function calculateTrustScore(profile?: {
 
   return Math.max(0, Math.min(100, score));
 }
+
+/**
+ * Formate proprement le nom de la boutique pour éviter d'exposer les noms personnels de commerçants.
+ */
+export function formatShopName(name: string | null | undefined): string {
+  if (!name || !name.trim()) return 'Boutique Officielle';
+  let clean = name.trim();
+  if (clean.includes('(') && clean.includes(')')) {
+    const match = clean.match(/\(([^)]+)\)/);
+    if (match && match[1]) clean = match[1].trim();
+  }
+  clean = clean.replace(/^(Boutique\s+)+/i, '').trim();
+  if (!clean) return 'Boutique Officielle';
+
+  if (/^(Boutique|Magasin|Maison|Atelier|Store|Shop|E-Shop|Pharmacie|Linguère|Galerie)\b/i.test(clean)) {
+    return clean;
+  }
+
+  return `Boutique ${clean}`;
+}

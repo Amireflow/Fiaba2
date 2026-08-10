@@ -23,6 +23,8 @@ import {
   SectionTitle,
 } from '../components/merchant-ui';
 
+import { getOrCreateMerchantId } from '@/hooks/use-supabase-query';
+
 type PlanRow = {
   id: string;
   name: string;
@@ -40,22 +42,59 @@ type SubscriptionRow = {
   status: string;
 };
 
+const defaultPlans: PlanRow[] = [
+  {
+    id: 'plan-free',
+    name: 'Free',
+    price_monthly: 0,
+    max_active_products: 5,
+    max_active_campaigns: 2,
+    platform_fee_rate: 5.0,
+    features: ['5 produits actifs', '2 campagnes d\'affiliation', 'Frais plateforme 5%'],
+    is_active: true,
+  },
+  {
+    id: 'plan-pro',
+    name: 'Pro',
+    price_monthly: 9900,
+    max_active_products: 20,
+    max_active_campaigns: 10,
+    platform_fee_rate: 4.0,
+    features: ['20 produits actifs', '10 campagnes d\'affiliation', 'Frais plateforme 4%', 'Support prioritaire'],
+    is_active: true,
+  },
+  {
+    id: 'plan-premium',
+    name: 'Premium',
+    price_monthly: 24900,
+    max_active_products: 50,
+    max_active_campaigns: 25,
+    platform_fee_rate: 3.0,
+    features: ['50 produits actifs', '25 campagnes d\'affiliation', 'Frais plateforme réduits 3%', 'Accès API & Badges'],
+    is_active: true,
+  },
+];
+
 export const MerchantSubscriptionPage: React.FC = () => {
   const { toast } = useToast();
-  const { merchantId } = useAuth();
-  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const { merchantId, profile } = useAuth();
+  const [plans, setPlans] = useState<PlanRow[]>(defaultPlans);
   const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
   const [activeProductsCount, setActiveProductsCount] = useState(0);
   const [activeCampaignsCount, setActiveCampaignsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [resolvedMerchantId, setResolvedMerchantId] = useState<string | null>(merchantId);
 
   useEffect(() => {
     async function loadData() {
-      if (!merchantId) {
-        setLoading(false);
-        return;
+      setLoading(true);
+
+      let targetMerchantId = merchantId;
+      if (!targetMerchantId && profile?.id) {
+        targetMerchantId = await getOrCreateMerchantId();
       }
+      setResolvedMerchantId(targetMerchantId);
 
       // Fetch all active subscription plans
       const { data: planRows } = await supabase
@@ -63,36 +102,41 @@ export const MerchantSubscriptionPage: React.FC = () => {
         .select('id, name, price_monthly, max_active_products, max_active_campaigns, platform_fee_rate, features, is_active')
         .eq('is_active', true)
         .order('price_monthly', { ascending: true });
-      setPlans((planRows as PlanRow[] | null) ?? []);
 
-      // Fetch merchant's current subscription
-      const { data: subRow } = await supabase
-        .from('merchant_subscriptions')
-        .select('id, plan_id, status')
-        .eq('merchant_id', merchantId)
-        .maybeSingle();
-      setSubscription((subRow as SubscriptionRow | null) ?? null);
+      const fetchedPlans = (planRows as PlanRow[] | null) ?? [];
+      setPlans(fetchedPlans.length > 0 ? fetchedPlans : defaultPlans);
 
-      // Count active products
-      const { count: productCount } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-        .eq('merchant_id', merchantId)
-        .in('status', ['actif', 'active']);
-      setActiveProductsCount(productCount ?? 0);
+      if (targetMerchantId) {
+        // Fetch merchant's current subscription
+        const { data: subRow } = await supabase
+          .from('merchant_subscriptions')
+          .select('id, plan_id, status')
+          .eq('merchant_id', targetMerchantId)
+          .maybeSingle();
+        setSubscription((subRow as SubscriptionRow | null) ?? null);
 
-      // Count active campaigns
-      const { count: campaignCount } = await supabase
-        .from('campaigns')
-        .select('id', { count: 'exact', head: true })
-        .eq('merchant_id', merchantId)
-        .eq('status', 'active');
-      setActiveCampaignsCount(campaignCount ?? 0);
+        // Count active products
+        const { count: productCount } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('merchant_id', targetMerchantId)
+          .in('status', ['actif', 'active']);
+        setActiveProductsCount(productCount ?? 0);
+
+        // Count active campaigns
+        const { count: campaignCount } = await supabase
+          .from('campaigns')
+          .select('id', { count: 'exact', head: true })
+          .eq('merchant_id', targetMerchantId)
+          .eq('status', 'active');
+        setActiveCampaignsCount(campaignCount ?? 0);
+      }
 
       setLoading(false);
     }
-    loadData();
-  }, [merchantId]);
+
+    loadData().catch(() => setLoading(false));
+  }, [merchantId, profile]);
 
   const currentPlan = plans.find((p) => p.id === subscription?.plan_id) ?? plans[0] ?? null;
 
@@ -102,7 +146,11 @@ export const MerchantSubscriptionPage: React.FC = () => {
   const campaignsAtLimit = currentPlan ? activeCampaignsCount >= currentPlan.max_active_campaigns : false;
 
   async function handleUpgrade(plan: PlanRow) {
-    if (!merchantId || !currentPlan || plan.id === currentPlan.id) return;
+    let targetMerchantId = resolvedMerchantId || merchantId;
+    if (!targetMerchantId && profile?.id) {
+      targetMerchantId = await getOrCreateMerchantId();
+    }
+    if (!targetMerchantId || !currentPlan || plan.id === currentPlan.id) return;
     haptic('medium');
     setIsUpgrading(true);
 
@@ -117,7 +165,7 @@ export const MerchantSubscriptionPage: React.FC = () => {
         // Insert new subscription
         const { error } = await (supabase.from('merchant_subscriptions') as any)
           .insert({
-            merchant_id: merchantId,
+            merchant_id: targetMerchantId,
             plan_id: plan.id,
             status: 'active',
             current_period_start: new Date().toISOString(),

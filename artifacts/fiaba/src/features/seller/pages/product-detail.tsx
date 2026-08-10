@@ -3,7 +3,7 @@ import { Link, useParams } from 'wouter';
 import { ArrowLeft01Icon, CheckmarkCircle02Icon, Chart02Icon, Store01Icon, UserGroupIcon, Share02Icon, Wallet01Icon, LockKeyIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
-import { money, haptic } from '@/lib/utils';
+import { money, haptic, formatShopName } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { useSellerDiscovery } from '@/hooks/use-seller-discovery';
@@ -119,7 +119,7 @@ export function ProductDetail() {
         product_category: c.products?.category ?? null,
         product_description: c.products?.description ?? null,
         merchant_id: c.merchant_id,
-        merchant_name: c.merchants?.name ?? 'Boutique',
+        merchant_name: formatShopName(c.merchants?.name),
         niche_name: c.niches?.name ?? null,
         match_score: 50,
         is_joined: isJoined,

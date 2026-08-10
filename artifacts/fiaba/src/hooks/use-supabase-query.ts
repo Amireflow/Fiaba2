@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
+import { formatShopName } from '@/lib/utils';
 
 // Cache en mémoire ultrarapide pour un affichage instantané (0ms) lors de la navigation entre onglets
 const queryCacheMap = new Map<string, { data: any[]; timestamp: number }>();
@@ -173,13 +174,7 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
       .eq('id', userId)
       .maybeSingle();
 
-    let cleanShopName = (prof?.full_name || 'Ma Boutique').trim();
-    if (cleanShopName.includes('(') && cleanShopName.includes(')')) {
-      const match = cleanShopName.match(/\(([^)]+)\)/);
-      if (match && match[1]) cleanShopName = match[1].trim();
-    }
-    cleanShopName = cleanShopName.replace(/^(Boutique\s+)+/i, '').trim();
-    if (!cleanShopName) cleanShopName = 'Ma Boutique';
+    const cleanShopName = formatShopName(prof?.full_name);
 
     const slugName = cleanShopName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const uniqueSlug = `${slugName}-${userId.slice(0, 6)}-${Date.now().toString(36).slice(-4)}`;
@@ -208,6 +203,50 @@ export async function getOrCreateMerchantId(cachedMerchantId?: string | null): P
     return fallbackMerch?.[0]?.id ?? null;
   } catch (err) {
     console.error('getOrCreateMerchantId error:', err);
+    return null;
+  }
+}
+
+/**
+ * Récupère ou crée automatiquement l'identifiant Vendeur (seller_id) pour l'utilisateur connecté.
+ */
+export async function getOrCreateSellerId(userId?: string): Promise<string | null> {
+  let targetId = userId;
+  if (!targetId) {
+    const { data: userData } = await supabase.auth.getUser();
+    targetId = userData.user?.id;
+  }
+  if (!targetId) return null;
+
+  try {
+    const { data: existing } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('profile_id', targetId)
+      .maybeSingle();
+
+    if (existing?.id) return existing.id;
+
+    // Création automatique du profil vendeur
+    const { data: prof } = await supabase.from('profiles').select('full_name, phone').eq('id', targetId).maybeSingle();
+    const cleanName = prof?.full_name ? prof.full_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'vendeur';
+    const handle = `${cleanName}-${targetId.slice(0, 4)}-${Date.now().toString(36).slice(-3)}`;
+
+    const { data: newSeller } = await (supabase.from('sellers') as any)
+      .insert({
+        profile_id: targetId,
+        handle,
+        bio: 'Créateur & Vendeur affilié',
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (newSeller?.id) return newSeller.id;
+
+    const { data: fallback } = await supabase.from('sellers').select('id').eq('profile_id', targetId).limit(1);
+    return fallback?.[0]?.id ?? null;
+  } catch (err) {
+    console.error('getOrCreateSellerId error:', err);
     return null;
   }
 }

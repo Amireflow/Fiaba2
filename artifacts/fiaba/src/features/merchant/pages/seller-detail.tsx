@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'wouter';
-import { ArrowLeft01Icon, ArrowUpRightIcon, UserRemove01Icon } from '@hugeicons/core-free-icons';
+import {
+  ArrowLeft01Icon,
+  ArrowUpRightIcon,
+  UserRemove01Icon,
+  Chart02Icon,
+  Store01Icon,
+  Wallet01Icon,
+  UserGroupIcon,
+  Target01Icon,
+} from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -24,8 +33,12 @@ type SellerDetail = {
   joined_at: string | null;
   invited_at: string;
   city: string | null;
-  sales: number;
-  revenue: number;
+  salesCount: number;
+  totalRevenue: number;
+  totalCommissions: number;
+  totalClicks: number;
+  conversionRate: number;
+  activeCampaignsCount: number;
 };
 
 const statusLabel: Record<string, 'Actif' | 'Invité' | 'En attente'> = {
@@ -95,42 +108,59 @@ export function SellerDetail() {
         return;
       }
 
-      // Fetch city from profile
-      let city: string | null = null;
-      if (row.profile_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('city')
-          .eq('id', row.profile_id)
-          .maybeSingle();
-        city = (profile as { city: string | null } | null)?.city ?? null;
-      }
+      // Execute parallel queries for real statistics
+      const [profileRes, ordersRes, linksRes, campaignsRes] = await Promise.all([
+        row.profile_id
+          ? supabase.from('profiles').select('city, full_name, phone').eq('id', row.profile_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from('orders')
+          .select('id, total_amount, commission_amount, status')
+          .eq('seller_id', row.id)
+          .neq('status', 'annulee'),
+        supabase
+          .from('tracking_links')
+          .select('clicks')
+          .eq('seller_id', row.id),
+        supabase
+          .from('campaign_sellers')
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', row.id),
+      ]);
 
-      // Fetch commissions aggregated
-      const { data: commissions } = await supabase
-        .from('commissions')
-        .select('amount')
-        .eq('seller_id', row.id);
+      const prof = profileRes.data as { city: string | null; full_name: string | null; phone: string | null } | null;
+      const orderRows = (ordersRes.data as { total_amount: number; commission_amount: number }[] | null) ?? [];
+      const linkRows = (linksRes.data as { clicks: number }[] | null) ?? [];
 
-      const commissionRows = (commissions as { amount: number }[] | null) ?? [];
-      const sales = commissionRows.length;
-      const revenue = commissionRows.reduce((sum, c) => sum + c.amount, 0);
+      const salesCount = orderRows.length;
+      const totalRevenue = orderRows.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      const totalCommissions = orderRows.reduce((sum, o) => sum + (o.commission_amount || 0), 0);
+      const totalClicks = linkRows.reduce((sum, l) => sum + (l.clicks || 0), 0);
+      const conversionRate = totalClicks > 0 ? Math.round((salesCount / totalClicks) * 100) : 0;
+      const activeCampaignsCount = campaignsRes.count ?? 0;
+      const city = prof?.city ?? 'Dakar';
+      const displayName = row.display_name || prof?.full_name || 'Vendeur';
 
       setSeller({
         id: row.id,
-        display_name: row.display_name,
-        status: row.status,
+        display_name: displayName,
+        status: row.status ?? 'actif',
         followers: row.followers ?? 0,
-        phone: row.phone,
+        phone: row.phone || prof?.phone || null,
         joined_at: row.joined_at,
         invited_at: row.invited_at,
-        city: city ?? 'Dakar',
-        sales,
-        revenue,
+        city,
+        salesCount,
+        totalRevenue,
+        totalCommissions,
+        totalClicks,
+        conversionRate,
+        activeCampaignsCount,
       });
       setLoading(false);
     }
-    loadData();
+
+    loadData().catch(() => setLoading(false));
   }, [id, merchantId]);
 
   async function confirmRemove() {
@@ -162,18 +192,18 @@ export function SellerDetail() {
     return (
       <Page eyebrow="Vendeur" title="Introuvable" description="Ce vendeur n'existe pas.">
         <Card className="mt-6 p-8 text-center">
-          <p className="text-sm text-[#77738a]">Le vendeur {id} est introuvable.</p>
+          <p className="text-sm text-[#77738a]">Le vendeur est introuvable.</p>
           <Link href="/merchant/sellers" className="mt-4 inline-block"><Button variant="soft">Retour aux vendeurs</Button></Link>
         </Card>
       </Page>
     );
   }
 
-  const label = statusLabel[seller.status] ?? 'En attente';
+  const label = statusLabel[seller.status] ?? 'Actif';
 
   return (
     <Page
-      eyebrow="Vendeur"
+      eyebrow="Fiche Affilié"
       title={seller.display_name}
       description={`${seller.city} · ${formatFollowers(seller.followers)}`}
       action={
@@ -183,56 +213,104 @@ export function SellerDetail() {
       }
     >
       <div className="mt-6 space-y-5">
+        {/* Profile Card Header */}
         <Card>
           <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-[#dfdbff] text-lg font-bold text-[#5140d4]">{getInitials(seller.display_name)}</span>
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-[#dfdbff] text-lg font-bold text-[#5140d4]">
+              {getInitials(seller.display_name)}
+            </span>
             <div>
               <p className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">{seller.display_name}</p>
               <p className="mt-0.5 text-xs text-[#77738a]">{seller.city}, Sénégal</p>
-              <div className="mt-1.5"><Badge tone={seller.status === 'actif' ? 'mint' : seller.status === 'invite' ? 'violet' : 'amber'}>{label}</Badge></div>
+              <div className="mt-1.5">
+                <Badge tone={seller.status === 'actif' ? 'mint' : seller.status === 'invite' ? 'violet' : 'amber'}>{label}</Badge>
+              </div>
             </div>
           </div>
         </Card>
 
-        {seller.status === 'actif' && (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes</p>
-                <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{seller.sales}</p>
-              </Card>
-              <Card>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">CA généré</p>
-                <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(seller.revenue)}</p>
-              </Card>
-            </div>
-            <Card>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Performance</p>
-              <div className="mt-3"><ProgressBar value={(seller.sales / 50) * 100} tone="violet" /></div>
-              <p className="mt-2 text-xs text-[#77738a]">{seller.sales} ventes sur objectif 50</p>
-            </Card>
-          </>
-        )}
+        {/* Real Statistics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-3.5 sm:p-4">
+            <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]">
+              <Icon glyph={Store01Icon} size={18} />
+            </span>
+            <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes réalisées</p>
+            <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{seller.salesCount}</p>
+          </Card>
 
+          <Card className="p-3.5 sm:p-4">
+            <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
+              <Icon glyph={Wallet01Icon} size={18} />
+            </span>
+            <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">CA généré</p>
+            <p className="mt-1 font-[Space_Grotesk] text-lg sm:text-2xl font-bold text-[#292541]">{money(seller.totalRevenue)}</p>
+          </Card>
+
+          <Card className="p-3.5 sm:p-4">
+            <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#fff4de] text-[#ac741e]">
+              <Icon glyph={Chart02Icon} size={18} />
+            </span>
+            <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Commissions</p>
+            <p className="mt-1 font-[Space_Grotesk] text-lg sm:text-2xl font-bold text-[#278e69]">{money(seller.totalCommissions)}</p>
+          </Card>
+
+          <Card className="p-3.5 sm:p-4">
+            <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#f0eff5] text-[#67627b]">
+              <Icon glyph={UserGroupIcon} size={18} />
+            </span>
+            <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Clics (Conv.)</p>
+            <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">
+              {seller.totalClicks} <small className="text-xs font-sans text-[#807b98]">({seller.conversionRate}%)</small>
+            </p>
+          </Card>
+        </div>
+
+        {/* Real Performance Progress Card */}
         <Card>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Informations</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Niveau de Performance</p>
+              <p className="mt-0.5 font-[Space_Grotesk] text-base font-bold text-[#292541]">
+                {seller.salesCount} vente{seller.salesCount > 1 ? 's' : ''} · {seller.activeCampaignsCount} campagne{seller.activeCampaignsCount > 1 ? 's' : ''}
+              </p>
+            </div>
+            <Badge tone={seller.salesCount >= 10 ? 'mint' : seller.salesCount >= 1 ? 'violet' : 'slate'}>
+              {seller.salesCount >= 10 ? 'Top Vendeur' : seller.salesCount >= 1 ? 'Actif' : 'Nouveau'}
+            </Badge>
+          </div>
+          <div className="mt-3">
+            <ProgressBar value={Math.min(100, Math.round((seller.salesCount / 20) * 100))} tone="violet" />
+          </div>
+          <p className="mt-2 text-xs text-[#77738a]">
+            {seller.salesCount} ventes enregistrées · Taux de conversion {seller.conversionRate}% sur {seller.totalClicks} clics.
+          </p>
+        </Card>
+
+        {/* Detailed Information Card */}
+        <Card>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Informations du profil</p>
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex justify-between"><span className="text-[#77738a]">Téléphone</span><span className="font-bold text-[#292541]">{seller.phone ?? '—'}</span></div>
-            <div className="flex justify-between"><span className="text-[#77738a]">Abonnés</span><span className="font-bold text-[#292541]">{formatFollowers(seller.followers)}</span></div>
-            <div className="flex justify-between"><span className="text-[#77738a]">Rejoint le</span><span className="font-bold text-[#292541]">{formatDate(seller.joined_at)}</span></div>
-            <div className="flex justify-between"><span className="text-[#77738a]">Invité le</span><span className="font-bold text-[#292541]">{formatDate(seller.invited_at)}</span></div>
+            <div className="flex justify-between"><span className="text-[#77738a]">Audience</span><span className="font-bold text-[#292541]">{formatFollowers(seller.followers)}</span></div>
+            <div className="flex justify-between"><span className="text-[#77738a]">Inscrit le</span><span className="font-bold text-[#292541]">{formatDate(seller.joined_at || seller.invited_at)}</span></div>
           </div>
         </Card>
 
+        {/* Actions Footer */}
         <div className="flex flex-wrap justify-between gap-2">
           {seller.status === 'actif' ? (
-            <Button variant="danger" onClick={() => setToRemove(seller)} testId="button-remove-seller"><Icon glyph={UserRemove01Icon} size={15} /> Retirer du réseau</Button>
+            <Button variant="danger" onClick={() => setToRemove(seller)} testId="button-remove-seller">
+              <Icon glyph={UserRemove01Icon} size={15} /> Retirer du réseau
+            </Button>
           ) : seller.status === 'invite' ? (
             <Badge tone="violet">Invitation envoyée</Badge>
           ) : (
             <Badge tone="amber">Suspendu</Badge>
           )}
-          <Link href="/merchant/campaigns"><Button variant="ghost">Voir les campagnes <Icon glyph={ArrowUpRightIcon} size={14} /></Button></Link>
+          <Link href="/merchant/campaigns">
+            <Button variant="ghost">Voir les campagnes <Icon glyph={ArrowUpRightIcon} size={14} /></Button>
+          </Link>
         </div>
       </div>
 

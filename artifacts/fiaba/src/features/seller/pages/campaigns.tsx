@@ -13,6 +13,7 @@ import {
   SellerEmptyState,
   SellerPage as Page,
 } from '../components/seller-ui';
+import { SafeImage } from '@/components/shared/safe-image';
 import { getFirstImageUrl } from '@/lib/storage-upload';
 
 type JoinedCampaign = {
@@ -178,7 +179,7 @@ export function SellerCampaigns() {
     const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
     const link = `${window.location.origin}${baseUrl}/p/${c.tracking_token ?? c.campaign_id}`;
     navigator.clipboard?.writeText(link).catch(() => {});
-    toast({ title: 'Lien copié', description: 'Partagez-le sur WhatsApp ou vos réseaux.' });
+    toast({ title: 'Lien copié', description: 'Partagez-le sur vos réseaux.' });
   }
 
   function copyCode(c: JoinedCampaign) {
@@ -216,31 +217,31 @@ export function SellerCampaigns() {
 
   return (
     <Page
-      eyebrow="Votre activité"
+      eyebrow="Activité"
       title="Mes campagnes"
-      description="Les campagnes que vous avez rejointes. Partagez, suivez vos clics et vos ventes."
+      description="Campagnes rejointes, clics et revenus générés."
     >
       {/* Stats */}
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card className="p-4">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]"><Icon glyph={Wallet01Icon} size={18} /></span>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Gains totaux</p>
-          <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{money(totalEarnings)}</p>
+      <div className="mt-4 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+        <Card className="p-3.5 sm:p-4">
+          <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#e7faf2] text-[#278e69]"><Icon glyph={Wallet01Icon} size={18} /></span>
+          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Gains totaux</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{money(totalEarnings)}</p>
         </Card>
-        <Card className="p-4">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={UserGroupIcon} size={18} /></span>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Clics générés</p>
-          <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{totalClicks}</p>
+        <Card className="p-3.5 sm:p-4">
+          <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={UserGroupIcon} size={18} /></span>
+          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Clics</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{totalClicks}</p>
         </Card>
-        <Card className="p-4">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#fff4de] text-[#ac741e]"><Icon glyph={Store01Icon} size={18} /></span>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes</p>
-          <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{totalSales}</p>
+        <Card className="p-3.5 sm:p-4">
+          <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#fff4de] text-[#ac741e]"><Icon glyph={Store01Icon} size={18} /></span>
+          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Ventes</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{totalSales}</p>
         </Card>
-        <Card className="p-4">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#fff0f1] text-[#c45667]"><Icon glyph={Target01Icon} size={18} /></span>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Taux de conversion</p>
-          <p className="mt-2 font-[Space_Grotesk] text-2xl font-bold text-[#292541]">{totalClicks > 0 ? Math.round((totalSales / totalClicks) * 100) : 0}%</p>
+        <Card className="p-3.5 sm:p-4">
+          <span className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl bg-[#fff0f1] text-[#c45667]"><Icon glyph={Target01Icon} size={18} /></span>
+          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#9290a2]">Conversion</p>
+          <p className="mt-1 font-[Space_Grotesk] text-xl sm:text-2xl font-bold text-[#292541]">{totalClicks > 0 ? Math.round((totalSales / totalClicks) * 100) : 0}%</p>
         </Card>
       </div>
 
@@ -261,63 +262,63 @@ export function SellerCampaigns() {
           />
         </Card>
       ) : (
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
           {campaigns.map((c) => {
             const imgUrl = getFirstImageUrl(c.product_image_url);
             return (
-              <Card key={c.campaign_id}>
+              <Card key={c.campaign_id} className="p-4 space-y-3 sm:space-y-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {imgUrl ? (
-                      <img src={imgUrl} alt={c.product_name ?? c.campaign_name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-[#eee]" />
-                    ) : (
-                      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]"><Icon glyph={Chart02Icon} size={20} /></span>
-                    )}
-                    <div className="min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <SafeImage src={imgUrl} alt={c.product_name ?? c.campaign_name} className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 rounded-xl object-cover" fallbackGlyph={Chart02Icon} iconSize={20} />
+                    <div className="min-w-0 flex-1">
                       <p className="font-[Space_Grotesk] text-base font-bold text-[#292541] truncate">{c.campaign_name}</p>
                       <p className="mt-0.5 text-xs text-[#9290a2] truncate">{c.product_name ?? 'Produit'} · {c.merchant_name}</p>
                     </div>
                   </div>
-                  <SellerBadge tone={toneFor(c.status)}>{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
+                  <SellerBadge tone={toneFor(c.status)} className="shrink-0">{c.status === 'active' ? 'Active' : c.status === 'en_pause' ? 'En pause' : c.status}</SellerBadge>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7fc] p-3 text-center sm:grid-cols-4">
-                  <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.clicks}</p></div>
-                  <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{c.sales}</p></div>
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 rounded-xl bg-[#f8f7fc] p-2.5 text-center text-xs">
+                  <div><p className="text-[10px] text-[#9290a2]">Clics</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#292541]">{c.clicks}</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Ventes</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#292541]">{c.sales}</p></div>
                   <div>
-                    <p className="text-[10px] text-[#9290a2]">{c.model === 'marge' ? 'Marge' : 'Commission'}</p>
-                    <p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#278e69]">
+                    <p className="text-[10px] text-[#9290a2]">{c.model === 'marge' ? 'Marge' : 'Comm.'}</p>
+                    <p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#278e69]">
                       {c.model === 'marge' || c.commission_type === 'fixed' || (!c.commission_type && c.commission >= 100) ? money(c.commission) : `${c.commission}%`}
                     </p>
                   </div>
-                  <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] text-sm font-bold text-[#292541]">{money(c.earnings)}</p></div>
+                  <div><p className="text-[10px] text-[#9290a2]">Gains</p><p className="mt-0.5 font-[Space_Grotesk] font-bold text-[#292541]">{money(c.earnings)}</p></div>
                 </div>
 
-              {/* Link + code */}
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2.5">
-                  <Icon glyph={Store01Icon} size={15} />
-                  <span className="min-w-0 flex-1 truncate text-xs text-[#77738a]">/p/{c.tracking_token ?? c.campaign_id}</span>
-                  <button onClick={() => copyLink(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-link-${c.campaign_id}`}><Icon glyph={Copy01Icon} size={15} /></button>
+                {/* Link + code */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2 text-xs min-w-0">
+                    <Icon glyph={Store01Icon} size={15} />
+                    <span className="min-w-0 flex-1 truncate text-[#77738a]">/p/{c.tracking_token ?? c.campaign_id}</span>
+                    <button onClick={() => copyLink(c)} className="shrink-0 text-[#5b49e8] hover:opacity-80 transition" data-testid={`copy-link-${c.campaign_id}`} title="Copier le lien">
+                      <Icon glyph={Copy01Icon} size={15} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2 text-xs min-w-0">
+                    <span className="text-[10px] font-bold uppercase text-[#9290a2] shrink-0">Code</span>
+                    <span className="flex-1 truncate font-bold text-[#292541]">{c.seller_code ?? '—'}</span>
+                    <button onClick={() => copyCode(c)} className="shrink-0 text-[#5b49e8] hover:opacity-80 transition" data-testid={`copy-code-${c.campaign_id}`} title="Copier le code">
+                      <Icon glyph={Copy01Icon} size={15} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl border border-[#e9e6f1] bg-[#fbfaff] px-3 py-2.5">
-                  <span className="text-[10px] font-bold uppercase text-[#9290a2]">Code</span>
-                  <span className="flex-1 text-xs font-bold text-[#292541]">{c.seller_code ?? '—'}</span>
-                  <button onClick={() => copyCode(c)} className="shrink-0 text-[#5b49e8]" data-testid={`copy-code-${c.campaign_id}`}><Icon glyph={Copy01Icon} size={15} /></button>
-                </div>
-              </div>
 
-              {/* Actions */}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Link href={`/seller/share/${c.campaign_id}`}>
-                  <Button testId={`share-${c.campaign_id}`}><Icon glyph={Share02Icon} size={15} /> Partager</Button>
-                </Link>
-                <Link href="/seller/sales">
-                  <Button variant="soft" testId={`sales-${c.campaign_id}`}>Voir les ventes <Icon glyph={ArrowUpRight01Icon} size={14} /></Button>
-                </Link>
-                <Button variant="ghost" onClick={() => { haptic('light'); setToLeave(c); }} testId={`leave-${c.campaign_id}`}>Quitter</Button>
-              </div>
-            </Card>
+                {/* Actions */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Link href={`/seller/share/${c.campaign_id}`} className="flex-1 min-w-[120px]">
+                    <Button className="w-full text-xs" testId={`share-${c.campaign_id}`}><Icon glyph={Share02Icon} size={14} /> Partager</Button>
+                  </Link>
+                  <Link href="/seller/sales" className="flex-1 min-w-[120px]">
+                    <Button variant="soft" className="w-full text-xs" testId={`sales-${c.campaign_id}`}>Ventes <Icon glyph={ArrowUpRight01Icon} size={13} /></Button>
+                  </Link>
+                  <Button variant="ghost" className="text-xs text-[#c45667]" onClick={() => { haptic('light'); setToLeave(c); }} testId={`leave-${c.campaign_id}`}>Quitter</Button>
+                </div>
+              </Card>
             );
           })}
         </div>
@@ -326,10 +327,12 @@ export function SellerCampaigns() {
       {/* Confirm leave */}
       {toLeave && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-[#201b3c]/75 p-4" role="alertdialog">
-          <div className="w-full max-w-[380px] rounded-[22px] bg-[#fffefd] p-6 shadow-2xl">
-            <p className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Quitter cette campagne ?</p>
-            <p className="mt-2 text-sm leading-5 text-[#77738a]">Vous ne gagnerez plus de commissions sur les futures ventes de « {toLeave.campaign_name} ».</p>
-            <div className="mt-6 flex justify-end gap-2">
+          <div className="w-full max-w-[380px] rounded-[22px] bg-[#fffefd] p-6 shadow-2xl space-y-4">
+            <div>
+              <p className="font-[Space_Grotesk] text-lg font-bold text-[#292541]">Quitter cette campagne ?</p>
+              <p className="mt-1 text-xs text-[#77738a]">Vous ne percevrez plus de commission sur « {toLeave.campaign_name} ».</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setToLeave(null)}>Annuler</Button>
               <Button variant="danger" onClick={handleLeave} disabled={leaving}>{leaving ? '…' : 'Quitter'}</Button>
             </div>

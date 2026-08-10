@@ -14,6 +14,7 @@ import {
   MerchantCard as Card,
   Page,
 } from '../components/merchant-ui';
+import { SafeImage } from '@/components/shared/safe-image';
 
 type ProductRow = {
   id: string;
@@ -52,11 +53,16 @@ export function Products() {
   async function confirmDelete() {
     if (!toDelete) return;
     haptic('warning');
+
+    // 1. Supprimer les campagnes d'affiliation liées à ce produit
+    await supabase.from('campaigns').delete().eq('product_id', toDelete.id);
+
+    // 2. Supprimer le produit du catalogue
     const { error } = await supabaseDelete('products', toDelete.id);
     if (error) {
       toast({ title: 'Erreur', description: error });
     } else {
-      toast({ title: 'Produit supprimé', description: `${toDelete.name} n'est plus dans votre catalogue.` });
+      toast({ title: 'Produit et campagnes supprimés', description: `« ${toDelete.name} » et ses offres ont été retirés de votre catalogue.` });
       refetch();
     }
     setToDelete(null);
@@ -122,13 +128,7 @@ export function Products() {
                 return (
                   <Card key={p.id} className="p-4 space-y-3">
                     <div className="flex items-start gap-3">
-                      {imageUrl ? (
-                        <img src={imageUrl} alt={p.name} className="h-14 w-14 shrink-0 rounded-2xl object-cover" />
-                      ) : (
-                        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#efedff] text-[#5b49e8]">
-                          <Icon glyph={Store01Icon} size={22} />
-                        </span>
-                      )}
+                      <SafeImage src={imageUrl} alt={p.name} className="h-14 w-14 shrink-0 rounded-2xl object-cover" iconSize={22} />
 
                       <div className="min-w-0 flex-1">
                         <p className="font-bold text-[#292541] text-sm truncate">{p.name}</p>
@@ -202,13 +202,7 @@ export function Products() {
                         <tr key={p.id} className="transition hover:bg-[#faf9fd]">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              {imageUrl ? (
-                                <img src={imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
-                              ) : (
-                                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                                  <Icon glyph={Store01Icon} size={18} />
-                                </span>
-                              )}
+                              <SafeImage src={imageUrl} alt={p.name} className="h-10 w-10 shrink-0 rounded-xl object-cover" iconSize={18} />
                               <div className="min-w-0">
                                 <p className="font-bold text-[#292541] truncate max-w-[220px]">{p.name}</p>
                                 <div className="mt-1 flex items-center gap-1.5">

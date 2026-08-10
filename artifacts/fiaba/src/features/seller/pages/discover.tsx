@@ -26,6 +26,7 @@ import {
   sellerInputClass,
   sellerSelectClass,
 } from '../components/seller-ui';
+import { SafeImage } from '@/components/shared/safe-image';
 
 const potentialFromScore = (score: number): 'Fort' | 'Bon' | 'Moyen' =>
   score >= 80 ? 'Fort' : score >= 40 ? 'Bon' : 'Moyen';
@@ -301,17 +302,7 @@ export function Discover() {
                               {c.merchant_name} · {c.product_category ?? 'Divers'}
                             </p>
                           </div>
-                          {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={c.product_name ?? ''}
-                              className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                            />
-                          ) : (
-                            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                              <Icon glyph={Store01Icon} size={22} />
-                            </span>
-                          )}
+                          <SafeImage src={imgUrl} alt={c.product_name ?? ''} className="h-14 w-14 shrink-0 rounded-xl object-cover" iconSize={22} />
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -398,13 +389,7 @@ export function Discover() {
                             </p>
                             <p className="mt-0.5 truncate text-xs text-[#9290a2]">{c.merchant_name}</p>
                           </div>
-                          {imgUrl ? (
-                            <img src={imgUrl} alt={c.product_name ?? ''} className="h-10 w-10 shrink-0 rounded-xl object-cover" />
-                          ) : (
-                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                              <Icon glyph={Store01Icon} size={18} />
-                            </span>
-                          )}
+                          <SafeImage src={imgUrl} alt={c.product_name ?? ''} className="h-10 w-10 shrink-0 rounded-xl object-cover" iconSize={18} />
                         </div>
 
                         <div className="mt-3 flex items-center justify-between rounded-xl bg-[#e7faf2] px-3 py-2 text-xs text-[#278e69]">
@@ -460,13 +445,7 @@ export function Discover() {
                             {c.merchant_name} · {c.product_category ?? 'Divers'}
                           </p>
                         </div>
-                        {imgUrl ? (
-                          <img src={imgUrl} alt={c.product_name ?? ''} className="h-11 w-11 shrink-0 rounded-xl object-cover" />
-                        ) : (
-                          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#efedff] text-[#5b49e8]">
-                            <Icon glyph={Store01Icon} size={18} />
-                          </span>
-                        )}
+                        <SafeImage src={imgUrl} alt={c.product_name ?? ''} className="h-11 w-11 shrink-0 rounded-xl object-cover" iconSize={18} />
                       </div>
 
                       <div className="mt-3 flex items-center justify-between text-xs">

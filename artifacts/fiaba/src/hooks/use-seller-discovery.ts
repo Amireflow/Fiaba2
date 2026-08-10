@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
-import { haptic } from '@/lib/utils';
+import { getOrCreateSellerId } from '@/hooks/use-supabase-query';
+import { haptic, formatShopName } from '@/lib/utils';
 
 export type DiscoveryCampaign = {
   campaign_id: string;
@@ -72,7 +73,10 @@ export function useSellerDiscovery() {
         supabase.from('profiles').select('city').eq('id', profile.id).maybeSingle(),
       ]);
 
-      const sId = (sellerRes.data as { id: string; city: string | null } | null)?.id ?? null;
+      let sId = (sellerRes.data as { id: string; city: string | null } | null)?.id ?? null;
+      if (!sId && profile?.id) {
+        sId = await getOrCreateSellerId(profile.id);
+      }
       setSellerId(sId);
       const sellerCity = (sellerRes.data as { city: string | null } | null)?.city
         ?? (profileRes.data as { city: string | null } | null)?.city
@@ -187,7 +191,7 @@ export function useSellerDiscovery() {
           digital_file_url: c.products?.digital_file_url ?? null,
           digital_access_instructions: c.products?.digital_access_instructions ?? null,
           merchant_id: c.merchant_id,
-          merchant_name: c.merchants?.name ?? 'Boutique',
+          merchant_name: formatShopName(c.merchants?.name),
           merchant_slug: c.merchants?.slug ?? null,
           niche_id: c.niche_id,
           niche_name: c.niches?.name ?? null,
@@ -245,7 +249,7 @@ export function useSellerDiscovery() {
             digital_file_url: p.digital_file_url ?? null,
             digital_access_instructions: p.digital_access_instructions ?? null,
             merchant_id: p.merchant_id,
-            merchant_name: p.merchants?.name ?? 'Boutique',
+            merchant_name: formatShopName(p.merchants?.name),
             merchant_slug: p.merchants?.slug ?? null,
             niche_id: null,
             niche_name: p.category ?? 'Général',
@@ -272,7 +276,12 @@ export function useSellerDiscovery() {
    * Rejoint une campagne avec mise à jour optimiste et création rapide du lien de suivi.
    */
   const joinCampaign = useCallback(async (campaignId: string): Promise<{ error: string | null }> => {
-    if (!sellerId) return { error: 'Profil vendeur introuvable' };
+    let activeSellerId = sellerId;
+    if (!activeSellerId && profile?.id) {
+      activeSellerId = await getOrCreateSellerId(profile.id);
+      if (activeSellerId) setSellerId(activeSellerId);
+    }
+    if (!activeSellerId) return { error: 'Impossible de créer ou charger votre profil vendeur. Veuillez réessayer.' };
     haptic('medium');
 
     let targetCampaignId = campaignId;
@@ -314,7 +323,7 @@ export function useSellerDiscovery() {
 
     const { error: joinErr } = await supabase
       .from('campaign_sellers')
-      .insert({ campaign_id: targetCampaignId, seller_id: sellerId } as never);
+      .insert({ campaign_id: targetCampaignId, seller_id: activeSellerId } as never);
 
     if (joinErr && !joinErr.message.includes('unique constraint')) {
       haptic('error');
@@ -326,11 +335,11 @@ export function useSellerDiscovery() {
     }
 
     const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-    const sellerCode = `F-${sellerId.slice(0, 6).toUpperCase()}`;
+    const sellerCode = `F-${activeSellerId.slice(0, 6).toUpperCase()}`;
     const signature = `${token}.${sellerCode}.${targetCampaignId.slice(0, 8)}`;
 
     await supabase.from('tracking_links').insert({
-      seller_id: sellerId,
+      seller_id: activeSellerId,
       campaign_id: targetCampaignId,
       token,
       seller_code: sellerCode,

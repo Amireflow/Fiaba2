@@ -509,7 +509,7 @@ export function ProductForm() {
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {[
             { step: 1 as WizardStep, label: '1. Infos', icon: PackageIcon },
-            { step: 2 as WizardStep, label: '2. Prix & Marge', icon: Tag01Icon },
+            { step: 2 as WizardStep, label: '2. Prix', icon: Tag01Icon },
             { step: 3 as WizardStep, label: '3. Visuels', icon: ImageUploadIcon },
           ].map((s) => {
             const isActive = activeStep === s.step;
@@ -641,7 +641,7 @@ export function ProductForm() {
             {activeStep === 2 && (
               <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Prix & Marge</h3>
+                  <h3 className="font-[Space_Grotesk] text-base sm:text-lg font-bold text-[#292541]">Prix</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

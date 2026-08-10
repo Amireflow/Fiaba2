@@ -17,6 +17,7 @@ const AdminZoneNew = lazy(() => import('./pages/zone-new').then((m) => ({ defaul
 const AdminNiches = lazy(() => import('./pages/niches').then((m) => ({ default: m.AdminNiches })));
 const AdminNicheNew = lazy(() => import('./pages/niche-new').then((m) => ({ default: m.AdminNicheNew })));
 const AdminSettings = lazy(() => import('./pages/settings').then((m) => ({ default: m.AdminSettings })));
+const AdminAiConfig = lazy(() => import('./pages/ai-config').then((m) => ({ default: m.AdminAiConfig })));
 const AdminNotifications = lazy(() => import('./pages/notifications').then((m) => ({ default: m.AdminNotifications })));
 const FinancialReportingPage = lazy(() => import('./pages/financial-reporting').then((m) => ({ default: m.FinancialReportingPage })));
 
@@ -49,6 +50,7 @@ export function AdminRouter() {
             <Route path="/admin/niches" component={AdminNiches} />
             <Route path="/admin/niches/new" component={AdminNicheNew} />
             <Route path="/admin/settings" component={AdminSettings} />
+            <Route path="/admin/ai-config" component={AdminAiConfig} />
             <Route path="/admin/notifications" component={AdminNotifications} />
           </Switch>
         </Suspense>

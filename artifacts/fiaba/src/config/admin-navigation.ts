@@ -5,6 +5,7 @@ import {
   MapPinIcon,
   Settings02Icon,
   Shield01Icon,
+  SparklesIcon,
   Store01Icon,
   Tag01Icon,
   Target01Icon,
@@ -36,6 +37,7 @@ export const adminSecondaryNav: NavItem[] = [
   { href: '/admin/zones', label: 'Référentiel zones', glyph: MapPinIcon },
   { href: '/admin/niches', label: 'Niches & catégories', glyph: Tag01Icon },
   { href: '/admin/settings', label: 'Paramètres', glyph: Settings02Icon },
+  { href: '/admin/ai-config', label: 'Configuration IA', glyph: SparklesIcon },
 ];
 
 export const adminAllNav: NavItem[] = [...adminPrimaryNav, ...adminSecondaryNav];

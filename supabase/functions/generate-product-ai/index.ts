@@ -76,10 +76,40 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Limite de générations
-    if (product.ai_generation_count >= MAX_GENERATIONS) {
+    // Récupérer la configuration IA depuis la base
+    const { data: aiSettings, error: settingsError } = await supabase
+      .from("ai_settings")
+      .select("gemini_api_key, model, max_generations, is_enabled")
+      .eq("id", 1)
+      .single();
+
+    if (settingsError || !aiSettings) {
       return new Response(
-        JSON.stringify({ error: `Limite de ${MAX_GENERATIONS} générations atteinte pour ce produit` }),
+        JSON.stringify({ error: "Configuration IA non trouvée. Configurez l'IA dans l'admin." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!aiSettings.is_enabled) {
+      return new Response(
+        JSON.stringify({ error: "La génération IA est désactivée. Activez-la dans l'admin." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!aiSettings.gemini_api_key) {
+      return new Response(
+        JSON.stringify({ error: "Clé API Gemini manquante. Configurez-la dans l'admin." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const maxGens = aiSettings.max_generations ?? MAX_GENERATIONS;
+
+    // Limite de générations
+    if (product.ai_generation_count >= maxGens) {
+      return new Response(
+        JSON.stringify({ error: `Limite de ${maxGens} générations atteinte pour ce produit` }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -97,17 +127,12 @@ Description existante : ${product.description || "Aucune description fournie"}
 
 ${productContext}`;
 
-    // Appel à Gemini API
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "Configuration IA manquante (GEMINI_API_KEY)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Appel à Gemini API avec la clé configurée par l'admin
+    const apiKey = aiSettings.gemini_api_key;
+    const model = aiSettings.model || "gemini-1.5-flash";
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -187,7 +212,7 @@ ${productContext}`;
     return new Response(
       JSON.stringify({
         ...aiContent,
-        generations_remaining: MAX_GENERATIONS - (product.ai_generation_count + 1),
+        generations_remaining: maxGens - (product.ai_generation_count + 1),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

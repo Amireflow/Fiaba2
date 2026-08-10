@@ -738,10 +738,10 @@ function Home() {
               </div>
               <h1 className="mt-6 max-w-[650px] font-[var(--app-font-serif)] text-[clamp(3.15rem,7vw,6.5rem)] font-bold leading-[.92] tracking-[-.09em] text-[#27223f]">
                 Votre audience <br />
-                <span className="bg-gradient-to-r from-[#5b49e8] via-[#7d6cf0] to-[#b374e8] bg-clip-text text-transparent">mérite un salaire.</span>
+                <span className="text-[#5b49e8]">mérite un salaire.</span>
               </h1>
-              <p className="mt-6 max-w-lg text-base leading-7 text-[#6b677e]">
-                Fiaba connecte les créateurs de contenu et les boutiques au Sénégal. Obtenez votre lien unique, partagez-le sur WhatsApp et Instagram, et recevez vos commissions directement sur Wave ou Orange Money.
+              <p className="mt-7 max-w-[500px] text-base leading-7 text-[#706c81] sm:text-lg">
+                Fiaba transforme vos recommandations en revenus. Partagez des produits que vous aimez, gagnez à chaque vente sur WhatsApp, Instagram, TikTok. Construit à Dakar, pensé pour les créateurs sénégalais.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {isLoggedIn ? (

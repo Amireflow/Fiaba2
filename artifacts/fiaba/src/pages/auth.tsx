@@ -107,7 +107,7 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
       <div className="w-full max-w-[460px]">
         <div className="mb-6 text-center">
           <Link href={`${basePath || ''}/`} className="inline-flex items-center justify-center text-[#211c42]" data-testid={testId}>
-            <LogoImage light={false} className="h-16 w-auto" />
+            <LogoImage light={false} className="h-28 w-auto" />
           </Link>
           <p className="mt-3 text-xs font-bold uppercase tracking-[.18em] text-[#8b88a0]">{tagline}</p>
         </div>

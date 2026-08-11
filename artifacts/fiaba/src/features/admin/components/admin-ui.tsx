@@ -9,7 +9,7 @@ import { haptic } from '@/lib/utils';
 export function AdminLogo({ light = true }: { light?: boolean }) {
   return (
     <Link href="/admin" className={`flex items-center gap-2.5 ${light ? 'text-white' : 'text-[#211c42]'}`} data-testid="link-admin-logo">
-      <LogoImage light={light} className="h-12 w-auto" />
+      <LogoImage light={light} className="h-20 w-auto" />
       <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[.14em] ${light ? 'bg-white/10 text-[#c1bdd8]' : 'bg-[#efedff] text-[#5b49e8]'}`}>Admin</span>
     </Link>
   );

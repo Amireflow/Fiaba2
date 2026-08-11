@@ -57,8 +57,13 @@ const commissionStatusMap: Record<string, string> = {
 
 const filters: StatusFilter[] = ['Tous', 'a_preparer', 'en_livraison', 'livree', 'annulee'];
 
+// Borne le volume rapatrié : la recherche et les filtres s'appliquent en
+// mémoire, on garde donc un historique récent suffisant sans dégrader le
+// temps de chargement quand le vendeur accumule les ventes.
+const SALES_LIMIT = 200;
+
 export function Sales() {
-  const { profile } = useAuth();
+  const { sellerId } = useAuth();
   const [orders, setOrders] = useState<SellerOrderRow[]>([]);
   const [commissionStatuses, setCommissionStatuses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -67,31 +72,36 @@ export function Sales() {
 
   useEffect(() => {
     async function loadOrders() {
-      if (!profile) {
+      // sellerId est déjà résolu par le contexte d'authentification : inutile
+      // de refaire un aller-retour sur `sellers` à chaque montage.
+      if (!sellerId) {
         setLoading(false);
         return;
       }
 
-      // Get seller
-      const { data: seller } = await supabase
-        .from('sellers')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .single();
-      const sId = (seller as { id: string } | null)?.id;
-      if (!sId) {
-        setLoading(false);
-        return;
-      }
+      // Les commandes et les commissions ne dépendent pas l'une de l'autre :
+      // on les charge en parallèle plutôt qu'en cascade.
+      const [orderRes, commissionRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, customer_name, total_amount, commission_amount, status, created_at')
+          .eq('seller_id', sellerId)
+          .order('created_at', { ascending: false })
+          .limit(SALES_LIMIT),
+        supabase
+          .from('commissions')
+          .select('order_id, status')
+          .eq('seller_id', sellerId)
+          .limit(SALES_LIMIT),
+      ]);
 
-      // Fetch orders attributed to this seller
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('id, customer_name, total_amount, commission_amount, status, created_at')
-        .eq('seller_id', sId)
-        .order('created_at', { ascending: false });
+      const commMap = new Map<string, string>(
+        ((commissionRes.data as { order_id: string; status: string }[] | null) ?? [])
+          .map((c) => [c.order_id, c.status])
+      );
+      setCommissionStatuses(Object.fromEntries(commMap));
 
-      const orderRows = (orderData as Omit<SellerOrderRow, 'product_name' | 'quantity'>[] | null) ?? [];
+      const orderRows = (orderRes.data as Omit<SellerOrderRow, 'product_name' | 'quantity'>[] | null) ?? [];
       if (orderRows.length === 0) {
         setOrders([]);
         setLoading(false);
@@ -109,17 +119,6 @@ export function Sales() {
           .map((i) => [i.order_id, { product_name: i.product_name, quantity: i.quantity }])
       );
 
-      // Fetch commissions for status
-      const { data: commissions } = await supabase
-        .from('commissions')
-        .select('order_id, status')
-        .eq('seller_id', sId);
-      const commMap = new Map<string, string>(
-        ((commissions as { order_id: string; status: string }[] | null) ?? [])
-          .map((c) => [c.order_id, c.status])
-      );
-      setCommissionStatuses(Object.fromEntries(commMap));
-
       setOrders(orderRows.map((o) => ({
         ...o,
         product_name: itemMap.get(o.id)?.product_name ?? null,
@@ -128,7 +127,7 @@ export function Sales() {
       setLoading(false);
     }
     loadOrders();
-  }, [profile]);
+  }, [sellerId]);
 
   // Determine display status: use commission status if available, else order status
   function displayStatus(o: SellerOrderRow): string {

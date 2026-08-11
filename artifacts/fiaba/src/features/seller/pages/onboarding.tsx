@@ -62,14 +62,17 @@ export function SellerOnboarding() {
         .update({ phone, city } as never)
         .eq('id', profile.id);
 
-      // Update seller profile
+      // La ligne seller_profiles n'est créée nulle part ailleurs : un update
+      // simple ne toucherait aucune ligne et perdrait silencieusement les
+      // réponses de l'onboarding. On upsert sur la contrainte unique.
       await supabase
         .from('seller_profiles')
-        .update({
+        .upsert({
+          profile_id: profile.id,
+          display_name: profile.full_name || 'Vendeur Fiaba',
           city,
           audience_type: audienceType || null,
-        } as never)
-        .eq('profile_id', profile.id);
+        } as never, { onConflict: 'profile_id' });
 
       // Fetch niche IDs and insert seller_niches
       const { data: nicheRows } = await supabase

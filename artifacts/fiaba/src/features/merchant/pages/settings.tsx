@@ -38,9 +38,24 @@ export function Settings() {
       setPhone(authProfile.phone || '');
     }
     if (authMerchant) {
-      setName(authMerchant.name || '');
-      setBio(authMerchant.description || '');
-      if (authMerchant.phone) setPhone(authMerchant.phone);
+      const merchant = authMerchant as typeof authMerchant & {
+        notification_preferences?: { orders?: boolean; sellers?: boolean; tips?: boolean } | null;
+        payout_provider?: string | null;
+        payout_number?: string | null;
+      };
+      setName(merchant.name || '');
+      setBio(merchant.description || '');
+      if (merchant.phone) setPhone(merchant.phone);
+      setBankProvider(merchant.payout_provider || 'wave');
+      setBankNumber(merchant.payout_number || '');
+      const prefs = merchant.notification_preferences;
+      if (prefs) {
+        setNotifications({
+          orders: prefs.orders ?? true,
+          sellers: prefs.sellers ?? true,
+          tips: prefs.tips ?? false,
+        });
+      }
     }
   }, [authProfile, authMerchant]);
 
@@ -68,6 +83,9 @@ export function Settings() {
             name: cleanName,
             phone: phone || null,
             description: bio || null,
+            notification_preferences: notifications,
+            payout_provider: bankProvider || null,
+            payout_number: bankNumber || null,
           })
           .eq('id', authMerchant.id);
       }

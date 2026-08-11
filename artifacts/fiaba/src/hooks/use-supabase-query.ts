@@ -21,13 +21,14 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
     select?: string;
     filter?: Record<string, unknown>;
     order?: { column: string; ascending?: boolean };
+    limit?: number;
     enabled?: boolean;
   } = {}
 ) {
   const { profile } = useAuth();
   const enabled = opts.enabled !== false;
 
-  const cacheKey = `${table}:${opts.select ?? '*'}:${JSON.stringify(opts.filter ?? {})}:${opts.order?.column}:${opts.order?.ascending}`;
+  const cacheKey = `${table}:${opts.select ?? '*'}:${JSON.stringify(opts.filter ?? {})}:${opts.order?.column}:${opts.order?.ascending}:${opts.limit ?? ''}`;
   const cached = queryCacheMap.get(cacheKey);
 
   const [data, setData] = useState<T[]>(() => (cached ? (cached.data as T[]) : []));
@@ -59,6 +60,10 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
       query = query.order(opts.order.column, { ascending: opts.order.ascending ?? false });
     }
 
+    if (opts.limit) {
+      query = query.limit(opts.limit);
+    }
+
     const { data: result, error: err } = await query;
     if (err) {
       setError(err.message);
@@ -68,7 +73,7 @@ export function useSupabaseQuery<T = Record<string, unknown>>(
       queryCacheMap.set(cacheKey, { data: freshData, timestamp: Date.now() });
     }
     setLoading(false);
-  }, [table, opts.select, JSON.stringify(opts.filter), opts.order?.column, opts.order?.ascending, enabled, cacheKey]);
+  }, [table, opts.select, JSON.stringify(opts.filter), opts.order?.column, opts.order?.ascending, opts.limit, enabled, cacheKey]);
 
   useEffect(() => {
     const cachedItem = queryCacheMap.get(cacheKey);
@@ -94,6 +99,7 @@ export function useMerchantQuery<T = Record<string, unknown>>(
     select?: string;
     filter?: Record<string, unknown>;
     order?: { column: string; ascending?: boolean };
+    limit?: number;
     enabled?: boolean;
   } = {}
 ) {
@@ -119,6 +125,7 @@ export function useSellerQuery<T = Record<string, unknown>>(
     select?: string;
     filter?: Record<string, unknown>;
     order?: { column: string; ascending?: boolean };
+    limit?: number;
     enabled?: boolean;
   } = {}
 ) {

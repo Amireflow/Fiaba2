@@ -177,6 +177,18 @@ export function Checkout() {
 
   // Load campaign + product + merchant + zones
   useEffect(() => {
+    // Les zones ne sont consultées qu'à l'étape « livraison ». On les charge en
+    // arrière-plan pour ne pas retarder l'affichage de la fiche produit, qui est
+    // le premier écran vu par l'acheteur arrivant depuis un lien social.
+    async function loadZones(merchantId: string) {
+      const { data: zoneData } = await supabase
+        .from('delivery_zones')
+        .select('id, name, fee')
+        .eq('merchant_id', merchantId)
+        .eq('is_active', true);
+      setZones((zoneData as ZoneInfo[] | null) ?? []);
+    }
+
     async function loadData() {
       if (!id) return;
       setLoading(true);
@@ -230,12 +242,7 @@ export function Checkout() {
             merchant_name: formatShopName(c.merchants?.name),
           });
 
-          const { data: zoneData } = await supabase
-            .from('delivery_zones')
-            .select('id, name, fee')
-            .eq('merchant_id', c.merchant_id)
-            .eq('is_active', true);
-          setZones(((zoneData as ZoneInfo[] | null) ?? []));
+          void loadZones(c.merchant_id);
           setLoading(false);
           return;
         }
@@ -267,13 +274,7 @@ export function Checkout() {
             merchant_name: formatShopName(p.merchants?.name),
           });
 
-          // Fetch delivery zones
-          const { data: zoneData } = await supabase
-            .from('delivery_zones')
-            .select('id, name, fee')
-            .eq('merchant_id', p.merchant_id)
-            .eq('is_active', true);
-          setZones(((zoneData as ZoneInfo[] | null) ?? []));
+          void loadZones(p.merchant_id);
         }
         setLoading(false);
         return;
@@ -304,13 +305,7 @@ export function Checkout() {
         merchant_name: formatShopName(c.merchants?.name),
       });
 
-      // Fetch delivery zones for this merchant
-      const { data: zoneData } = await supabase
-        .from('delivery_zones')
-        .select('id, name, fee')
-        .eq('merchant_id', c.merchant_id)
-        .eq('is_active', true);
-      setZones(((zoneData as ZoneInfo[] | null) ?? []));
+      void loadZones(c.merchant_id);
 
       setLoading(false);
     }

@@ -36,7 +36,7 @@ type JoinedCampaign = {
 
 export function SellerCampaigns() {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { sellerId } = useAuth();
   const [campaigns, setCampaigns] = useState<JoinedCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [toLeave, setToLeave] = useState<JoinedCampaign | null>(null);
@@ -44,37 +44,46 @@ export function SellerCampaigns() {
 
   useEffect(() => {
     async function loadCampaigns() {
-      if (!profile) {
+      // sellerId vient du contexte d'authentification : pas de requête dédiée.
+      if (!sellerId) {
         setLoading(false);
         return;
       }
 
-      // Get seller
-      const { data: seller } = await supabase
-        .from('sellers')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .single();
-      const sId = (seller as { id: string } | null)?.id;
-      if (!sId) {
-        setLoading(false);
-        return;
-      }
+      // Ces quatre requêtes ne dépendent que du seller_id : on les exécute
+      // simultanément au lieu de les enchaîner.
+      const [joinedRes, linksRes, commissionsRes, ordersRes] = await Promise.all([
+        supabase
+          .from('campaign_sellers')
+          .select('id, campaign_id, joined_at')
+          .eq('seller_id', sellerId),
+        supabase
+          .from('tracking_links')
+          .select('campaign_id, token, seller_code, clicks')
+          .eq('seller_id', sellerId),
+        supabase
+          .from('commissions')
+          .select('campaign_id, order_id, amount, status')
+          .eq('seller_id', sellerId),
+        supabase
+          .from('orders')
+          .select('id, campaign_id, commission_amount, status')
+          .eq('seller_id', sellerId)
+          .neq('status', 'annulee'),
+      ]);
 
-      // Get joined campaigns
-      const { data: joined } = await supabase
-        .from('campaign_sellers')
-        .select('id, campaign_id, joined_at')
-        .eq('seller_id', sId);
+      const links = linksRes.data;
+      const commissions = commissionsRes.data;
+      const orderList = ordersRes.data;
 
-      const joinedRows = (joined as { id: string; campaign_id: string; joined_at: string }[] | null) ?? [];
+      const joinedRows = (joinedRes.data as { id: string; campaign_id: string; joined_at: string }[] | null) ?? [];
       if (joinedRows.length === 0) {
         setCampaigns([]);
         setLoading(false);
         return;
       }
 
-      // Fetch campaign details
+      // Seule requête réellement dépendante : elle a besoin des campaign_id.
       const campaignIds = joinedRows.map((j) => j.campaign_id);
       const { data: campaignData } = await supabase
         .from('campaigns')
@@ -85,25 +94,6 @@ export function SellerCampaigns() {
           merchants:merchant_id (name)
         `)
         .in('id', campaignIds);
-
-      // Fetch tracking links
-      const { data: links } = await supabase
-        .from('tracking_links')
-        .select('campaign_id, token, seller_code, clicks')
-        .eq('seller_id', sId);
-
-      // Fetch commissions for earnings + sales count
-      const { data: commissions } = await supabase
-        .from('commissions')
-        .select('campaign_id, order_id, amount, status')
-        .eq('seller_id', sId);
-
-      // Fetch orders for fallback sales + earnings count
-      const { data: orderList } = await supabase
-        .from('orders')
-        .select('id, campaign_id, commission_amount, status')
-        .eq('seller_id', sId)
-        .neq('status', 'annulee');
 
       const campaignMap = new Map<string, JoinedCampaign>();
       const linkMap = new Map<string, { token: string; seller_code: string; clicks: number }>(
@@ -175,7 +165,7 @@ export function SellerCampaigns() {
       setLoading(false);
     }
     loadCampaigns();
-  }, [profile]);
+  }, [sellerId]);
 
   function copyLink(c: JoinedCampaign) {
     haptic('light');

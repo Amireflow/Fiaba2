@@ -17,11 +17,24 @@ type OrderRow = {
   seller_id: string | null;
 };
 
-type ProfileRow = { id: string; role: string; verification_status: string };
-type MerchantRow = { id: string; is_active: boolean };
-type SellerRow = { id: string; status: string };
-type DisputeRow = { id: string; status: string };
 type FraudRow = { id: string; signal_type: string; target_user: string | null; detail: string | null; severity: string; status: string; created_at: string };
+
+// Agrégats renvoyés par la RPC admin_platform_stats() : calculés en SQL sur
+// l'intégralité des données, sans rapatrier les tables côté client.
+type PlatformStats = {
+  gmv: number;
+  commission_total: number;
+  platform_fee_total: number;
+  orders_count: number;
+  pending_verifications: number;
+  open_disputes: number;
+  new_fraud: number;
+  active_merchants: number;
+  active_sellers: number;
+  total_merchants: number;
+  total_sellers: number;
+  total_disputes: number;
+};
 
 const statusTone: Record<string, 'mint' | 'amber' | 'rose' | 'violet'> = {
   livree: 'mint',
@@ -52,51 +65,52 @@ const fraudStatusMap: Record<string, string> = {
 
 export function AdminOverview() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [merchants, setMerchants] = useState<MerchantRow[]>([]);
-  const [sellers, setSellers] = useState<SellerRow[]>([]);
-  const [disputes, setDisputes] = useState<DisputeRow[]>([]);
   const [fraudAlerts, setFraudAlerts] = useState<FraudRow[]>([]);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
-      const [ordersRes, profilesRes, merchantsRes, sellersRes, disputesRes, fraudRes] = await Promise.all([
-        supabase.from('orders').select('id, customer_name, total_amount, commission_amount, platform_fee_amount, status, created_at, seller_id').order('created_at', { ascending: false }).limit(10),
-        supabase.from('profiles').select('id, role, verification_status'),
-        supabase.from('merchants').select('id, is_active'),
-        supabase.from('sellers').select('id, status'),
-        supabase.from('disputes').select('id, status'),
+      // Les agrégats viennent de SQL. Les tables profiles/merchants/sellers/
+      // disputes ne sont plus rapatriées en entier : seules les listes
+      // réellement affichées (commandes récentes, alertes) sont chargées.
+      const [statsRes, ordersRes, fraudRes] = await Promise.all([
+        (supabase.rpc as any)('admin_platform_stats'),
+        supabase.from('orders').select('id, customer_name, total_amount, commission_amount, platform_fee_amount, status, created_at, seller_id').order('created_at', { ascending: false }).limit(30),
         supabase.from('fraud_signals').select('id, signal_type, target_user, detail, severity, status, created_at').order('created_at', { ascending: false }).limit(5),
       ]);
 
-      const anyError = ordersRes.error || profilesRes.error || merchantsRes.error || sellersRes.error || disputesRes.error || fraudRes.error;
+      const anyError = ordersRes.error || fraudRes.error;
       if (anyError) {
         console.error('[admin/overview] load error:', anyError);
         setLoadError('Erreur lors du chargement des données. Vérifiez vos permissions.');
       }
 
+      if (statsRes.data) {
+        setStats(statsRes.data as unknown as PlatformStats);
+      } else if (statsRes.error) {
+        // Repli si la migration 0033 n'est pas encore appliquée : les
+        // compteurs restent vides plutôt que d'afficher des chiffres faux.
+        console.warn('[admin/overview] admin_platform_stats indisponible:', statsRes.error.message);
+      }
+
       setOrders((ordersRes.data as OrderRow[] | null) ?? []);
-      setProfiles((profilesRes.data as ProfileRow[] | null) ?? []);
-      setMerchants((merchantsRes.data as MerchantRow[] | null) ?? []);
-      setSellers((sellersRes.data as SellerRow[] | null) ?? []);
-      setDisputes((disputesRes.data as DisputeRow[] | null) ?? []);
       setFraudAlerts((fraudRes.data as FraudRow[] | null) ?? []);
       setLoading(false);
     }
     loadData();
   }, []);
 
-  const isCancelledOrder = (st: string | null | undefined) => !st || st === 'annulee' || st === 'cancelled' || st === 'refunded' || st === 'refusee';
-  const gmv = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : o.total_amount), 0);
-  const commissionTotal = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : (o.commission_amount ?? 0)), 0);
-  const platformFeeTotal = orders.reduce((s, o) => s + (isCancelledOrder(o.status) ? 0 : (o.platform_fee_amount ?? 0)), 0);
-  const pendingVerifications = profiles.filter((p) => p.verification_status === 'pending').length;
-  const openDisputes = disputes.filter((d) => d.status === 'open' || d.status === 'in_review').length;
-  const newFraud = fraudAlerts.filter((f) => f.status === 'new').length;
-  const activeMerchants = merchants.filter((m) => m.is_active).length;
-  const activeSellers = sellers.filter((s) => s.status === 'actif').length;
+  const gmv = stats?.gmv ?? 0;
+  const commissionTotal = stats?.commission_total ?? 0;
+  const platformFeeTotal = stats?.platform_fee_total ?? 0;
+  const pendingVerifications = stats?.pending_verifications ?? 0;
+  const openDisputes = stats?.open_disputes ?? 0;
+  const newFraud = stats?.new_fraud ?? 0;
+  const activeMerchants = stats?.active_merchants ?? 0;
+  const activeSellers = stats?.active_sellers ?? 0;
+  const ordersCount = stats?.orders_count ?? orders.length;
 
   // Build 12-bar chart from last 12 days
   const bars = (() => {
@@ -142,7 +156,7 @@ export function AdminOverview() {
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
         <div className="rounded-[22px] bg-[#5745df] p-5 text-white">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-white/80">GMV (10 dernières commandes)</p>
+            <p className="text-sm text-white/80">GMV total</p>
             <Link href="/admin/orders" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/25" data-testid="link-overview-orders">
               Voir les commandes <Icon glyph={ArrowUpRightIcon} size={13} />
             </Link>
@@ -151,7 +165,7 @@ export function AdminOverview() {
             <span className="font-[Space_Grotesk] text-3xl font-bold tracking-[-.06em] sm:text-4xl">{money(gmv).replace(' F', '')}</span>
             <span className="mb-1 text-sm text-white/70">FCFA</span>
           </div>
-          <div className="mt-3"><AdminBadge tone="mint">{orders.length} commandes récentes</AdminBadge></div>
+          <div className="mt-3"><AdminBadge tone="mint">{ordersCount} commande(s) au total</AdminBadge></div>
           <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-4 text-sm">
             <div>
               <p className="text-white/70">Commissions générées</p>
@@ -186,9 +200,9 @@ export function AdminOverview() {
 
       {/* Stats */}
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AdminStat label="Commerçants actifs" value={String(activeMerchants)} change={`${merchants.length} au total`} glyph={Store01Icon} />
-        <AdminStat label="Vendeurs actifs" value={String(activeSellers)} change={`${sellers.length} au total`} glyph={UserGroupIcon} tone="mint" />
-        <AdminStat label="Litiges ouverts" value={String(openDisputes)} change={`${disputes.length} au total`} glyph={CheckmarkCircle02Icon} tone="amber" />
+        <AdminStat label="Commerçants actifs" value={String(activeMerchants)} change={`${stats?.total_merchants ?? 0} au total`} glyph={Store01Icon} />
+        <AdminStat label="Vendeurs actifs" value={String(activeSellers)} change={`${stats?.total_sellers ?? 0} au total`} glyph={UserGroupIcon} tone="mint" />
+        <AdminStat label="Litiges ouverts" value={String(openDisputes)} change={`${stats?.total_disputes ?? 0} au total`} glyph={CheckmarkCircle02Icon} tone="amber" />
         <AdminStat label="Signaux fraude" value={String(newFraud)} change={`${fraudAlerts.length} récents`} glyph={Wallet01Icon} />
       </div>
 

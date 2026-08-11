@@ -35,6 +35,12 @@ type UserStats = {
   disputes: number;
 };
 
+// La recherche et les filtres de cette page s'appliquent en mémoire : on borne
+// le volume rapatrié pour que le temps de chargement reste stable à mesure que
+// la plateforme grandit. Au-delà, une pagination serveur sera nécessaire.
+const USERS_LIMIT = 500;
+const ORDER_STATS_LIMIT = 2000;
+
 const roleTone = (role: string) => (role === 'marchand' ? 'violet' : role === 'vendeur' ? 'mint' : 'amber');
 const statusTone = (status: string) => (status === 'verified' ? 'mint' : status === 'pending' ? 'amber' : 'rose');
 const getInitials = (name: string) => (name || 'U').split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -50,17 +56,18 @@ export function AdminUsers() {
 
   const roles = ['Tous', 'marchand', 'vendeur', 'admin'] as const;
 
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
 
       // 1. Fetch profiles, sellers, merchants, orders, disputes in parallel
       const [profRes, sellerRes, merchRes, orderRes, disputeRes] = await Promise.all([
-        supabase.from('profiles').select('id, role, full_name, phone, email, city, verification_status, trust_score, created_at').order('created_at', { ascending: false }),
-        supabase.from('sellers').select('id, profile_id, display_name, phone, status'),
-        supabase.from('merchants').select('id, owner_id, name, phone, email'),
-        supabase.from('orders').select('seller_id, merchant_id, total_amount'),
-        supabase.from('disputes').select('opened_by'),
+        supabase.from('profiles').select('id, role, full_name, phone, email, city, verification_status, trust_score, created_at').order('created_at', { ascending: false }).limit(USERS_LIMIT),
+        supabase.from('sellers').select('id, profile_id, display_name, phone, status').limit(USERS_LIMIT),
+        supabase.from('merchants').select('id, owner_id, name, phone, email').limit(USERS_LIMIT),
+        supabase.from('orders').select('seller_id, merchant_id, total_amount').limit(ORDER_STATS_LIMIT),
+        supabase.from('disputes').select('opened_by').limit(ORDER_STATS_LIMIT),
       ]);
 
       const profileRows = (profRes.data as ProfileRow[] | null) ?? [];

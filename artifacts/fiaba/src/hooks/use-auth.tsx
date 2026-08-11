@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
@@ -38,6 +38,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [seller, setSeller] = useState<Seller | null>(null);
   const [loading, setLoading] = useState(true);
+  // Utilisateur dont les données ont déjà été résolues, pour éviter les
+  // rechargements redondants déclenchés par les événements d'authentification.
+  const loadedUserIdRef = useRef<string | null>(null);
 
   const fetchUserData = useCallback(async (userId: string) => {
     try {
@@ -194,28 +197,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    // getSession() et onAuthStateChange (événement INITIAL_SESSION) se
+    // déclenchent tous les deux au démarrage pour le même utilisateur : sans
+    // garde, toute la cascade profil → boutique → vendeur était exécutée deux
+    // fois à chaque chargement de page. On mémorise l'utilisateur déjà résolu
+    // pour ne recharger que lors d'un véritable changement de compte.
+    let cancelled = false;
+
     supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
       setSession(data.session);
-      if (data.session?.user) {
-        fetchUserData(data.session.user.id);
+      const userId = data.session?.user?.id;
+      if (userId) {
+        if (loadedUserIdRef.current !== userId) {
+          loadedUserIdRef.current = userId;
+          fetchUserData(userId);
+        }
       } else {
         setLoading(false);
       }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
-      if (newSession?.user) {
-        fetchUserData(newSession.user.id);
-      } else {
+      const userId = newSession?.user?.id;
+
+      if (!userId) {
+        loadedUserIdRef.current = null;
         setProfile(null);
         setMerchant(null);
         setSeller(null);
         setLoading(false);
+        return;
       }
+
+      // Un simple renouvellement de jeton ne change pas les données du compte.
+      if (event === 'TOKEN_REFRESHED' && loadedUserIdRef.current === userId) return;
+
+      if (loadedUserIdRef.current === userId) return;
+
+      loadedUserIdRef.current = userId;
+      fetchUserData(userId);
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
   }, [fetchUserData]);
 
   const refetchProfile = useCallback(async () => {

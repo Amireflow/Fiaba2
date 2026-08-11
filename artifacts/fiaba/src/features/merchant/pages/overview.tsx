@@ -28,6 +28,10 @@ type CampaignRow = {
   status: string;
 };
 
+// Le tableau de bord agrège en mémoire : on borne le volume rapatrié pour que
+// le temps de chargement reste constant quel que soit l'historique du marchand.
+const DASHBOARD_ORDER_LIMIT = 500;
+
 const statusTone: Record<string, 'mint' | 'amber' | 'rose' | 'violet'> = {
   livree: 'mint',
   a_preparer: 'amber',
@@ -63,15 +67,18 @@ export function Overview() {
           .from('orders')
           .select('id, customer_name, total_amount, merchant_amount, commission_amount, status, created_at')
           .eq('merchant_id', merchantId)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .limit(DASHBOARD_ORDER_LIMIT),
         supabase
           .from('sellers')
           .select('id, status')
-          .eq('merchant_id', merchantId),
+          .eq('merchant_id', merchantId)
+          .limit(500),
         supabase
           .from('campaigns')
           .select('id, name, status')
-          .eq('merchant_id', merchantId),
+          .eq('merchant_id', merchantId)
+          .limit(200),
       ]);
 
       setOrders((orderRes.data as OrderRow[] | null) ?? []);

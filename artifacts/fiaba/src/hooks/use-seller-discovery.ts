@@ -29,6 +29,13 @@ export type DiscoveryCampaign = {
   is_joined: boolean;
 };
 
+// La découverte porte sur tout le catalogue de la plateforme, pas seulement sur
+// une boutique : sans borne, chaque vendeur téléchargerait l'intégralité des
+// campagnes et produits actifs, et la page ralentirait au rythme de la
+// croissance de Fiaba. On rapatrie les plus récents, puis le classement par
+// pertinence s'applique en mémoire.
+const DISCOVERY_LIMIT = 200;
+
 /**
  * Hook qu'exécute les requêtes de découverte en parallèle (Promise.all)
  * pour un chargement ultrarapide du catalogue vendeurs.
@@ -59,14 +66,18 @@ export function useSellerDiscovery() {
             merchants:merchant_id (id, name, slug),
             niches:niche_id (id, name)
           `)
-          .eq('status', 'active'),
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(DISCOVERY_LIMIT),
         supabase
           .from('products')
           .select(`
             id, name, price, image_url, category, description, type, digital_file_url, digital_access_instructions, merchant_id,
             merchants:merchant_id (id, name, slug)
           `)
-          .eq('status', 'actif'),
+          .eq('status', 'actif')
+          .order('created_at', { ascending: false })
+          .limit(DISCOVERY_LIMIT),
         profile?.id
           ? supabase.from('profiles').select('city').eq('id', profile.id).maybeSingle()
           : Promise.resolve({ data: null }),

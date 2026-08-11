@@ -179,7 +179,7 @@ export function Onboarding() {
         {/* Header Logo */}
         <div className="mb-6 text-center">
           <Link href={`${basePath || ''}/`} className="inline-flex items-center justify-center text-[#211c42]">
-            <LogoImage light={false} className="h-11 w-auto" />
+            <LogoImage light={false} className="h-16 w-auto" />
           </Link>
         </div>
 

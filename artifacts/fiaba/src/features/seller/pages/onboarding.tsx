@@ -136,7 +136,7 @@ export function SellerOnboarding() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <span className="inline-flex items-center justify-center text-[#211c42]">
-            <LogoImage light={false} className="h-11 w-auto" />
+            <LogoImage light={false} className="h-16 w-auto" />
           </span>
         </div>
 

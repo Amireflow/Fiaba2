@@ -8,7 +8,7 @@ import { haptic } from '@/lib/utils';
 export function MerchantLogo({ light = true }: { light?: boolean }) {
   return (
     <Link href="/merchant" className={`flex items-center gap-2.5 ${light ? 'text-white' : 'text-[#211c42]'}`} data-testid="link-merchant-logo">
-      <LogoImage light={light} className="h-9 w-auto" />
+      <LogoImage light={light} className="h-12 w-auto" />
     </Link>
   );
 }

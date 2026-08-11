@@ -7,7 +7,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
  */
 export function LogoImage({
   light = false,
-  className = "h-9 w-auto",
+  className = "h-12 w-auto",
   alt = "Fiaba",
 }: {
   light?: boolean;

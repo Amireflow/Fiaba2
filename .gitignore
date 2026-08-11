@@ -9,6 +9,10 @@ out-tsc
 .expo
 .expo-shared
 
+# Exception : le dossier public de l'app fiaba est versionné (logos, images, favicon)
+!artifacts/fiaba/public/
+!artifacts/fiaba/public/**
+
 # dependencies
 node_modules
 

@@ -11,6 +11,7 @@ import {
   Tag01Icon
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
+import { LogoImage } from '@/components/shared/logo-image';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { haptic } from '@/lib/utils';
@@ -91,7 +92,7 @@ export function Onboarding() {
 
       if (activeUserId) {
         // 1. Upsert Profile Location & Role
-        await (supabase.from('profiles') as any).upsert({
+        const { error: profErr } = await (supabase.from('profiles') as any).upsert({
           id: activeUserId,
           email: activeEmail,
           full_name: fullName || profile?.full_name || 'Utilisateur Fiaba',
@@ -100,6 +101,7 @@ export function Onboarding() {
           role: role,
           verification_status: 'verified',
         });
+        if (profErr) throw profErr;
 
         // 2. If Merchant, ensure merchant record exists
         if (role === 'marchand') {
@@ -114,7 +116,7 @@ export function Onboarding() {
           const slugName = cleanStoreName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
           const uniqueSlug = `${slugName}-${activeUserId.slice(0, 6)}-${Date.now().toString(36).slice(-4)}`;
 
-          await (supabase.from('merchants') as any).upsert({
+          const { error: merchErr } = await (supabase.from('merchants') as any).upsert({
             owner_id: activeUserId,
             name: cleanStoreName,
             slug: uniqueSlug,
@@ -123,11 +125,12 @@ export function Onboarding() {
             city: city || 'Dakar',
             is_active: true,
           });
+          if (merchErr) throw merchErr;
         }
 
         // 3. If Seller, ensure seller record exists
         if (role === 'vendeur') {
-          const { data: sellRecord } = await (supabase.from('sellers') as any)
+          const { data: sellRecord, error: sellErr } = await (supabase.from('sellers') as any)
             .upsert({
               profile_id: activeUserId,
               display_name: fullName || profile?.full_name || 'Vendeur Fiaba',
@@ -136,24 +139,23 @@ export function Onboarding() {
             })
             .select()
             .maybeSingle();
+          if (sellErr) throw sellErr;
 
           const sellerId = sellRecord?.id;
           if (sellerId) {
-            await (supabase.from('seller_profiles') as any).upsert({
+            const { error: spErr } = await (supabase.from('seller_profiles') as any).upsert({
               profile_id: activeUserId,
               city: city || 'Dakar',
               audience_type: selectedChannels.join(', '),
             });
+            if (spErr) throw spErr;
           }
         }
         await refetchProfile();
       }
-    } catch (err: any) {
-      console.error('Onboarding save error:', err);
-    } finally {
+
       haptic('success');
       toast({ title: 'Profil configuré !', description: 'Bienvenue sur Fiaba.' });
-      setSubmitting(false);
 
       const targetRole = profile?.role || role;
       if (targetRole === 'marchand') {
@@ -163,6 +165,11 @@ export function Onboarding() {
       } else {
         setLocation('/seller');
       }
+    } catch (err: any) {
+      haptic('error');
+      toast({ title: 'Erreur', description: err?.message || 'Impossible de configurer le profil. Réessayez.' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -171,11 +178,8 @@ export function Onboarding() {
       <div className="w-full max-w-[540px] min-w-0">
         {/* Header Logo */}
         <div className="mb-6 text-center">
-          <Link href={`${basePath || ''}/`} className="inline-flex items-center gap-2 text-[#211c42]">
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#5b49e8] text-white shadow-sm font-[Space_Grotesk] text-xl font-bold">
-              F
-            </span>
-            <span className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.07em]">Fiaba</span>
+          <Link href={`${basePath || ''}/`} className="inline-flex items-center justify-center text-[#211c42]">
+            <LogoImage light={false} className="h-11 w-auto" />
           </Link>
         </div>
 

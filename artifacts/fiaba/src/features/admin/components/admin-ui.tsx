@@ -2,16 +2,14 @@ import { type ReactNode, useEffect } from 'react';
 import { Link } from 'wouter';
 import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
 import { Icon, type IconType } from '@/components/shared/icon';
+import { LogoImage } from '@/components/shared/logo-image';
 import { haptic } from '@/lib/utils';
 
 /* ── AdminLogo (distinguished with a shield mark) ── */
 export function AdminLogo({ light = true }: { light?: boolean }) {
   return (
     <Link href="/admin" className={`flex items-center gap-2.5 ${light ? 'text-white' : 'text-[#211c42]'}`} data-testid="link-admin-logo">
-      <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[#6b58f0] text-white shadow-sm">
-        <span className="font-[Space_Grotesk] text-xl font-bold">F</span>
-      </span>
-      <span className="font-[Space_Grotesk] text-[21px] font-bold tracking-[-.06em]">Fiaba</span>
+      <LogoImage light={light} className="h-9 w-auto" />
       <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[.14em] ${light ? 'bg-white/10 text-[#c1bdd8]' : 'bg-[#efedff] text-[#5b49e8]'}`}>Admin</span>
     </Link>
   );

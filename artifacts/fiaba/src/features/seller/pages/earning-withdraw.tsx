@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import { money } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
-import { useSellerQuery } from '@/hooks/use-supabase-query';
 import { calculatePayoutFee, DEFAULT_PAYOUT_FEE_RULE } from '@/lib/monetization';
 import type { PayoutFeeRule } from '@/types/entities';
 import { trackEvent } from '@/lib/analytics';
@@ -58,14 +57,21 @@ export function EarningWithdraw() {
     loadRule();
   }, []);
 
-  // Fetch commissions available
-  const { data: commissions } = useSellerQuery<{ amount: number; status: string }>('commissions', {
-    select: 'amount, status',
-  });
-
-  const availableBalance = commissions
-    .filter((c: { amount: number; status: string }) => c.status === 'available')
-    .reduce((acc: number, c: { amount: number; status: string }) => acc + c.amount, 0);
+  // Solde disponible calculé côté serveur (déduit les retraits en attente).
+  // On ne peut pas utiliser useSellerQuery car c'est un appel RPC.
+  const [availableBalance, setAvailableBalance] = useState(0);
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    (supabase.rpc as any)('seller_available_balance', { p_seller_id: sellerId })
+      .then(({ data }: { data: number | null }) => {
+        if (!cancelled && typeof data === 'number') setAvailableBalance(data);
+      })
+      .catch((err: unknown) => {
+        console.error('[earning-withdraw] seller_available_balance RPC failed:', err);
+      });
+    return () => { cancelled = true; };
+  }, [sellerId]);
 
   async function requestPayout(e: React.FormEvent) {
     e.preventDefault();
@@ -93,19 +99,19 @@ export function EarningWithdraw() {
     const feeCalc = calculatePayoutFee(amt, payoutRule);
     setSubmitting(true);
 
+    // Le trigger serveur (validate_payout_request) impose le statut, le solde
+    // et le recalcul des frais : on n'envoie ni fee_amount, ni net_amount, ni
+    // status depuis le client.
     const { error } = await (supabase.from('payouts') as any).insert({
       seller_id: sellerId,
       amount: amt,
-      fee_amount: feeCalc.feeAmount,
-      net_amount: feeCalc.netAmount,
       account_type: account,
-      status: 'requested',
     });
 
     setSubmitting(false);
 
     if (error) {
-      toast({ title: 'Erreur de demande', description: error.message });
+      toast({ title: 'Demande refusée', description: error.message });
     } else {
       // Analytics: payout_requested (CDC §25)
       trackEvent('payout_requested', {

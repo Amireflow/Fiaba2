@@ -68,32 +68,46 @@ export function AdminSettings() {
       { key: 'cod_limit', label: 'Plafond COD (FCFA)', value: codLimit, category: 'Frais' },
     ];
 
-    for (const rule of rules) {
-      const existing = settings.find((s) => s.key === rule.key);
-      if (existing) {
-        await (supabase.from('country_settings') as any).update({ value: rule.value } as never).eq('id', existing.id);
-      } else {
-        await (supabase.from('country_settings') as any).insert({
-          key: rule.key,
-          label: rule.label,
-          value: rule.value,
-          category: rule.category,
-          is_active: true,
-        });
+    try {
+      for (const rule of rules) {
+        const existing = settings.find((s) => s.key === rule.key);
+        let op;
+        if (existing) {
+          op = await (supabase.from('country_settings') as any).update({ value: rule.value } as never).eq('id', existing.id);
+        } else {
+          op = await (supabase.from('country_settings') as any).insert({
+            key: rule.key,
+            label: rule.label,
+            value: rule.value,
+            category: rule.category,
+            is_active: true,
+          });
+        }
+        if (op.error) throw op.error;
       }
+
+      // Refresh settings
+      const { data: refreshed, error: refreshErr } = await supabase.from('country_settings').select('id, key, label, value, category, is_active').order('category', { ascending: true }).order('label', { ascending: true });
+      if (refreshErr) throw refreshErr;
+      setSettings((refreshed as SettingRow[] | null) ?? []);
+
+      toast({ title: 'Règles financières enregistrées', description: `Frais ${platformFee}% · sécurité ${safetyPeriod}j · COD ${codLimit} F. Tracé dans l'audit.` });
+    } catch (err: any) {
+      haptic('error');
+      toast({ title: 'Erreur', description: err?.message || 'Impossible d\'enregistrer les règles.' });
+    } finally {
+      setSaving(false);
     }
-
-    // Refresh settings
-    const { data: refreshed } = await supabase.from('country_settings').select('id, key, label, value, category, is_active').order('category', { ascending: true }).order('label', { ascending: true });
-    setSettings((refreshed as SettingRow[] | null) ?? []);
-
-    setSaving(false);
-    toast({ title: 'Règles financières enregistrées', description: `Frais ${platformFee}% · sécurité ${safetyPeriod}j · COD ${codLimit} F. Tracé dans l'audit.` });
   }
 
   async function saveSetting(id: string, value: string) {
     haptic('light');
-    await (supabase.from('country_settings') as any).update({ value } as never).eq('id', id);
+    const { error } = await (supabase.from('country_settings') as any).update({ value } as never).eq('id', id);
+    if (error) {
+      haptic('error');
+      toast({ title: 'Erreur', description: error.message });
+      return;
+    }
     setSettings((prev) => prev.map((s) => (s.id === id ? { ...s, value } : s)));
     toast({ title: 'Paramètre enregistré', description: "La modification est tracée dans le journal d'audit." });
   }

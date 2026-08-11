@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { ArrowRight01Icon, CheckmarkCircle02Icon, SmartPhone01Icon, UserGroupIcon, MapPinIcon } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
+import { LogoImage } from '@/components/shared/logo-image';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
 import { haptic } from '@/lib/utils';
@@ -57,15 +58,16 @@ export function SellerOnboarding() {
 
     try {
       // Update profile
-      await supabase
+      const { error: profErr } = await supabase
         .from('profiles')
         .update({ phone, city } as never)
         .eq('id', profile.id);
+      if (profErr) throw profErr;
 
       // La ligne seller_profiles n'est créée nulle part ailleurs : un update
       // simple ne toucherait aucune ligne et perdrait silencieusement les
       // réponses de l'onboarding. On upsert sur la contrainte unique.
-      await supabase
+      const { error: spErr } = await supabase
         .from('seller_profiles')
         .upsert({
           profile_id: profile.id,
@@ -73,17 +75,19 @@ export function SellerOnboarding() {
           city,
           audience_type: audienceType || null,
         } as never, { onConflict: 'profile_id' });
+      if (spErr) throw spErr;
 
       // Fetch niche IDs and insert seller_niches
-      const { data: nicheRows } = await supabase
+      const { data: nicheRows, error: nicheErr } = await supabase
         .from('niches')
         .select('id, name')
         .in('name', selectedNiches)
         .eq('type', 'category');
+      if (nicheErr) throw nicheErr;
 
       if (nicheRows && nicheRows.length > 0) {
         // Get seller record
-        const { data: seller } = await supabase
+        const { data: seller, error: sellerErr } = await supabase
           .from('sellers')
           .select('id')
           .eq('profile_id', profile.id)
@@ -96,7 +100,10 @@ export function SellerOnboarding() {
             seller_id: sellerId,
             niche_id: n.id,
           }));
-          await supabase.from('seller_niches').upsert(inserts as never);
+          const { error: snErr } = await supabase.from('seller_niches').upsert(inserts as never);
+          if (snErr) throw snErr;
+        } else if (!sellerErr) {
+          // sellerErr est PLSR (plusieurs lignes) — on retombe sur maybeSingle
         }
       }
 
@@ -128,11 +135,8 @@ export function SellerOnboarding() {
       <div className="w-full max-w-[480px]">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <span className="inline-flex items-center gap-2.5 text-[#211c42]">
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#5b49e8] text-white shadow-sm">
-              <span className="font-[Space_Grotesk] text-xl font-bold">F</span>
-            </span>
-            <span className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.07em]">Fiaba</span>
+          <span className="inline-flex items-center justify-center text-[#211c42]">
+            <LogoImage light={false} className="h-11 w-auto" />
           </span>
         </div>
 

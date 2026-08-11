@@ -14,6 +14,7 @@ import {
   ViewOffIcon
 } from '@hugeicons/core-free-icons';
 import { Icon } from '@/components/shared/icon';
+import { LogoImage } from '@/components/shared/logo-image';
 import { haptic, friendlyErrorMessage } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics';
 
@@ -105,11 +106,8 @@ function AuthLayout({ children, tagline, testId }: { children: React.ReactNode; 
     <div className="merchant-grid flex min-h-[100dvh] items-center justify-center bg-[#f8f8fc] px-4 py-10">
       <div className="w-full max-w-[460px]">
         <div className="mb-6 text-center">
-          <Link href={`${basePath || ''}/`} className="inline-flex items-center gap-2.5 text-[#211c42]" data-testid={testId}>
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#5b49e8] text-white shadow-sm font-[Space_Grotesk] text-xl font-bold">
-              F
-            </span>
-            <span className="font-[Space_Grotesk] text-2xl font-bold tracking-[-.07em]">Fiaba</span>
+          <Link href={`${basePath || ''}/`} className="inline-flex items-center justify-center text-[#211c42]" data-testid={testId}>
+            <LogoImage light={false} className="h-11 w-auto" />
           </Link>
           <p className="mt-3 text-xs font-bold uppercase tracking-[.18em] text-[#8b88a0]">{tagline}</p>
         </div>

@@ -39,6 +39,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Icon, type IconType } from "@/components/shared/icon";
+import { LogoImage } from "@/components/shared/logo-image";
 import { haptic } from "@/lib/utils";
 import NotFound from "@/pages/not-found";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
@@ -74,12 +75,7 @@ function Logo({ light = false }: { light?: boolean }) {
       className={`flex items-center gap-2.5 ${light ? "text-white" : "text-[#211c42]"}`}
       data-testid="link-logo"
     >
-      <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[#5b49e8] text-white shadow-sm">
-        {icon(Store01Icon, 20, 2)}
-      </span>
-      <span className="font-[var(--app-font-serif)] text-[21px] font-bold tracking-[-.06em]">
-        Fiaba
-      </span>
+      <LogoImage light={light} className="h-9 w-auto" />
     </a>
   );
 }

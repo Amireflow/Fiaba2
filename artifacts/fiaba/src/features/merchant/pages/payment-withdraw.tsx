@@ -15,19 +15,6 @@ import {
   selectClass,
 } from '../components/merchant-ui';
 
-type OrderRow = {
-  id: string;
-  total_amount: number;
-  merchant_amount: number;
-  status: string;
-};
-
-type PaymentRow = {
-  id: string;
-  amount: number;
-  status: string;
-};
-
 const accounts = [
   { id: 'wave', label: 'Wave' },
   { id: 'orange_money', label: 'Orange Money' },
@@ -50,26 +37,12 @@ export function PaymentWithdraw() {
         setLoading(false);
         return;
       }
-
-      // Fetch delivered orders
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('id, total_amount, merchant_amount, status')
-        .eq('merchant_id', merchantId)
-        .eq('status', 'livree');
-      const orders = (orderData as OrderRow[] | null) ?? [];
-
-      // Fetch paid payments
-      const { data: payData } = await supabase
-        .from('payments')
-        .select('id, amount, status')
-        .eq('merchant_id', merchantId)
-        .eq('status', 'verse');
-      const payments = (payData as PaymentRow[] | null) ?? [];
-
-      const totalRevenue = orders.reduce((s, o) => s + (o.merchant_amount ?? o.total_amount), 0);
-      const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-      setBalance(Math.max(0, totalRevenue - totalPaid));
+      // Solde disponible calculé côté serveur (déduit les versements en attente).
+      const { data, error } = await (supabase.rpc as any)('merchant_available_balance', { p_merchant_id: merchantId });
+      if (error) {
+        console.error('[payment-withdraw] merchant_available_balance RPC failed:', error.message);
+      }
+      setBalance(typeof data === 'number' ? data : 0);
       setLoading(false);
     }
     loadBalance();
@@ -95,18 +68,19 @@ export function PaymentWithdraw() {
     haptic('medium');
     setSubmitting(true);
 
+    // Le trigger serveur (validate_payment_request) impose le statut et le
+    // contrôle de solde : on n'envoie pas status depuis le client.
     const { error } = await (supabase.from('payments') as any).insert({
       merchant_id: merchantId,
       amount: amt,
       method: account,
-      status: 'en_attente',
     });
 
     setSubmitting(false);
 
     if (error) {
       haptic('error');
-      toast({ title: 'Erreur de demande', description: error.message });
+      toast({ title: 'Demande refusée', description: error.message });
     } else {
       toast({
         title: 'Demande envoyée',

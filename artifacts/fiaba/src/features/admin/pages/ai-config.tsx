@@ -129,7 +129,9 @@ export function AdminAiConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AiSettings>({
-    gemini_api_key: '', model: 'gemini-1.5-flash', max_generations: 3, is_enabled: false,
+    // Les modèles Gemini 1.5 sont retirés par Google : l'alias
+    // `gemini-flash-latest` suit la version stable courante.
+    gemini_api_key: '', model: 'gemini-flash-latest', max_generations: 3, is_enabled: false,
   });
   const [showKey, setShowKey] = useState(false);
 

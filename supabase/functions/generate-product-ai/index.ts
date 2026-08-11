@@ -129,7 +129,8 @@ ${productContext}`;
 
     // Appel à Gemini API avec la clé configurée par l'admin
     const apiKey = aiSettings.gemini_api_key;
-    const model = aiSettings.model || "gemini-1.5-flash";
+    // Les modèles Gemini 1.0/1.5 sont retirés par Google et répondent 404.
+    const model = aiSettings.model || "gemini-flash-latest";
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -149,9 +150,25 @@ ${productContext}`;
 
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
-      console.error("Gemini API error:", errText);
+      console.error("Gemini API error:", geminiResponse.status, errText);
+
+      // Remonter la cause réelle : sans cela, un modèle retiré, une clé
+      // invalide ou un quota dépassé produisent tous le même message opaque.
+      let detail = "";
+      try {
+        detail = JSON.parse(errText)?.error?.message ?? "";
+      } catch {
+        detail = errText.slice(0, 300);
+      }
+
+      const hint = geminiResponse.status === 404
+        ? ` Le modèle « ${model} » est introuvable — il est probablement retiré. Choisissez-en un autre dans Admin › Configuration IA.`
+        : geminiResponse.status === 400 || geminiResponse.status === 403
+          ? " Vérifiez la clé API Gemini dans Admin › Configuration IA."
+          : "";
+
       return new Response(
-        JSON.stringify({ error: "Erreur de l'API IA. Veuillez réessayer." }),
+        JSON.stringify({ error: `Erreur de l'API Gemini (${geminiResponse.status}) : ${detail}${hint}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

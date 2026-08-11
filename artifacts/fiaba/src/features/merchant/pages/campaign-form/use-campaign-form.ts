@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { money, haptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { readEdgeFunctionError } from '@/lib/edge-function-error';
 import { useMerchantId, useSupabaseQuery, supabaseInsert, supabaseUpdate, getOrCreateMerchantId } from '@/hooks/use-supabase-query';
 import { emptyForm, type FormState, type ProductOption } from './types';
 
@@ -106,14 +107,16 @@ export function useCampaignForm() {
 
       if (form.productId) {
         setAiGenerating(true);
-        try {
-          const { error: aiError } = await supabase.functions.invoke('generate-product-ai', { body: { product_id: form.productId } });
-          if (aiError) throw aiError;
+        const { error: aiError } = await supabase.functions.invoke('generate-product-ai', { body: { product_id: form.productId } });
+        if (aiError) {
+          // La campagne est bien créée : on l'annonce, mais on remonte la
+          // raison exacte de l'échec IA au lieu de la masquer.
+          const reason = await readEdgeFunctionError(aiError);
+          haptic('success');
+          toast({ title: 'Campagne lancée, page IA non générée', description: reason });
+        } else {
           haptic('success');
           toast({ title: 'Campagne lancée + Page IA générée !', description: `${payload.name} est active. Page de vente IA générée.` });
-        } catch {
-          haptic('success');
-          toast({ title: 'Campagne lancée', description: `${payload.name} est active. La page IA sera générée depuis l'admin.` });
         }
         setAiGenerating(false);
       } else {
@@ -129,14 +132,13 @@ export function useCampaignForm() {
     if (!form.productId || aiGenerating) return;
     setAiGenerating(true);
     haptic('light');
-    try {
-      const { error } = await supabase.functions.invoke('generate-product-ai', { body: { product_id: form.productId } });
-      if (error) throw error;
+    const { error } = await supabase.functions.invoke('generate-product-ai', { body: { product_id: form.productId } });
+    if (error) {
+      haptic('error');
+      toast({ title: 'Génération IA échouée', description: await readEdgeFunctionError(error) });
+    } else {
       haptic('success');
       toast({ title: 'Page IA régénérée !', description: 'La page de vente optimisée a été mise à jour.' });
-    } catch (err: any) {
-      haptic('error');
-      toast({ title: 'Génération IA échouée', description: err?.message || 'Veuillez réessayer.' });
     }
     setAiGenerating(false);
   }, [form.productId, aiGenerating, toast]);
